@@ -30,6 +30,7 @@ nt init ~/notes                    # a notes repository; --clone <url> on a seco
 git -C ~/notes remote add origin git@github.com:<you>/notes.git
 nt install --sync                  # nt sync in the background every 2 minutes
 nt install --nvim                  # the nvim plugin; lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
+echo 'eval "$(nt completion zsh)"' >> ~/.zshrc   # after compinit; bash: nt completion bash
 nt doctor                          # check the setup
 ```
 

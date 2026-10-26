@@ -49,6 +49,7 @@ repository
 
 other
   theme --glamour [dir]   write nt's preview style for glow (glamour-dark.json, glamour-light.json)
+  completion bash|zsh     print a shell completion script; nt completion shows how to install it
   version                 print the version
 `
 
@@ -90,6 +91,10 @@ func Main(args []string) int {
 		return runImage(args[1:])
 	case "_editor":
 		return runEditorHelper(args[1:])
+	case "_complete":
+		return runComplete(args[1:])
+	case "completion":
+		return runCompletion(args[1:])
 	case "view":
 		return runView(args[1:])
 	case "paste":

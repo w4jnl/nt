@@ -118,6 +118,7 @@ Decisions taken with the user (2026-10-26):
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
 | `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
+| `nt completion bash\|zsh` | Print a completion script: commands, flags and their values, and the repository's folders and notes (from the hidden `nt _complete folders\|notes`), as flok's |
 | `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
 
