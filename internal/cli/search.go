@@ -1,9 +1,8 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -15,15 +14,8 @@ import (
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/render"
+	"github.com/w4jnl/nt/internal/search"
 )
-
-// match is one line rg found.
-type match struct {
-	Path  string `json:"path"`
-	Line  int    `json:"line"`
-	Text  string `json:"text"`
-	spans [][2]int
-}
 
 // nt s <query>: search the notes with rg (smart case, markdown files). Exits 1 when nothing
 // matches, as rg and grep do.
@@ -40,22 +32,13 @@ func runSearch(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	if _, err := exec.LookPath("rg"); err != nil {
-		return fail(errors.New("s: ripgrep (rg) is not installed: brew install ripgrep"))
+	matches, err := search.Rg(context.Background(), v.Root, strings.Join(words, " "))
+	if err != nil {
+		return fail(fmt.Errorf("s: %w", err))
 	}
-	cmd := exec.Command("rg", "--json", "--smart-case", "--glob", "*.md", "--glob", "!.nt-tmp-*", "--", strings.Join(words, " "), ".")
-	cmd.Dir = v.Root
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	var ee *exec.ExitError
-	if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 1) {
-		return fail(fmt.Errorf("rg: %s", strings.TrimSpace(stderr.String())))
-	}
-	matches := parseRg(out)
 	if asJSON {
 		if matches == nil {
-			matches = []match{}
+			matches = []search.Match{}
 		}
 		code := printJSON(matches)
 		if code == 0 && len(matches) == 0 {
@@ -84,43 +67,12 @@ func runSearch(args []string) int {
 
 func strconvQuote(s string) string { return strconv.Quote(s) }
 
-// parseRg reads rg --json output: one object per line, the "match" ones carry a path, a line
-// and the byte spans that matched.
-func parseRg(out []byte) []match {
-	var res []match
-	sc := bufio.NewScanner(bytes.NewReader(out))
-	sc.Buffer(make([]byte, 1<<20), 1<<20)
-	for sc.Scan() {
-		var ev struct {
-			Type string `json:"type"`
-			Data struct {
-				Path       struct{ Text string } `json:"path"`
-				Lines      struct{ Text string } `json:"lines"`
-				LineNumber int                   `json:"line_number"`
-				Submatches []struct {
-					Start int `json:"start"`
-					End   int `json:"end"`
-				} `json:"submatches"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(sc.Bytes(), &ev) != nil || ev.Type != "match" {
-			continue
-		}
-		mt := match{Path: strings.TrimPrefix(ev.Data.Path.Text, "./"), Line: ev.Data.LineNumber, Text: strings.TrimRight(ev.Data.Lines.Text, "\r\n")}
-		for _, s := range ev.Data.Submatches {
-			mt.spans = append(mt.spans, [2]int{s.Start, s.End})
-		}
-		res = append(res, mt)
-	}
-	return res
-}
-
 // highlight draws the line with its matches in the hit style, cut to 200 characters.
-func highlight(mt match, text, hit lipgloss.Style) string {
+func highlight(mt search.Match, text, hit lipgloss.Style) string {
 	line := mt.Text
 	var b strings.Builder
 	at := 0
-	for _, sp := range mt.spans {
+	for _, sp := range mt.Spans {
 		if sp[0] < at || sp[1] > len(line) {
 			continue
 		}

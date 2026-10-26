@@ -145,9 +145,15 @@ Decisions taken with the user (2026-10-26):
 | `v` | Open in `glow` |
 | `y` | Copy the path or a md link (OSC 52) |
 | `s` | Sync now |
+| `<` `>` | Narrower / wider list; dragging the divider with the mouse does the same |
 
-- `l`, `o` and `i` are built from the goldmark parse. Glamour has no way to map rendered lines back to the source.
-- Backlinks ("Linked from") come from an in-memory scan, with no persisted index.
+- `l`, `o` and `i` come from `internal/mdparse`, a line scan that skips code and keeps source line numbers. Glamour has no way to map rendered lines back to the source.
+- Backlinks ("Linked from") come from an in-memory scan (`internal/scan`), with no persisted index. Titles for `ctrl-p` come from the same scan, matched by nt's own subsequence scorer.
+- The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
+- While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
+- `i` opens an image with `image_viewer`, else Quick Look, else `xdg-open` on a Linux desktop, else `nt _image` (chafa, full screen) in the terminal.
+- The mouse: dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag selects text in Ghostty and most terminals.
+- Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
 **Deferred:** back stack, image paste, and multiple views.
 
@@ -160,7 +166,7 @@ Decisions taken with the user (2026-10-26):
 | Linux with a desktop (`$DISPLAY` or `$WAYLAND_DISPLAY` set) | `xdg-open` |
 | Linux, headless, or over ssh | `tmux display-popup -E 'chafa … ; read'`. chafa draws with text symbols in any terminal, or uses kitty/sixel where it can. Without tmux, the TUI is suspended and chafa runs full screen. |
 
-**Inline images** (`internal/termimg`, proven in the phase 0 spike). An image that is the whole of a
+**Inline images** (`internal/termimg`, proven in the phase 0 spike). An image alone on a line of a
 top-level paragraph is drawn in the preview, and so is an HTML block holding only one `<img src>`
 (wrapper tags allowed, as in GitHub READMEs); markdown is the form nt writes. An image inside a
 sentence, a list or a table keeps its alt text, and a remote image stays a link because nt fetches

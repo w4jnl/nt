@@ -5,8 +5,8 @@ day, dated topic notes, and a folder where coding agents report what they did, w
 digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the
 way.
 
-nt is in its second phase: the everyday commands and git sync work; the two-pane TUI and agent
-reports come next ([phases](docs/design.md#phases-each-ends-in-something-usable)).
+nt is in its third phase: the everyday commands, git sync and the browser work; agent reports
+come next ([phases](docs/design.md#phases-each-ends-in-something-usable)).
 
 ## Why
 
@@ -34,6 +34,7 @@ nt doctor                          # check the setup
 
 | Command | What it does |
 |---|---|
+| `nt` / `nt <folder>` | the browser: folders and notes on the left, the rendered note on the right, images included; `?` lists the keys |
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "title" [folder]` | a new dated note, linked from today's journal |
@@ -50,7 +51,6 @@ Commands that print data take `--json`.
 
 | Command | What it does |
 |---|---|
-| `nt` | the TUI: folders and notes on the left, the rendered note on the right |
 | `nt agent …` | write agent session reports (used by hooks and by flok), with a daily digest |
 
 ## Docs

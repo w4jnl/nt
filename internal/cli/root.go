@@ -2,13 +2,17 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/term"
+
+	"github.com/w4jnl/nt/internal/config"
 
 	"github.com/w4jnl/nt/internal/render"
 	"github.com/w4jnl/nt/internal/tui"
@@ -25,6 +29,7 @@ const usageText = `nt — plain markdown notes, synced by git
 usage: nt <command>; commands that print data take --json
 
 notes
+  (none) [folder]      the browser: folders and notes on the left, the note on the right; ? lists its keys
   t                    open today's journal in $EDITOR
   a <text>             add a timestamped line to today's journal (or pipe the text in)
   n <title> [folder]   a new dated note in folder, linked from today's journal
@@ -49,8 +54,7 @@ func usage() { fmt.Fprint(os.Stderr, usageText) }
 // Main runs the CLI and returns the exit code.
 func Main(args []string) int {
 	if len(args) == 0 {
-		usage()
-		return 2
+		return runBrowser("")
 	}
 	switch args[0] {
 	case "t", "today":
@@ -79,6 +83,8 @@ func Main(args []string) int {
 		return runImport(args[1:])
 	case "_preview":
 		return runPreview(args[1:])
+	case "_image":
+		return runImage(args[1:])
 	case "view":
 		return runView(args[1:])
 	case "theme":
@@ -93,6 +99,11 @@ func Main(args []string) int {
 	case "help", "-h", "--help":
 		usage()
 		return 0
+	}
+	if len(args) == 1 && !strings.HasPrefix(args[0], "-") {
+		if v, _, err := openVault(); err == nil && isDir(v.Abs(strings.Trim(args[0], "/"))) {
+			return runBrowser(args[0]) // nt <folder>
+		}
 	}
 	fmt.Fprintf(os.Stderr, "nt: unknown command %q\n\n", args[0])
 	usage()
@@ -138,8 +149,47 @@ func runView(args []string) int {
 	if err != nil {
 		return fail(fmt.Errorf("view: %w", err))
 	}
-	o.Path = path
+	o.Path, o.Root = path, ""
+	if v, _, err := openVault(); err == nil && strings.HasPrefix(path, v.Root+string(filepath.Separator)) {
+		o.Root = v.Root
+	} else if wd, err := os.Getwd(); err == nil {
+		o.Root = wd
+	}
 	return report(tui.RunView(o))
+}
+
+// nt, nt <folder>: the browser.
+func runBrowser(folder string) int {
+	v, m, err := openVault()
+	if err != nil {
+		return fail(err)
+	}
+	if !isTerminal(os.Stdout) {
+		return fail(errors.New("the browser needs a terminal; nt help lists the commands"))
+	}
+	bin, _ := os.Executable()
+	return report(tui.RunBrowser(tui.BrowserOptions{
+		Vault: v, Machine: m, Folder: strings.Trim(folder, "/"), Bin: bin,
+		Kick: func() { kickSync(m) }, StateDir: config.StateDir(),
+	}))
+}
+
+// nt _image <file>: a picture in the terminal with chafa, until Enter; the browser's i key on a
+// Linux machine without a desktop.
+func runImage(args []string) int {
+	if len(args) != 1 {
+		return 2
+	}
+	if _, err := exec.LookPath("chafa"); err != nil {
+		fmt.Println("chafa is not installed (apt install chafa); the image is", args[0])
+	} else {
+		c := exec.Command("chafa", args[0])
+		c.Stdout, c.Stderr = os.Stdout, os.Stderr
+		_ = c.Run()
+	}
+	fmt.Print("\npress enter to go back ")
+	_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+	return 0
 }
 
 // notePath finds a note the way the other commands name it: a path from the current directory

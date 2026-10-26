@@ -7,6 +7,7 @@ package render
 import (
 	"bytes"
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"charm.land/glamour/v2"
@@ -102,13 +103,28 @@ type Renderer struct {
 	width, margin int
 }
 
+// base is the fake URL scheme a note's folder is given, so Glamour resolves a relative link
+// like ../tech/x.md against it; the scheme is cut from the output, leaving the repository path
+// tech/x.md. Without a base Glamour resolves against nothing and prints /tech/x.md.
+const base = "ntrepo:///" // no hyphen: Glamour wraps long lines at hyphens
+
 // New returns a renderer that wraps at width columns.
-func New(width int, dark bool) (*Renderer, error) {
+func New(width int, dark bool) (*Renderer, error) { return NewAt(width, dark, "") }
+
+// NewAt is New for a note in folder dir (slash-separated, relative to the repository or the
+// working directory): relative links show as paths from that root.
+func NewAt(width int, dark bool, dir string) (*Renderer, error) {
 	s := Style(dark)
+	if dir = strings.Trim(dir, "/"); dir != "" && dir != "." {
+		dir += "/"
+	} else {
+		dir = ""
+	}
 	tr, err := glamour.NewTermRenderer(
 		glamour.WithStyles(s),
 		glamour.WithWordWrap(width),
 		glamour.WithInlineTableLinks(true),
+		glamour.WithBaseURL(base+dir),
 	)
 	if err != nil {
 		return nil, err
@@ -124,26 +140,50 @@ func New(width int, dark bool) (*Renderer, error) {
 func (r *Renderer) Render(note []byte) (string, error) { return r.RenderImages(note, nil) }
 
 // Title is a note's title (docs/format.md §4): the frontmatter title, then the first "# "
-// heading, then the file name without its extension.
+// heading, then the file name without its extension. A date at the start of a title is left
+// out (the date is shown on its own), and a title that is nothing but a date and time, as
+// templates that copy the file name leave behind, does not count.
 func Title(note []byte, path string) string {
 	front, body := SplitFrontmatter(note)
 	for _, l := range strings.Split(string(front), "\n") {
 		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "title:"); ok {
-			if t := strings.Trim(strings.TrimSpace(v), `"'`); t != "" {
+			if t := undated(strings.Trim(strings.TrimSpace(v), `"'`)); t != "" {
 				return t
 			}
 		}
 	}
 	for _, l := range strings.Split(string(body), "\n") {
 		if t, ok := strings.CutPrefix(l, "# "); ok {
-			return strings.TrimSpace(t)
+			if t := undated(strings.TrimSpace(t)); t != "" {
+				return t
+			}
 		}
 	}
 	base := path[strings.LastIndexAny(path, "/\\")+1:]
 	if i := strings.LastIndexByte(base, '.'); i > 0 {
 		base = base[:i]
 	}
+	if t := undated(base); t != "" {
+		return t
+	}
 	return base
+}
+
+var (
+	leadingDate = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[ _T-]*`)
+	clock       = regexp.MustCompile(`^\d{4,6}$`)
+)
+
+// undated is t without a leading date; "" when nothing but a date or a time is left.
+func undated(t string) string {
+	rest := strings.TrimSpace(leadingDate.ReplaceAllString(t, ""))
+	if rest == t {
+		return t
+	}
+	if rest == "" || clock.MatchString(rest) {
+		return ""
+	}
+	return rest
 }
 
 // SplitFrontmatter separates a leading YAML block ("---" line, YAML, "---" or "..." line) from

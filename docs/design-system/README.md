@@ -117,8 +117,10 @@ t today  [ ] day  a append  n new  / search  ? help
 
 - The brand line: the wordmark `[nt]` at the top left (brackets in `mark`, name in `ink` bold),
   then the folder you are in, then the sync state at the right edge as glyph and word.
-- The list pane: a folder browser. Dated names sort themselves, newest first. The width is
-  `list-ratio` of the screen, at least `list-min` columns.
+- The list pane: a folder browser. Dated names sort themselves, newest first. It is
+  `list-width` columns wide, at least `list-min`. Dragging the `│` divider with the mouse, or
+  `<` `>` (`list-step` columns a press), changes the width; nt remembers it per machine. The
+  divider turns `accent` while it is held.
 - The preview pane: the selected note rendered (see Preview styling), wrapped at no more than
   `preview-max` columns. Under `list-min` + `preview-min` columns the preview hides and Enter
   shows the note full width.
@@ -147,7 +149,7 @@ t today  [ ] day  a append  n new  / search  ? help
   palette drawn from the tokens.
 - Block quotes in `ink-muted` with a `line` rule on the left.
 - Tables use `line` for borders and `ink` for cells; links in tables stay inline.
-- Frontmatter is never rendered. An image alone in its paragraph (`![alt](path)`, or one HTML
+- Frontmatter is never rendered. An image alone on its line (`![alt](path)`, or one HTML
   `<img src>` alone in its block) is drawn in place where the terminal can (Ghostty, kitty, also
   through tmux), indented with the text and never wider than it; elsewhere it shows its alt text. `i` opens images full size in the OS viewer.
 - `nt theme --glamour` writes the same style to `~/.config/nt/glamour-dark.json` and
@@ -202,8 +204,8 @@ t today  [ ] day  a append  n new  / search  ? help
 - Go: `internal/theme` mirrors `tokens.json` as Lip Gloss v2 colours for both themes, plus the
   state glyphs. A test parses `docs/design-system/tokens.json` and fails when the two drift.
   `internal/render` builds the Glamour style from the same values.
-- The terminal tokens (`list-ratio`, `list-min`, `preview-min`, `preview-max`, `gutter`,
-  `selection-bar`) are the layout rules above in numbers.
+- The terminal tokens (`list-width`, `list-step`, `list-min`, `preview-min`, `preview-max`,
+  `gutter`, `selection-bar`) are the layout rules above in numbers.
 - A later Mac or iOS app reads `tokens.json` for its colours and `fonts/` for the brand face,
   and uses `nt-appicon.svg` for its icon. Its UI words use the system face, as vink's web UI
   does.

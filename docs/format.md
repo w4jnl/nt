@@ -83,9 +83,10 @@ Notes use CommonMark plus the GitHub extensions: tables, task lists, strikethrou
 
 `![alt](assets/2026-10-26-iptables.png)`, with the path relative to the note.
 
-Put an image in a paragraph of its own to have it shown as a picture: clients that can draw images
-(nt in Ghostty and kitty) draw it there. An image inside a sentence, a list or a table is shown as
-its alt text. Always write alt text; it is what every other client shows.
+Put an image on a line of its own to have it shown as a picture: clients that can draw images
+(nt in Ghostty and kitty) draw it there, also when text sits on the lines just above or below it.
+An image inside a sentence, a list or a table is shown as its alt text. Always write alt text; it
+is what every other client shows.
 
 Clients write markdown images. They should also draw an HTML `<img src="…">` that is the only
 thing in its block, wrappers like `<p align="center">` or `<a href="…">` included, because

@@ -19,14 +19,17 @@ import (
 // keep Glamour's own rendering (the alt text and the link).
 type Placer func(dest string, width int) (rows []string, ok bool)
 
-// imageBlock is an image that is the whole of a top-level block: a paragraph holding only
-// ![alt](path), or an HTML block holding only one <img src> (wrapper tags like <p align="center">
-// allowed). These are the images the preview draws in place; an image inside a sentence, a list
-// or a table keeps its alt text.
+// imageBlock is an image the preview draws in place: ![alt](path) alone on a line of a
+// top-level paragraph (text above or below it on other lines is fine, as Obsidian draws it), or
+// an HTML block holding only one <img src> (wrapper tags like <p align="center"> allowed). An
+// image inside a sentence, a list or a table keeps its alt text.
 type imageBlock struct {
 	dest, alt  string
-	start, end int // the paragraph's bytes in the body
+	start, end int  // its bytes in the body
+	split      bool // a line inside a paragraph: the marker needs blank lines around it
 }
+
+var lineImage = regexp.MustCompile(`^!\[((?:[^\[\]]|\\[\[\]])*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)$`)
 
 func imageBlocks(body []byte) []imageBlock {
 	doc := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().Parse(text.NewReader(body))
@@ -41,6 +44,18 @@ func imageBlocks(body []byte) []imageBlock {
 		case *ast.Paragraph:
 			if c, ok := b.FirstChild().(*ast.Image); ok && b.ChildCount() == 1 {
 				out = append(out, imageBlock{dest: string(c.Destination), alt: plainText(c, body), start: start, end: end})
+			} else if b.ChildCount() > 1 && hasImage(b) {
+				for i := 0; i < lines.Len(); i++ { // an image alone on one of the paragraph's lines
+					seg := lines.At(i)
+					raw := body[seg.Start:seg.Stop]
+					text := bytes.TrimSpace(raw)
+					m := lineImage.FindSubmatch(text)
+					if m == nil {
+						continue
+					}
+					from := seg.Start + bytes.Index(raw, text)
+					out = append(out, imageBlock{dest: string(m[2]), alt: string(m[1]), start: from, end: from + len(text), split: true})
+				}
 			} else if onlyHTML(b, body) {
 				// inline tags only, like <a href="…"><img src="…"></a>
 				if dest, alt, ok := htmlImage(body[start:end]); ok {
@@ -64,6 +79,15 @@ var (
 	anyTag  = regexp.MustCompile(`(?s)<[^>]*>`)
 	imgAttr = regexp.MustCompile(`(?is)\b(src|alt)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`)
 )
+
+func hasImage(p ast.Node) bool {
+	for c := p.FirstChild(); c != nil; c = c.NextSibling() {
+		if _, ok := c.(*ast.Image); ok {
+			return true
+		}
+	}
+	return false
+}
 
 // onlyHTML reports a paragraph made of inline HTML tags and blanks, nothing else.
 func onlyHTML(p ast.Node, src []byte) bool {
@@ -115,7 +139,8 @@ func plainText(n ast.Node, src []byte) string {
 func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 	_, body := SplitFrontmatter(note)
 	if place == nil {
-		return r.tr.Render(string(body))
+		out, err := r.tr.Render(string(body))
+		return strings.ReplaceAll(out, base, ""), err
 	}
 	width := max(1, r.width-2*r.margin)
 	type drawn struct {
@@ -136,9 +161,13 @@ func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 		marks = append(marks, m)
 		// keep the newlines the block ends with, so it stays a block of its own
 		repl := m.marker + strings.Repeat("\n", len(src[b.start:b.end])-len(bytes.TrimRight(src[b.start:b.end], "\n")))
+		if b.split { // a line out of a paragraph becomes a paragraph of its own
+			repl = "\n" + m.marker + "\n"
+		}
 		src = append(append(append([]byte{}, src[:b.start]...), repl...), src[b.end:]...)
 	}
 	out, err := r.tr.Render(string(src))
+	out = strings.ReplaceAll(out, base, "")
 	if err != nil || len(marks) == 0 {
 		return out, err
 	}

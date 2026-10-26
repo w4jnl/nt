@@ -152,3 +152,61 @@ func TestRenderImagesDrawsHTMLImage(t *testing.T) {
 		t.Errorf("placer asked for %v, want both images", asked)
 	}
 }
+
+func TestRelativeLinksShowAsRepositoryPaths(t *testing.T) {
+	r, err := NewAt(200, true, "daily/2026") // wide: the paths must not wrap
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := r.Render([]byte("[NAS](../../tech/2026-10-26-nas.md) and [yesterday](2026-10-25.md) and [web](https://example.com/x)\n\n" +
+		"[← 2026-10-25](2026-10-25.md) · [2026-10-27 →](2026-10-27.md) · [agents](../../agents/2026/2026-10-26/README.md)\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := xansi.Strip(out)
+	for _, want := range []string{"tech/2026-10-26-nas.md", "daily/2026/2026-10-25.md", "https://example.com/x", "agents/2026/2026-10-26/README.md"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("output lacks %q:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(plain, "ntrepo") || strings.Contains(plain, " /tech") {
+		t.Errorf("the base leaked or the link lost its folder:\n%s", plain)
+	}
+}
+
+func TestTitle(t *testing.T) {
+	for _, tc := range []struct{ note, path, want string }{
+		{"---\ntitle: NAS setup\n---\n# Other\n", "x.md", "NAS setup"},
+		{"# Heading only\n", "x.md", "Heading only"},
+		{"no title\n", "notes/2026-10-26-nas-setup.md", "nas-setup"},
+		{"---\ntitle: 2023-09-08 105704\n---\n## HPC\n", "notes/2023-09-08-hpc-migration.md", "hpc-migration"},
+		{"---\ntitle: 2023-09-08 105704\n---\n# HPC Migration\n", "notes/2023-09-08-hpc-migration.md", "HPC Migration"},
+		{"---\ntitle: 2025-11-05 LDAP SPN\n---\n", "x.md", "LDAP SPN"},
+		{"---\ntitle: Monday 26 October 2026\n---\n", "daily/2026/2026-10-26.md", "Monday 26 October 2026"},
+		{"---\ndate: 2023-04-11\n---\n# Testing\n", "daily/2023/2023-04-11.md", "Testing"},
+		{"plain\n", "daily/2026/2026-10-26.md", "2026-10-26"},
+	} {
+		if got := Title([]byte(tc.note), tc.path); got != tc.want {
+			t.Errorf("Title(%q, %s) = %q, want %q", tc.note, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestImageAloneOnALineOfAParagraph(t *testing.T) {
+	body := []byte("For example:\n![iptables](assets/iptables.png)\nand after it.\n\nText with ![inline](x.png) image.\n")
+	got := imageBlocks(body)
+	if len(got) != 1 || got[0].dest != "assets/iptables.png" || got[0].alt != "iptables" || !got[0].split {
+		t.Fatalf("blocks %+v", got)
+	}
+	r, _ := New(60, true)
+	out, err := r.RenderImages(body, func(dest string, width int) ([]string, bool) { return []string{"ROW-" + dest}, true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := xansi.Strip(out)
+	for _, want := range []string{"For example:", "  ROW-assets/iptables.png\n", "and after it.", "Image: inline"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("output lacks %q:\n%s", want, plain)
+		}
+	}
+}
