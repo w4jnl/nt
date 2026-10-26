@@ -16,6 +16,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/render"
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
@@ -167,11 +168,8 @@ func (m *viewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // edit hands the terminal to $VISUAL or $EDITOR (nvim by default) and reloads the note when the
 // editor exits. Bubble Tea suspends itself for the editor's lifetime.
 func (m *viewer) edit() tea.Cmd {
-	argv := strings.Fields(firstNonEmpty(os.Getenv("VISUAL"), os.Getenv("EDITOR"), "nvim"))
-	if line := m.sourceLine(); line > 0 && isVi(argv[0]) {
-		argv = append(argv, fmt.Sprintf("+%d", line))
-	}
-	c := exec.Command(argv[0], append(argv[1:], m.path)...)
+	argv := editor.Argv(m.path, m.sourceLine())
+	c := exec.Command(argv[0], argv[1:]...)
 	return tea.ExecProcess(c, func(err error) tea.Msg { return editedMsg{err: err} })
 }
 
@@ -188,7 +186,7 @@ func (m *viewer) sourceLine() int {
 
 func (m *viewer) load() {
 	m.raw, m.err = os.ReadFile(m.path)
-	m.title = titleOf(m.raw, m.path)
+	m.title = render.Title(m.raw, m.path)
 }
 
 func (m *viewer) rerender() {
@@ -305,25 +303,6 @@ func joinLR(left, right string, width int) string {
 	return left + strings.Repeat(" ", gap) + right
 }
 
-// titleOf finds the note's title: frontmatter title, then the first "# " heading, then the
-// file name (docs/format.md §4).
-func titleOf(note []byte, path string) string {
-	front, body := render.SplitFrontmatter(note)
-	for _, l := range strings.Split(string(front), "\n") {
-		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "title:"); ok {
-			if t := strings.Trim(strings.TrimSpace(v), `"'`); t != "" {
-				return t
-			}
-		}
-	}
-	for _, l := range strings.Split(string(body), "\n") {
-		if t, ok := strings.CutPrefix(l, "# "); ok {
-			return strings.TrimSpace(t)
-		}
-	}
-	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-}
-
 func shortPath(p string) string {
 	if home, err := os.UserHomeDir(); err == nil {
 		if rel, ok := strings.CutPrefix(p, home+"/"); ok {
@@ -331,21 +310,4 @@ func shortPath(p string) string {
 		}
 	}
 	return p
-}
-
-func isVi(bin string) bool {
-	switch filepath.Base(bin) {
-	case "nvim", "vim", "vi", "hx", "nano", "micro", "kak":
-		return true
-	}
-	return false
-}
-
-func firstNonEmpty(s ...string) string {
-	for _, v := range s {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }

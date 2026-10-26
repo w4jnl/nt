@@ -125,13 +125,14 @@ type: daily
 
 # Monday 26 October 2026
 
-[← 2026-10-25](../2026/2026-10-25.md) · [2026-10-27 →](../2026/2026-10-27.md) · [agents](../../agents/2026/2026-10-26/README.md)
+[← 2026-10-25](2026-10-25.md) · [2026-10-27 →](2026-10-27.md) · [agents](../../agents/2026/2026-10-26/README.md)
 
 ## Log
 
 ## Notes
 ```
 
+- Links are relative to the journal, so across a year they read `../2025/2025-12-31.md`.
 - **Appending** (`nt a`, and anything else that appends to the journal) adds one line, `- HH:MM text`, at the end of the `## Log` section. If the section is missing, it is created at the end of the file.
 - **Creating a topic note** adds `- [Title](relative/path.md)` at the end of `## Notes` in that day's journal.
 - Everything else in the journal is the person's to edit.
@@ -211,6 +212,7 @@ Glyphs: `◐` in-progress, `✓` done, `●` blocked, `◆` failed, `○` abando
 
 - Templates are in `.nt/templates/` and use Go `text/template`. Missing templates fall back to the built-in defaults.
 - Variables: `.Title`, `.Slug`, `.Date` (`2026-10-26`), `.Time` (`14:03`), `.Weekday` (`Monday`), `.Long` (`Monday 26 October 2026`), `.Yesterday`, `.Tomorrow`, `.Folder`, and `.Rel`, a function that returns the relative path from the new note to a repository path.
+- Also `.YesterdayJournal`, `.TomorrowJournal` and `.AgentsDigest` (repository paths, for `.Rel`), and the function `yaml`, which quotes a string for frontmatter: `title: {{yaml .Title}}`.
 - `daily.md` must use only date-derived variables (§5).
 
 ## 9. Configuration

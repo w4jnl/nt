@@ -5,8 +5,8 @@ day, dated topic notes, and a folder where coding agents report what they did, w
 digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the
 way.
 
-nt is in its first phase: the design, the repository format and the design language are written,
-and `nt view` shows a note in nt's style. The commands below the line are the plan.
+nt is in its second phase: the everyday commands and git sync work; the two-pane TUI and agent
+reports come next ([phases](docs/design.md#phases-each-ends-in-something-usable)).
 
 ## Why
 
@@ -22,28 +22,36 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 - **The terminal first.** A two-pane TUI and a plain CLI, both with `--json`; a Mac app and an
   iOS app can follow the same [format](docs/format.md).
 
-## Try it
+## Use it
 
 ```sh
-make build
-./bin/nt view README.md                # e edits in $EDITOR, r reloads, q quits
-./bin/nt view assets/brand/README.md   # images are drawn in Ghostty and kitty, also in tmux
-./bin/nt theme --glamour               # nt's preview style for glow: glow -s ~/.config/nt/glamour-dark.json
+make install                       # nt into ~/.local/bin
+nt init ~/notes                    # a notes repository; --clone <url> on a second machine
+git -C ~/notes remote add origin git@github.com:<you>/notes.git
+nt install --sync                  # nt sync in the background every 2 minutes
+nt doctor                          # check the setup
 ```
-
----
-
-## Planned
 
 | Command | What it does |
 |---|---|
-| `nt` | the TUI: folders and notes on the left, the rendered note on the right |
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "title" [folder]` | a new dated note, linked from today's journal |
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
-| `nt sync` | commit, merge, push; also on a timer |
-| `nt agent …` | write agent session reports (used by hooks and by flok) |
+| `nt ls [folder]` | the folders and notes in a folder, newest first |
+| `nt view <file>` | one note rendered in nt's style, images included; `e` edits it |
+| `nt sync` | commit, merge, push; conflicts never leave markers, the other version is kept beside the note |
+| `nt import obsidian <vault>` | bring an Obsidian vault over once; `--dry-run` shows the plan |
+| `nt theme --glamour` | nt's preview style for glow: `glow -s ~/.config/nt/glamour-dark.json` |
+
+Commands that print data take `--json`.
+
+### Planned
+
+| Command | What it does |
+|---|---|
+| `nt` | the TUI: folders and notes on the left, the rendered note on the right |
+| `nt agent …` | write agent session reports (used by hooks and by flok), with a daily digest |
 
 ## Docs
 

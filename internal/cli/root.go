@@ -22,13 +22,26 @@ const Tagline = "plain markdown notes, synced by git"
 
 const usageText = `nt — plain markdown notes, synced by git
 
-usage: nt <command>
+usage: nt <command>; commands that print data take --json
 
-  view        <file> [--theme auto|dark|light] [--images auto|on|off]: show one note rendered,
-              e to edit it in $EDITOR; images are drawn in Ghostty and kitty, also inside tmux
-  theme       --glamour [dir]: write nt's preview style for glow (glamour-dark.json and
-              glamour-light.json, in ~/.config/nt by default); use it with glow -s <file>
-  version     print the version
+notes
+  t                    open today's journal in $EDITOR
+  a <text>             add a timestamped line to today's journal (or pipe the text in)
+  n <title> [folder]   a new dated note in folder, linked from today's journal
+  f                    find a note with fzf and open it
+  s <query>            search the notes with rg
+  ls [folder]          the folders and notes in a folder, newest first
+  view <file>          show one note rendered [--theme auto|dark|light] [--images auto|on|off]
+
+repository
+  init [folder]        make folder a notes repository; --clone <url> on a second machine
+  sync                 commit, merge and push now
+  install --sync       run nt sync in the background every sync.interval; uninstall --sync stops it
+  doctor               check the repository, git, the sync timer and the tools nt uses
+
+other
+  theme --glamour [dir]   write nt's preview style for glow (glamour-dark.json, glamour-light.json)
+  version                 print the version
 `
 
 func usage() { fmt.Fprint(os.Stderr, usageText) }
@@ -40,6 +53,32 @@ func Main(args []string) int {
 		return 2
 	}
 	switch args[0] {
+	case "t", "today":
+		return runToday(args[1:])
+	case "a", "add":
+		return runAppend(args[1:])
+	case "n", "new":
+		return runNew(args[1:])
+	case "f", "find":
+		return runFind(args[1:])
+	case "s", "search":
+		return runSearch(args[1:])
+	case "ls":
+		return runList(args[1:])
+	case "init":
+		return runInit(args[1:])
+	case "sync":
+		return runSync(args[1:])
+	case "install":
+		return runInstall(args[1:], false)
+	case "uninstall":
+		return runInstall(args[1:], true)
+	case "doctor":
+		return runDoctor(args[1:])
+	case "import":
+		return runImport(args[1:])
+	case "_preview":
+		return runPreview(args[1:])
 	case "view":
 		return runView(args[1:])
 	case "theme":

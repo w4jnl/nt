@@ -110,11 +110,13 @@ Decisions taken with the user (2026-10-26):
 | `nt t` | Open today in `$EDITOR` |
 | `nt a "text"` / `pbpaste \| nt a` | Append a timestamped line to today |
 | `nt n "title" [folder]` | New dated note in the folder, or in `default_folder` |
-| `nt f` | `rg --files \| fzf --preview 'glow …'`, then open the pick in `$EDITOR` |
+| `nt f` | `rg --files \| fzf --preview 'nt _preview {}'` (nt's own style), then open the pick in `$EDITOR` |
 | `nt s <query>` | Search with `rg` |
 | `nt ls <folder>` | List notes in a folder |
 | `nt sync`, `nt doctor` | Sync now; check the setup |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
+| `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
+| `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
 
 **TUI: one screen, two panes.**
@@ -294,6 +296,7 @@ internal/render     glamour: style from tokens, strip frontmatter, rewrite [[x]]
 internal/termimg    kitty graphics: detect, size, send, placeholder rows (inline images)
 internal/tui        two panes, keys, pickers, ExecProcess
 internal/importer   hidden one-shot: Obsidian → nt
+internal/editor     $VISUAL / $EDITOR hand-off with +line, shared by the CLI and the TUI
 assets/brand/ · docs/design-system/ · docs/{research,format}.md · skills/nt/SKILL.md
 scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/ci.yml
 ```
@@ -342,10 +345,11 @@ scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/c
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.
 2. `mv ~/Notes ~/Notes.obsidian`, because of case-insensitive APFS.
-3. `nt init ~/notes`, create the remote with `gh repo create <you>/notes --private`, and set the SSH remote.
-4. `nt import obsidian ~/Notes.obsidian`. Review the report, then sync.
-5. In nvim, remove `obsidian.lua` and `telekasten.lua`, and enable the Marksman LSP.
-6. `nt install --sync`, then `nt doctor`.
+3. `make install`, so the background job runs a stable `~/.local/bin/nt`.
+4. `nt init ~/notes`, create the remote with `gh repo create <you>/notes --private`, and set the SSH remote.
+5. `nt import obsidian ~/Notes.obsidian --dry-run`, review the plan, then run it without `--dry-run` and `nt sync`.
+6. In nvim, remove `obsidian.lua` and `telekasten.lua`, and enable the Marksman LSP.
+7. `nt install --sync`, then `nt doctor`.
 
 ## Verification
 - **Unit tests:**

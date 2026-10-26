@@ -31,7 +31,8 @@ person's notes live in their own repository.
 - Voice in docs, help text and messages: technical, direct, short sentences; no emoji, no
   exclamation marks; `nt` always lowercase. States are lowercase words with their glyph, never
   colour alone. Errors say what is wrong and how to fix it.
-- Tests: table-driven, temp directories and temp git repositories; no mocks of git. End-to-end
+- Tests: table-driven, temp directories and temp git repositories; no mocks of git. `NT_CONFIG`,
+  `NT_STATE` and `NT_REPO` point nt at a test's own machine config, state and repository. End-to-end
   suites in `scripts/e2e/` drive a bare repository and isolated tmux servers (`tmux -L <name>
   -f /dev/null`), in flok's style: poll for a transition, never sleep and assert.
 

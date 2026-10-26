@@ -123,6 +123,29 @@ func New(width int, dark bool) (*Renderer, error) {
 // Render styles a note: frontmatter stripped, the body rendered, images as their alt text.
 func (r *Renderer) Render(note []byte) (string, error) { return r.RenderImages(note, nil) }
 
+// Title is a note's title (docs/format.md §4): the frontmatter title, then the first "# "
+// heading, then the file name without its extension.
+func Title(note []byte, path string) string {
+	front, body := SplitFrontmatter(note)
+	for _, l := range strings.Split(string(front), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "title:"); ok {
+			if t := strings.Trim(strings.TrimSpace(v), `"'`); t != "" {
+				return t
+			}
+		}
+	}
+	for _, l := range strings.Split(string(body), "\n") {
+		if t, ok := strings.CutPrefix(l, "# "); ok {
+			return strings.TrimSpace(t)
+		}
+	}
+	base := path[strings.LastIndexAny(path, "/\\")+1:]
+	if i := strings.LastIndexByte(base, '.'); i > 0 {
+		base = base[:i]
+	}
+	return base
+}
+
 // SplitFrontmatter separates a leading YAML block ("---" line, YAML, "---" or "..." line) from
 // the body. A note without one returns nil and the note unchanged.
 func SplitFrontmatter(note []byte) (front, body []byte) {
