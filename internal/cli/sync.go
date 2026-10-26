@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/gitsync"
@@ -49,7 +51,7 @@ func runSync(args []string) int {
 	}
 	line := statusLine(st, cliPalette(m))
 	if background {
-		fmt.Fprintln(stamped{os.Stdout}, line)
+		fmt.Fprintln(stamped{os.Stdout}, ansi.Strip(line)) // a log file, not a terminal
 	} else {
 		lipgloss.Println(line)
 	}
@@ -152,7 +154,7 @@ func runInstall(args []string, remove bool) int {
 	if err := t.Install(); err != nil {
 		return fail(err)
 	}
-	lipgloss.Println(fmt.Sprintf("installed %s: %s sync every %s (%s)", gitsync.Label, tilde(t.Bin), t.Interval, tilde(t.Path())))
+	lipgloss.Println(fmt.Sprintf("installed %s: %s sync every %s (%s)", gitsync.Label, tilde(t.Bin), short(t.Interval), tilde(t.Path())))
 	return 0
 }
 
@@ -188,4 +190,16 @@ func stableBinary() (string, error) {
 		}
 	}
 	return self, nil
+}
+
+// short writes a duration without empty units: 2m, 90s, 1h30m.
+func short(d time.Duration) string {
+	s := d.String()
+	if strings.HasSuffix(s, "m0s") {
+		s = strings.TrimSuffix(s, "0s")
+	}
+	if strings.HasSuffix(s, "h0m") {
+		s = strings.TrimSuffix(s, "0m")
+	}
+	return s
 }

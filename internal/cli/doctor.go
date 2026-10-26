@@ -134,7 +134,7 @@ func syncChecks(m config.Machine, add func(name, state, format string, a ...any)
 	} else if !t.Loaded() {
 		add("timer", "warn", "not running: nt install --sync")
 	} else {
-		add("timer", "ok", "%s every %s", gitsync.Label, t.Interval)
+		add("timer", "ok", "%s every %s", gitsync.Label, short(t.Interval))
 	}
 	st, ok := gitsync.ReadStatus(config.StateDir())
 	if !ok {
