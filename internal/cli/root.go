@@ -37,6 +37,8 @@ notes
   s <query>            search the notes with rg
   ls [folder]          the folders and notes in a folder, newest first
   view <file>          show one note rendered [--theme auto|dark|light] [--images auto|on|off]
+  paste <note>         save the clipboard's image beside the note and print its markdown line
+                       [--name words]
 
 repository
   init [folder]        make folder a notes repository; --clone <url> on a second machine
@@ -87,6 +89,8 @@ func Main(args []string) int {
 		return runImage(args[1:])
 	case "view":
 		return runView(args[1:])
+	case "paste":
+		return runPaste(args[1:])
 	case "theme":
 		return runTheme(args[1:])
 	case "version", "--version", "-V":

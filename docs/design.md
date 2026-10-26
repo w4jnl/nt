@@ -113,6 +113,7 @@ Decisions taken with the user (2026-10-26):
 | `nt f` | `rg --files \| fzf --preview 'nt _preview {}'` (nt's own style), then open the pick in `$EDITOR` |
 | `nt s <query>` | Search with `rg` |
 | `nt ls <folder>` | List notes in a folder |
+| `nt paste <note> [--name words]` | Save the clipboard's image as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it |
 | `nt sync`, `nt doctor` | Sync now; check the setup |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
@@ -155,7 +156,9 @@ Decisions taken with the user (2026-10-26):
 - The mouse: dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag selects text in Ghostty and most terminals.
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
-**Deferred:** back stack, image paste, and multiple views.
+- `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.
+
+**Deferred:** back stack and multiple views.
 
 ## 5. Images and platforms
 **Image opener.** Configurable as `image_viewer`. The default depends on the OS:

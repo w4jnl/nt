@@ -41,6 +41,7 @@ nt doctor                          # check the setup
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered in nt's style, images included; `e` edits it |
+| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line, for the editor to insert |
 | `nt sync` | commit, merge, push; conflicts never leave markers, the other version is kept beside the note |
 | `nt import obsidian <vault>` | bring an Obsidian vault over once; `--dry-run` shows the plan |
 | `nt theme --glamour` | nt's preview style for glow: `glow -s ~/.config/nt/glamour-dark.json` |

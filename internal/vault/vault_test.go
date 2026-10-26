@@ -289,3 +289,31 @@ func TestOpenAndFormat(t *testing.T) {
 		t.Errorf("template config: %+v %v", w, err)
 	}
 }
+
+func TestSaveAsset(t *testing.T) {
+	v := newVault(t)
+	now := at("2026-10-26 01:30") // before day_starts: still the 25th
+	for _, tc := range []struct {
+		note, name, ext, want string
+	}{
+		{"tech/2026-10-20-nas.md", "", ".png", "tech/assets/2026-10-25-image.png"},
+		{"tech/2026-10-20-nas.md", "", ".png", "tech/assets/2026-10-25-image-2.png"},
+		{"tech/2026-10-20-nas.md", "iptables rules", ".png", "tech/assets/2026-10-25-iptables-rules.png"},
+		{"tech/2026-10-20-nas.md", "Screenshot 2026-10-24 at 10.12.03", ".PNG", "tech/assets/2026-10-25-screenshot-2026-10-24-at-10-12-03.png"},
+		{"tech/2026-10-20-nas.md", "2026-10-24 rack", ".jpeg", "tech/assets/2026-10-24-rack.jpg"},
+		{"daily/2026/2026-10-25.md", "whiteboard", ".png", "daily/2026/assets/2026-10-25-whiteboard.png"},
+		{"README.md", "logo", ".svg", "assets/2026-10-25-logo.svg"},
+	} {
+		got, err := v.SaveAsset(tc.note, tc.name, tc.ext, []byte("data"), now)
+		if err != nil || got != tc.want {
+			t.Errorf("SaveAsset(%q, %q, %q) = %q, %v; want %q", tc.note, tc.name, tc.ext, got, err, tc.want)
+			continue
+		}
+		if read(t, v, got) != "data" {
+			t.Errorf("%s does not hold the data", got)
+		}
+	}
+	if _, err := v.SaveAsset(".nt/templates/note.md", "x", ".png", nil, now); err == nil {
+		t.Error("an attachment was written under .nt")
+	}
+}

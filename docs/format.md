@@ -56,7 +56,7 @@ An empty result is no slug. A slug never contains `--`.
 | Daily journal | `daily/YYYY/YYYY-MM-DD.md` |
 | Topic note | `YYYY-MM-DD-<slug>.md`, in the folder it belongs to |
 | Topic note without a title | `YYYY-MM-DD-HHMMSS.md` |
-| Attachment | `assets/YYYY-MM-DD-<slug>.<ext>` beside the note, where `<slug>` comes from the original file name or `image` |
+| Attachment | `assets/YYYY-MM-DD-<slug>.<ext>` beside the note, where `<slug>` comes from the original file name or `image`; a name that starts with a date keeps it, and a taken name gets `-2`, `-3` |
 | Agent report | `agents/YYYY/YYYY-MM-DD/<host>--<agent>--<project>--<sid8>.md` |
 | Digest | `agents/YYYY/YYYY-MM-DD/README.md` |
 | Conflict copy | `<stem>.conflict-<host>-<YYYYMMDDTHHMMSS><ext>`, beside the original |

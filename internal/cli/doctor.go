@@ -183,5 +183,10 @@ func toolChecks(add func(name, state, format string, a ...any)) {
 		if _, err := exec.LookPath("chafa"); err != nil {
 			add("chafa", "warn", "not installed: images cannot open over ssh (apt install chafa)")
 		}
+		if _, werr := exec.LookPath("wl-paste"); werr != nil {
+			if _, xerr := exec.LookPath("xclip"); xerr != nil {
+				add("clipboard", "warn", "neither wl-paste nor xclip: nt paste cannot read images (apt install wl-clipboard or xclip)")
+			}
+		}
 	}
 }
