@@ -33,6 +33,12 @@ expect_soon "fzf narrows to the typed note" '1/[0-9]+' capture
 S send-keys -t e2e Enter
 expect_soon "nt f opens the pick" "/notes/tech/[0-9-]+-plan-a\.md$" edited
 
+S new-session -d -s e2e -x 100 -y 30 -c "$T" "env NT_CONFIG='$NT_CONFIG' NT_STATE='$NT_STATE' '$BIN' view --theme dark work/$(basename "$T"/notes/work/*-other-topic.md)"
+expect_soon "nt view finds a note by its repository path from anywhere" 'Other topic' capture
+S kill-server
+rc=0; "$BIN" view work/no-such-note.md 2>"$T/err" || rc=$?
+expect "nt view says where it looked" 'no such file here or in' "$(cat "$T/err")"
+
 expect "nt ls --json lists the notes" '"title": "Other topic"' "$("$BIN" ls work --json)"
 expect "nt s --json finds the text" '"path": "tech/[0-9-]+-plan-a.md"' "$("$BIN" s 'Plan A' --json)"
 rc=0; "$BIN" s no-such-words --json >/dev/null || rc=$?

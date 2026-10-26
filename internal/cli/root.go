@@ -134,10 +134,28 @@ func runView(args []string) int {
 	if o.Path == "" {
 		return fail(errors.New("view: name a note, e.g. nt view daily/2026/2026-10-26.md"))
 	}
-	if _, err := os.Stat(o.Path); err != nil {
+	path, err := notePath(o.Path)
+	if err != nil {
 		return fail(fmt.Errorf("view: %w", err))
 	}
+	o.Path = path
 	return report(tui.RunView(o))
+}
+
+// notePath finds a note the way the other commands name it: a path from the current directory
+// when one exists there, else a path inside the notes repository (as nt ls, s and f print them).
+func notePath(p string) (string, error) {
+	if _, err := os.Stat(p); err == nil || filepath.IsAbs(p) {
+		return p, err
+	}
+	v, _, err := openVault()
+	if err != nil {
+		return "", fmt.Errorf("%s: no such file here, and no notes repository to look in", p)
+	}
+	if abs := v.Abs(p); isFile(abs) {
+		return abs, nil
+	}
+	return "", fmt.Errorf("%s: no such file here or in %s", p, tilde(v.Root))
 }
 
 func runTheme(args []string) int {
