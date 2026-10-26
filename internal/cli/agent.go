@@ -1,0 +1,238 @@
+package cli
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"charm.land/lipgloss/v2"
+
+	"github.com/w4jnl/nt/internal/agents"
+	"github.com/w4jnl/nt/internal/config"
+	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/skills"
+)
+
+// nt agent start|turn|end|write.
+func runAgent(args []string) int {
+	if len(args) == 0 {
+		return fail(errors.New("agent: use start, turn, end (hooks) or write"))
+	}
+	switch args[0] {
+	case "start", "turn", "end":
+		return runAgentHook(args[0], args[1:])
+	case "write":
+		return runAgentWrite(args[1:])
+	}
+	return fail(fmt.Errorf("agent: unknown %q: use start, turn, end or write", args[0]))
+}
+
+// nt agent start|turn|end [--agent name]: a hook. It reads the hook's payload on stdin, in
+// Claude Code's or Copilot CLI's shape, and records the event in the session's report. It
+// prints nothing and always exits 0, so a hook never holds up or fails the agent; what goes
+// wrong is written to agent.log in the state folder. The end of a session starts a sync.
+func runAgentHook(kind string, args []string) (code int) {
+	defer func() {
+		if r := recover(); r != nil {
+			agentLog("%s: panic: %v", kind, r)
+			code = 0
+		}
+	}()
+	_, agent, _, _ := takeValue(args, "--agent")
+	var payload []byte
+	if !stdinIsTerminal() {
+		payload, _ = io.ReadAll(io.LimitReader(os.Stdin, 4<<20))
+	}
+	ev, ok, err := agents.ParseEvent(kind, payload, agent)
+	if err != nil {
+		agentLog("%s: %v", kind, err)
+		return 0
+	}
+	if !ok {
+		return 0
+	}
+	v, m, err := openVault()
+	if err != nil {
+		agentLog("%s %s: %v", kind, ev.Session, err)
+		return 0
+	}
+	if _, err := agents.Apply(v, config.StateDir(), ev, v.Now()); err != nil {
+		agentLog("%s %s: %v", kind, ev.Session, err)
+	}
+	if kind == "end" {
+		kickSync(m)
+	}
+	return 0
+}
+
+// agentLog notes a hook's failure in agent.log in the state folder; hooks print nothing.
+func agentLog(format string, a ...any) {
+	dir := config.StateDir()
+	if os.MkdirAll(dir, 0o755) != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "agent.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, a...))
+}
+
+// nt agent write [--session id] [--agent name] [--status s] [--summary text]: the agent's own
+// account of its session, read on stdin as markdown under ## Done, ## Decisions and ## Open.
+// Without --session it fills the latest report whose session started in this folder or one
+// above it; with none, it makes one.
+func runAgentWrite(args []string) int {
+	args, asJSON := takeBool(args, "--json")
+	var sel agents.Selector
+	var status, summary string
+	for _, f := range []struct {
+		name string
+		to   *string
+	}{{"--session", &sel.Session}, {"--agent", &sel.Agent}, {"--status", &status}, {"--summary", &summary}} {
+		var err error
+		if args, *f.to, _, err = takeValue(args, f.name); err != nil {
+			return fail(fmt.Errorf("agent write: %w", err))
+		}
+	}
+	if _, err := positional("agent write", args); err != nil {
+		return fail(err)
+	}
+	var text []byte
+	if !stdinIsTerminal() {
+		var err error
+		if text, err = io.ReadAll(io.LimitReader(os.Stdin, 1<<20)); err != nil {
+			return fail(err)
+		}
+	}
+	if len(strings.TrimSpace(string(text))) == 0 && status == "" && summary == "" {
+		return fail(errors.New("agent write: give the report on stdin (## Done, ## Decisions, ## Open), --status or --summary"))
+	}
+	v, m, err := openVault()
+	if err != nil {
+		return fail(err)
+	}
+	sel.Cwd, _ = os.Getwd()
+	rel, err := agents.Write(v, config.StateDir(), sel, string(text), status, summary, v.Now())
+	if err != nil {
+		return fail(fmt.Errorf("agent write: %w", err))
+	}
+	if asJSON {
+		return printJSON(map[string]any{"path": v.Abs(rel), "rel": rel})
+	}
+	st := cliStyles(m)
+	lipgloss.Println(st.Muted.Render("wrote ") + st.Text.Render(rel))
+	return 0
+}
+
+// nt digest [date] [--json]: write the day's agents/YYYY/YYYY-MM-DD/README.md from its reports
+// and print them. date is YYYY-MM-DD, today or yesterday; the default is today.
+func runDigest(args []string) int {
+	args, asJSON := takeBool(args, "--json")
+	pos, err := positional("digest", args)
+	if err != nil {
+		return fail(err)
+	}
+	v, m, err := openVault()
+	if err != nil {
+		return fail(err)
+	}
+	day := v.Day(v.Now())
+	if len(pos) > 0 {
+		switch pos[0] {
+		case "today":
+		case "yesterday":
+			day = day.AddDate(0, 0, -1)
+		default:
+			if day, err = time.ParseInLocation("2006-01-02", pos[0], time.Local); err != nil {
+				return fail(fmt.Errorf("digest: %q is not a date: use YYYY-MM-DD, today or yesterday", pos[0]))
+			}
+		}
+	}
+	changed, err := agents.Digest(v, day)
+	if err != nil {
+		return fail(err)
+	}
+	lines := agents.Day(v, day)
+	rel := v.AgentsRel(day) + "/README.md"
+	if asJSON {
+		if lines == nil {
+			lines = []agents.Line{}
+		}
+		return printJSON(map[string]any{"path": v.Abs(rel), "rel": rel, "changed": changed, "reports": lines})
+	}
+	st, pal := cliStyles(m), cliPalette(m)
+	if len(lines) == 0 {
+		lipgloss.Println(st.Muted.Render("no agent reports on " + day.Format("Monday 2 January 2006")))
+		return 0
+	}
+	project := "\x00"
+	for _, l := range lines {
+		if l.Project != project {
+			project = l.Project
+			lipgloss.Println(st.Text.Render(project))
+		}
+		s := theme.State(l.Status)
+		mark := lipgloss.NewStyle().Foreground(pal.Color(s)).Render(theme.Glyph(s, 0) + " " + l.Status)
+		lipgloss.Println("  " + mark + st.Muted.Render(" · "+l.Agent+" · "+l.Host+" · ") + st.Text.Render(l.Summary) + st.Faint.Render("  "+l.Rel))
+	}
+	verb := "unchanged"
+	if changed {
+		verb = "wrote"
+	}
+	lipgloss.Println(st.Faint.Render(verb + " " + rel))
+	return 0
+}
+
+// installHooks adds nt agent to Claude Code's settings and writes Copilot CLI's hooks file, or
+// removes both.
+func installHooks(remove bool) error {
+	bin, err := stableBinary()
+	if err != nil {
+		return err
+	}
+	cp, cpp := agents.ClaudeSettingsPath(), agents.CopilotHooksPath()
+	changed, err := agents.ClaudeHooks(cp, bin, remove)
+	if err != nil {
+		return err
+	}
+	copilot, err := agents.CopilotHooks(cpp, bin, remove)
+	if err != nil {
+		return err
+	}
+	switch {
+	case remove:
+		fmt.Printf("removed nt's hooks from %s and %s\n", tilde(cp), tilde(cpp))
+	case changed || copilot:
+		fmt.Printf("hooked %s agent start|turn|end into Claude Code (%s) and Copilot CLI (%s); new sessions get reports\n", tilde(bin), tilde(cp), tilde(cpp))
+	default:
+		fmt.Println("the hooks are in place: " + tilde(cp) + ", " + tilde(cpp))
+	}
+	return nil
+}
+
+// installSkill writes the agent skill and links it for Claude Code and Copilot CLI, or removes it.
+func installSkill(remove bool) error {
+	dir, links := skills.Dir(), skills.Links()
+	if remove {
+		if err := skills.Remove(dir, links); err != nil {
+			return err
+		}
+		fmt.Println("removed the nt skill")
+		return nil
+	}
+	if err := skills.Install(dir, links); err != nil {
+		return err
+	}
+	var at []string
+	for _, l := range links {
+		at = append(at, tilde(l))
+	}
+	fmt.Printf("installed the nt skill in %s, linked from %s\n", tilde(dir), strings.Join(at, " and "))
+	return nil
+}

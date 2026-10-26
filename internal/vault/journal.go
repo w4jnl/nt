@@ -103,6 +103,10 @@ func (v *Vault) render(name, builtin string, d TemplateData) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// YAMLString writes s as a YAML scalar for frontmatter: plain when that reads back as the same
+// string, else double-quoted.
+func YAMLString(s string) string { return yamlString(s) }
+
 // yamlString writes s as a YAML scalar: plain when that reads back as the same string, else
 // double-quoted.
 func yamlString(s string) string {

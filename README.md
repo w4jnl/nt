@@ -30,6 +30,7 @@ nt init ~/notes                    # a notes repository; --clone <url> on a seco
 git -C ~/notes remote add origin git@github.com:<you>/notes.git
 nt install --sync                  # nt sync in the background every 2 minutes
 nt install --nvim                  # the nvim plugin; lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
+nt install --hooks --skill         # agent session reports, and the skill that teaches agents nt
 echo 'eval "$(nt completion zsh)"' >> ~/.zshrc   # after compinit; bash: nt completion bash
 nt doctor                          # check the setup
 ```
@@ -50,11 +51,18 @@ nt doctor                          # check the setup
 
 Commands that print data take `--json`.
 
-### Planned
+### Agents
+
+`nt install --hooks` gives every Claude Code and Copilot CLI session a report in
+`agents/YYYY/YYYY-MM-DD/`: when it started and where, a line per turn, when it ended. `nt install --skill`
+teaches the agents nt, so they add their own Done, Decisions and Open with `nt agent write`. The machine
+with `digest = true` keeps each day's `README.md` digest, which GitHub shows when you open the folder.
 
 | Command | What it does |
 |---|---|
-| `nt agent …` | write agent session reports (used by hooks and by flok), with a daily digest |
+| `nt agent start\|turn\|end` | the hooks: a session's start, each turn, its end, from the hook payload on stdin |
+| `nt agent write` | the agent's own account on stdin, `--status done\|blocked\|failed`, `--summary "…"` |
+| `nt digest [date]` | write and list a day's digest |
 
 ## Docs
 

@@ -18,7 +18,7 @@ Rules are marked **must** or **should**. A client that cannot follow a must rule
 ```
 <repo>/
   .nt/config.toml                 repository settings (§9)
-  .nt/templates/                  daily.md, note.md, report.md (§8)
+  .nt/templates/                  daily.md, note.md (§8)
   .gitattributes                  daily/** merge=union
   .gitignore                      §11
   AGENTS.md                       layout and rules for agents working in the repository
@@ -148,7 +148,8 @@ type: daily
 - **One file per agent session.**
   - The session's process is the only writer: the hook receiver, or the agent through `nt agent`.
   - The path is fixed by the date of the session's first event and never changes. A session that runs past midnight stays in its first day's folder.
-  - A session resumed on a later day starts a new file, which links to the earlier one.
+  - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`).
+  - A writer that finds no report for the session (no hooks, or hooks added mid-session) starts one.
 
 **Frontmatter.** All keys are flat. Times are RFC 3339 with offset.
 
@@ -165,7 +166,7 @@ type: daily
 | `model` | string | optional |
 | `host` | slug | short host name |
 | `session` | string | the agent's full session id |
-| `project` | slug | the repository or directory name of `cwd` |
+| `project` | string | the name of the git repository around `cwd`, else of `cwd`; its slug goes into the file name |
 | `cwd` | path | |
 | `git_branch` | string | optional |
 | `git_head` | string | optional, short hash |
@@ -174,7 +175,8 @@ type: daily
 | `tags` | list | optional |
 | `continues` | path | optional, the report this one resumes |
 
-`status` changes only to a later state. Once `ended` is set, a late event cannot set `in-progress` again.
+- The hooks set `in-progress` at the start. At the end a report still `in-progress` becomes `abandoned` when it never finished a turn, `failed` when the session ended on an error, else `done`; a status the agent wrote stays.
+- Once `ended` is set, nothing sets `in-progress` again; a late turn still adds its log line.
 
 **Body.**
 
@@ -190,7 +192,7 @@ type: daily
 ```
 
 - `## Done`, `## Decisions` and `## Open` belong to the agent: `nt agent write` replaces them.
-- `## Log` is appended to, one line per turn. A line is a single line of at most 200 characters. Secrets and full transcripts do not belong in a report.
+- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text. Secrets and full transcripts do not belong in a report.
 
 ## 7. Digest
 

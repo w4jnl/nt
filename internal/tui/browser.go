@@ -1401,7 +1401,7 @@ func (b *browser) sync() tea.Cmd {
 	b.syncing = true
 	v, dir := b.v, b.o.StateDir
 	run := func() tea.Msg {
-		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify})
+		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify, Digest: b.o.Machine.Digest})
 		_ = gitsync.WriteStatus(dir, st)
 		return syncedMsg{st}
 	}

@@ -12,13 +12,23 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/w4jnl/nt/internal/agents"
 	"github.com/w4jnl/nt/internal/vault"
 )
+
+// digestPath is a day's agent digest, inside the agents folder.
+var digestPath = regexp.MustCompile(`^\d{4}/\d{4}-\d{2}-\d{2}/README\.md$`)
+
+func (r *run) isDigest(p string) bool {
+	rest, ok := strings.CutPrefix(p, r.v.Cfg.Folders.Agents+"/")
+	return ok && digestPath.MatchString(rest)
+}
 
 // MaxFile is the largest file sync commits; larger ones are reported instead.
 const MaxFile = 20 << 20
@@ -29,6 +39,7 @@ type Options struct {
 	Notify func(msg string) // tells the person about new conflict copies; nil: nobody
 	Log    io.Writer        // progress, one line per step; nil: discard
 	Retry  time.Duration    // base pause before retrying a rejected push; 0: 1 s
+	Digest bool             // this machine writes the agent digests (digest = true)
 }
 
 // Status is the outcome of a run, written to status.json for doctor, the TUI and flok.
@@ -118,6 +129,15 @@ func (r *run) cycle() error {
 	}
 	if err := r.locked(r.recover); err != nil {
 		return err
+	}
+	if r.o.Digest { // before the commit, so a day's digest goes out with its reports
+		days, err := agents.Refresh(r.v)
+		if err != nil {
+			return err
+		}
+		for _, d := range days {
+			r.logf("digest: %s", d)
+		}
 	}
 	if err := r.locked(r.commit); err != nil {
 		return err
@@ -369,6 +389,14 @@ func (r *run) resolve(unmerged map[string]map[int]string) error {
 		st := unmerged[p]
 		ours, theirs := st[2], st[3]
 		switch {
+		case ours != "" && theirs != "" && r.isDigest(p):
+			// a digest is made from its reports: take either, the digest machine writes it anew
+			if _, err := r.g.run("checkout", "--theirs", "--", p); err != nil {
+				return err
+			}
+			if _, err := r.g.run("add", "--", p); err != nil {
+				return err
+			}
 		case ours != "" && theirs != "":
 			local, err := r.g.bytes("cat-file", "blob", ours)
 			if err != nil {

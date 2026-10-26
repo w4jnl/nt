@@ -42,7 +42,7 @@ person's notes live in their own repository.
   asking. Simplicity is the main requirement.
 - Never commit an index, a cache or UI state into a notes repository.
 - Never make outbound network calls other than git and ssh to the configured remotes and hosts.
-- Before calling a task done: `gofmt -l ./cmd ./internal` is empty, `make vet` and `make test` pass.
+- Before calling a task done: `gofmt -l ./cmd ./internal ./skills` is empty, `make vet` and `make test` pass.
 
 ## Commands
 - `make build`: `bin/nt` with the version stamped from git.

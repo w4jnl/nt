@@ -49,6 +49,8 @@ c nt paste --name shot t
 c nt install --
 c nt completion ""
 c nt import ""
+c nt agent ""
+c nt agent write --status b
 `
 	out, err := exec.Command("bash", "-c", probe).CombinedOutput()
 	if err != nil {
@@ -64,9 +66,11 @@ c nt import ""
 		"auto dark light",
 		"tech/2026-10-20-nas.md", // the flag's value is not an argument
 		"tech/2026-10-20-nas.md",
-		"--sync --nvim",
+		"--sync --nvim --hooks --skill",
 		"bash zsh",
 		"obsidian",
+		"start turn end write",
+		"blocked",
 	}
 	got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(got) != len(want) {

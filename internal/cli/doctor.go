@@ -11,12 +11,14 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/w4jnl/nt/internal/agents"
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/gitsync"
 	"github.com/w4jnl/nt/internal/nvim"
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/skills"
 )
 
 // check is one line of nt doctor: ok, warn (works, but something is missing) or fail (nt will
@@ -120,10 +122,11 @@ func gitChecks(root string, add func(name, state, format string, a ...any)) {
 	}
 	attrs, _ := os.ReadFile(filepath.Join(root, ".gitattributes"))
 	ignore, _ := os.ReadFile(filepath.Join(root, ".gitignore"))
-	if !strings.Contains(string(attrs), "merge=union") || !strings.Contains(string(ignore), ".nt-tmp-*") {
-		add("files", "warn", ".gitattributes or .gitignore lacks nt's lines: nt init %s adds them", tilde(root))
+	_, agentsErr := os.Stat(filepath.Join(root, "AGENTS.md"))
+	if !strings.Contains(string(attrs), "merge=union") || !strings.Contains(string(ignore), ".nt-tmp-*") || agentsErr != nil {
+		add("files", "warn", "AGENTS.md, .gitattributes or .gitignore is missing nt's part: nt init %s adds it", tilde(root))
 	} else {
-		add("files", "ok", ".gitattributes and .gitignore")
+		add("files", "ok", "AGENTS.md, .gitattributes and .gitignore")
 	}
 }
 
@@ -169,6 +172,19 @@ func toolChecks(add func(name, state, format string, a ...any)) {
 		add("editor", "fail", "%s is not on PATH: set $EDITOR", ed)
 	} else {
 		add("editor", "ok", "%s", ed)
+	}
+	switch ev := agents.ClaudeHooked(agents.ClaudeSettingsPath()); {
+	case len(ev) == len(agents.Kinds):
+		add("hooks", "ok", "Claude Code sessions get reports (%s)", tilde(agents.ClaudeSettingsPath()))
+	case len(ev) > 0:
+		add("hooks", "warn", "only %s hooked in %s: nt install --hooks", strings.Join(ev, ", "), tilde(agents.ClaudeSettingsPath()))
+	default:
+		add("hooks", "warn", "agent sessions get no reports: nt install --hooks")
+	}
+	if s := skills.State(skills.Dir(), skills.Links()); s == "" {
+		add("skill", "ok", "%s", tilde(skills.Dir()))
+	} else {
+		add("skill", "warn", "%s: nt install --skill", s)
 	}
 	if _, err := exec.LookPath("nvim"); err == nil {
 		switch present, current := nvim.Installed(nvim.Dir()); {

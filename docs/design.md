@@ -22,7 +22,7 @@ Decisions taken with the user (2026-10-26):
 ~/notes/      (default; after archiving ~/Notes → ~/Notes.obsidian, see Cutover)
   AGENTS.md                         layout + frontmatter rules for any agent in the repo
   .nt/config.toml                   committed: pins (1-9), default_folder, day_starts, templates
-  .nt/templates/{daily,note,report}.md   Go text/template: .Title .Date .Time .Weekday .Yesterday .Tomorrow
+  .nt/templates/{daily,note}.md   Go text/template: .Title .Date .Time .Weekday .Yesterday .Tomorrow
   .gitattributes                    daily/** merge=union
   .gitignore                        .nt-tmp-*  *~  4913  .*.sw?  .DS_Store  .obsidian/
   daily/2026/2026-10-26.md          journal (deterministic template → identical creations merge cleanly)
@@ -80,26 +80,29 @@ Decisions taken with the user (2026-10-26):
 
 ## 3. Agents (the contract for flok)
 
-**`nt agent start|turn|end`.** Reads a hook payload on stdin, in either the Claude (snake_case) or Copilot (camelCase) shape.
-- Fast and deterministic; always exits 0.
+**`nt agent start|turn|end`** (`internal/agents`). Reads a hook payload on stdin, in either the Claude (snake_case) or Copilot (camelCase) shape.
+- Fast and deterministic; always exits 0 and prints nothing. Failures go to `agent.log` in the state folder.
+- Claude Code: `SessionStart` → start, `Stop` → turn, `SessionEnd` → end; a subagent's events (`agent_id`) are skipped. Copilot CLI: `sessionStart`, `agentStop`, `sessionEnd`, with `--agent copilot-cli` because its payloads do not name the agent.
+- The hooks run in order, not in the background (`async`): each takes milliseconds, and a session's events then reach its report in the order they happened. Every write is under the repository lock.
 - The report path is fixed by the date of the session's **first** event. A `sid → path` map lives in the state dir, so sessions that cross midnight stay in one file.
 - `turn` updates `updated` (the max) and adds one `## Log` line of at most 200 characters, taken from `last_assistant_message`.
-- `end` sets `ended`, which is final. A late async Stop can't flip the status back.
+- `end` sets `ended`, which is final, the final `git_head`, and a status from the outcome (docs/format.md §6). A late Stop can't flip the status back. It also starts a sync, so the report goes out at once.
 
-**`nt agent write --session ID`.** The agent's own rich report (Done / Decisions / Open), read from stdin.
+**`nt agent write [--status s] [--summary text] [--session ID]`.** The agent's own rich report (Done / Decisions / Open), read from stdin. Without `--session` it fills the latest report whose session started in the working folder or one above it; with none, it starts one, so an agent without hooks can report too.
 
 **`nt digest [date]`.**
 - Builds the day's `README.md` from the reports' frontmatter, grouped by project: status, summary, link.
 - Output is deterministic and the file is written only when the bytes differ, so it causes no commit churn.
-- Sync runs it for days whose reports changed. Only the Mac does this, so it has one writer.
+- Sync runs it before each commit for every day whose folder or reports are newer than its digest. Only the machine with `digest = true` does this, so it has one writer. When both sides changed a digest, sync takes the remote one without a conflict copy and the next run rebuilds it.
+- `nt digest [date] [--json]` writes it by hand and lists the day's reports.
 
 **`skills/nt/SKILL.md`.**
-- Symlinked into `~/.claude/skills` and `~/.agents/skills`, so it works in Claude Code and Copilot CLI alike.
+- Carried in the binary; `nt install --skill` writes it to `~/.local/share/nt/skills/nt` and symlinks that from `~/.claude/skills/nt` and `~/.agents/skills/nt`, so it works in Claude Code and Copilot CLI alike and always matches the installed `nt`.
 - Covers search, read, `nt a`, and `nt agent write`.
 - Every command takes `--json`.
-- The notes repo also gets an `AGENTS.md`.
+- The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
-**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's, reusing the approach in `flok/internal/install`.
+**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill.
 
 ## 4. CLI and TUI (simplicity first)
 
@@ -118,6 +121,9 @@ Decisions taken with the user (2026-10-26):
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
 | `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
+| `nt install --hooks`, `--skill` | Agent hooks for Claude Code and Copilot CLI; the agent skill (§3) |
+| `nt agent start\|turn\|end`, `nt agent write` | Agent session reports (§3) |
+| `nt digest [date]` | Write and list a day's agent digest (§3) |
 | `nt completion bash\|zsh` | Print a completion script: commands, flags and their values, and the repository's folders and notes (from the hidden `nt _complete folders\|notes`), as flok's |
 | `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
@@ -313,7 +319,8 @@ internal/mdparse    title, links, images, headings (goldmark); wikilink read sup
 internal/scan       in-memory backlinks/titles (no persisted index)
 internal/search     rg --json wrapper, fuzzy titles
 internal/gitsync    cycle above, conflict resolver, status.json, launchd/systemd unit install, notify
-internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest
+internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest, hook installers
+skills/             skills/nt/SKILL.md, embedded; nt install --skill
 internal/theme      tokens → lipgloss v2 styles, state glyphs; termtheme (OSC 11) ported from flok
 internal/render     glamour: style from tokens, strip frontmatter, rewrite [[x]] → links, width
 internal/termimg    kitty graphics: detect, size, send, placeholder rows (inline images)

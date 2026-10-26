@@ -29,7 +29,7 @@ func runSync(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	o := gitsync.Options{Wait: !background}
+	o := gitsync.Options{Wait: !background, Digest: m.Digest}
 	if background {
 		o.Log, o.Notify = stamped{os.Stdout}, gitsync.Notify
 	} else if !asJSON {
@@ -124,23 +124,36 @@ func plural(n int, what string) string {
 	return fmt.Sprintf("%d %ss", n, what)
 }
 
-// nt install --sync: start the background sync timer; nt uninstall --sync stops it.
+// nt install --sync|--nvim|--hooks|--skill: the background sync timer, the nvim plugin, the
+// agent hooks and the agent skill; nt uninstall takes the same flags and removes them.
 func runInstall(args []string, remove bool) int {
 	args, sync := takeBool(args, "--sync")
 	args, withNvim := takeBool(args, "--nvim")
+	args, hooks := takeBool(args, "--hooks")
+	args, skill := takeBool(args, "--skill")
 	if _, err := positional("install", args); err != nil {
 		return fail(err)
 	}
-	if !sync && !withNvim {
-		return fail(errors.New("install: use nt install --sync or --nvim (and nt uninstall the same)"))
+	if !sync && !withNvim && !hooks && !skill {
+		return fail(errors.New("install: use --sync, --nvim, --hooks or --skill (nt uninstall takes the same)"))
 	}
 	if withNvim {
 		if err := installNvim(remove); err != nil {
 			return fail(fmt.Errorf("install: nvim plugin: %w", err))
 		}
-		if !sync {
-			return 0
+	}
+	if hooks {
+		if err := installHooks(remove); err != nil {
+			return fail(fmt.Errorf("install: hooks: %w", err))
 		}
+	}
+	if skill {
+		if err := installSkill(remove); err != nil {
+			return fail(fmt.Errorf("install: skill: %w", err))
+		}
+	}
+	if !sync {
+		return 0
 	}
 	m, err := config.LoadMachine()
 	if err != nil {

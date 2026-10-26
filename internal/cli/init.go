@@ -110,16 +110,47 @@ func written2(w []string) string {
 	return " · wrote " + strings.Join(w, ", ")
 }
 
+// agentsGuide is the repository's AGENTS.md: how an agent working in the notes repository finds
+// its way and writes to it. It is the person's file once written.
+const agentsGuide = `# Notes
+
+Plain markdown notes kept by nt (github.com/w4jnl/nt) and synced by git. This file is for an
+agent working in this repository.
+
+## Layout
+
+- ` + "`daily/YYYY/YYYY-MM-DD.md`" + `: one journal per day. Add to it with ` + "`nt a \"text\"`" + `.
+- ` + "`agents/YYYY/YYYY-MM-DD/`" + `: agent session reports, one file per session, and the day's
+  ` + "`README.md`" + `, which is generated from them: do not edit it.
+- Every other folder holds topic notes named ` + "`YYYY-MM-DD-<slug>.md`" + `, with attachments in an
+  ` + "`assets/`" + ` folder beside them.
+
+## Rules
+
+- Do not run git here. ` + "`nt sync`" + ` is the only git writer; it runs on a timer.
+- Write with nt where it can: ` + "`nt a`, `nt n \"Title\" folder`, `nt paste`, `nt agent write`" + `. It takes
+  the repository lock and writes atomically.
+- GitHub-flavoured markdown only: ` + "`[Title](relative/path.md)`" + ` links, ` + "`![alt](assets/x.png)`" + `
+  images, flat YAML frontmatter (` + "`title`, `date`, `tags`" + `). No wikilinks, embeds or callouts.
+- Your session's report: ` + "`nt agent write --status done --summary \"one line\"`" + ` with ` + "`## Done`" + `,
+  ` + "`## Decisions` and `## Open`" + ` on stdin. No secrets and no transcripts: this repository is
+  pushed to GitHub.
+- Find things with ` + "`nt s \"words\" --json` and `nt ls folder --json`" + `.
+
+The full format is docs/format.md in github.com/w4jnl/nt.
+`
+
 // ensureRepoFiles writes .nt/config.toml when missing and adds missing lines to .gitignore and
 // .gitattributes, keeping what is there. It returns the files it changed.
 func ensureRepoFiles(dir string) ([]string, error) {
 	var written []string
-	cfg := filepath.Join(dir, ".nt", "config.toml")
-	if !isFile(cfg) {
-		if err := vault.WriteFile(cfg, []byte(config.RepoTemplate)); err != nil {
-			return nil, err
+	for _, f := range []struct{ name, text string }{{".nt/config.toml", config.RepoTemplate}, {"AGENTS.md", agentsGuide}} {
+		if p := filepath.Join(dir, filepath.FromSlash(f.name)); !isFile(p) {
+			if err := vault.WriteFile(p, []byte(f.text)); err != nil {
+				return nil, err
+			}
+			written = append(written, f.name)
 		}
-		written = append(written, ".nt/config.toml")
 	}
 	for _, f := range []struct {
 		name  string

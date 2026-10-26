@@ -40,11 +40,17 @@ notes
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
 
+agents
+  agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin)
+  agent write             the agent's own Done, Decisions and Open on stdin [--status s] [--summary text]
+  digest [date]           write the day's agents/…/README.md from its reports and list them
+
 repository
   init [folder]        make folder a notes repository; --clone <url> on a second machine
   sync                 commit, merge and push now
   install --sync       run nt sync in the background every sync.interval; uninstall --sync stops it
   install --nvim       nt's nvim plugin: paste images, no merge under unsaved notes, sync on exit
+  install --hooks      report Claude Code and Copilot CLI sessions; --skill: teach them nt
   doctor               check the repository, git, the sync timer and the tools nt uses
 
 other
@@ -101,6 +107,10 @@ func Main(args []string) int {
 		return runPaste(args[1:])
 	case "theme":
 		return runTheme(args[1:])
+	case "agent":
+		return runAgent(args[1:])
+	case "digest":
+		return runDigest(args[1:])
 	case "version", "--version", "-V":
 		if stdoutIsTerminal() { // the lockup for people; "nt X.Y.Z" for scripts and the brew test
 			fmt.Println(Lockup(Version))

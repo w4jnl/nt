@@ -22,7 +22,7 @@ vet:
 	go vet ./...
 
 fmt:
-	gofmt -w ./cmd ./internal
+	gofmt -w ./cmd ./internal ./skills
 
 # The brand SVGs and render pages come from one geometry (assets/brand/gen.py, needs fontTools
 # and brotli); render-hero.sh turns them into the PNGs (headless Chrome, rsvg-convert).
