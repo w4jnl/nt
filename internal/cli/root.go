@@ -44,6 +44,7 @@ repository
   init [folder]        make folder a notes repository; --clone <url> on a second machine
   sync                 commit, merge and push now
   install --sync       run nt sync in the background every sync.interval; uninstall --sync stops it
+  install --nvim       nt's nvim plugin: paste images, no merge under unsaved notes, sync on exit
   doctor               check the repository, git, the sync timer and the tools nt uses
 
 other
@@ -87,6 +88,8 @@ func Main(args []string) int {
 		return runPreview(args[1:])
 	case "_image":
 		return runImage(args[1:])
+	case "_editor":
+		return runEditorHelper(args[1:])
 	case "view":
 		return runView(args[1:])
 	case "paste":

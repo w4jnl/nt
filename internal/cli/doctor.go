@@ -14,6 +14,7 @@ import (
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/gitsync"
+	"github.com/w4jnl/nt/internal/nvim"
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
 )
@@ -83,7 +84,7 @@ func runDoctor(args []string) int {
 	for _, c := range checks {
 		s := map[string]theme.State{"ok": theme.Done, "warn": theme.Blocked, "fail": theme.Failed}[c.State]
 		mark := lipgloss.NewStyle().Foreground(pal.Color(s)).Render(fmt.Sprintf("%s %-4s", theme.Glyph(s, 0), c.State))
-		lipgloss.Println(mark + "  " + st.Text.Render(fmt.Sprintf("%-11s", c.Check)) + st.Muted.Render(c.Detail))
+		lipgloss.Println(mark + "  " + st.Text.Render(fmt.Sprintf("%-12s", c.Check)) + st.Muted.Render(c.Detail))
 	}
 	if failed {
 		return 1
@@ -168,6 +169,16 @@ func toolChecks(add func(name, state, format string, a ...any)) {
 		add("editor", "fail", "%s is not on PATH: set $EDITOR", ed)
 	} else {
 		add("editor", "ok", "%s", ed)
+	}
+	if _, err := exec.LookPath("nvim"); err == nil {
+		switch present, current := nvim.Installed(nvim.Dir()); {
+		case !present:
+			add("nvim plugin", "warn", "not installed: nt install --nvim (paste images, no merge under unsaved notes)")
+		case !current:
+			add("nvim plugin", "warn", "older than this nt: nt install --nvim")
+		default:
+			add("nvim plugin", "ok", "%s", tilde(nvim.Dir()))
+		}
 	}
 	for _, t := range []struct{ bin, why, pkg string }{
 		{"rg", "nt s and nt f need it", "ripgrep"},

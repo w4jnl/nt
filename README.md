@@ -29,6 +29,7 @@ make install                       # nt into ~/.local/bin
 nt init ~/notes                    # a notes repository; --clone <url> on a second machine
 git -C ~/notes remote add origin git@github.com:<you>/notes.git
 nt install --sync                  # nt sync in the background every 2 minutes
+nt install --nvim                  # the nvim plugin; lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
 nt doctor                          # check the setup
 ```
 
@@ -41,7 +42,7 @@ nt doctor                          # check the setup
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered in nt's style, images included; `e` edits it |
-| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line, for the editor to insert |
+| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line; in nvim, `<leader>ip` |
 | `nt sync` | commit, merge, push; conflicts never leave markers, the other version is kept beside the note |
 | `nt import obsidian <vault>` | bring an Obsidian vault over once; `--dry-run` shows the plan |
 | `nt theme --glamour` | nt's preview style for glow: `glow -s ~/.config/nt/glamour-dark.json` |

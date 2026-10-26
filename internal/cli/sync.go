@@ -127,11 +127,20 @@ func plural(n int, what string) string {
 // nt install --sync: start the background sync timer; nt uninstall --sync stops it.
 func runInstall(args []string, remove bool) int {
 	args, sync := takeBool(args, "--sync")
+	args, withNvim := takeBool(args, "--nvim")
 	if _, err := positional("install", args); err != nil {
 		return fail(err)
 	}
-	if !sync {
-		return fail(errors.New("install: use nt install --sync (and nt uninstall --sync)"))
+	if !sync && !withNvim {
+		return fail(errors.New("install: use nt install --sync or --nvim (and nt uninstall the same)"))
+	}
+	if withNvim {
+		if err := installNvim(remove); err != nil {
+			return fail(fmt.Errorf("install: nvim plugin: %w", err))
+		}
+		if !sync {
+			return 0
+		}
 	}
 	m, err := config.LoadMachine()
 	if err != nil {

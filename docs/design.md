@@ -48,7 +48,7 @@ Decisions taken with the user (2026-10-26):
 **`nt sync` is one-shot.** One code path, triggered by:
 - a launchd agent with `StartInterval` set from `sync.interval` (default `2m`), installed by `nt install --sync`; on Linux, a systemd user timer;
 - the TUI starting;
-- nvim exiting;
+- nvim exiting after a note was written (the nvim plugin, below);
 - the `s` key.
 
 **Each cycle:**
@@ -74,7 +74,7 @@ Decisions taken with the user (2026-10-26):
 
 **Status** is written to `$XDG_STATE_HOME/nt/status.json`: synced, ↑N ahead, conflicts, offline, error. The TUI and flok read it. A new conflict also sends an OS notification (`osascript`, or `notify-send` on Linux).
 
-**Editing safety.** While `nt` has nvim open, it holds `.git/nt-edit`. Sync still commits but skips the merge until nvim exits. This avoids nvim's W12 prompt silently reverting the incoming change.
+**Editing safety.** While `nt` has nvim open, it holds `.git/nt-edit`. Sync still commits but skips the merge until nvim exits. This avoids nvim's W12 prompt silently reverting the incoming change. In an nvim started any other way, the nvim plugin holds it only while a note has unsaved changes, the one time a merge underneath can conflict; a long-lived nvim does not block merges for days, and the notes a merge changed reload.
 
 **Manual mode.** `sync.auto = false` installs no timer; the `s` key and `nt sync` still work.
 
@@ -117,6 +117,7 @@ Decisions taken with the user (2026-10-26):
 | `nt sync`, `nt doctor` | Sync now; check the setup |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
+| `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
 | `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
 
@@ -157,6 +158,14 @@ Decisions taken with the user (2026-10-26):
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
 - `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.
+
+**nvim** (`internal/nvim`). A small Lua plugin carried inside the binary, so it always matches the `nt` that runs it. `nt install --nvim` writes it to `$XDG_DATA_HOME/nt/nvim` (`~/.local/share/nt/nvim`); a lazy.nvim config loads it with `{ dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }`, and `require("nt").setup(opts)` changes `cmd`, `keys.paste` or `reload`. `nt doctor` warns when it is missing or older than `nt`. In a markdown note inside the repository it:
+- maps `<leader>ip` to `nt paste` with a name prompt, the line going below the cursor;
+- holds `.git/nt-edit` while a note has unsaved changes (`nt _editor hold`, until its input ends);
+- reloads notes that changed on disk and have no unsaved changes, every 3 s in normal mode;
+- starts a background sync when nvim exits after a note was written (`nt _editor kick`).
+
+It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same three `_editor` calls and `nt paste`.
 
 **Deferred:** back stack and multiple views.
 
@@ -308,6 +317,8 @@ internal/termimg    kitty graphics: detect, size, send, placeholder rows (inline
 internal/tui        two panes, keys, pickers, ExecProcess
 internal/importer   hidden one-shot: Obsidian → nt
 internal/editor     $VISUAL / $EDITOR hand-off with +line, shared by the CLI and the TUI
+internal/clip       the clipboard's image for nt paste: AppKit via osascript, wl-paste, xclip
+internal/nvim       the nvim plugin (Lua, embedded) and nt install --nvim
 assets/brand/ · docs/design-system/ · docs/{research,format}.md · skills/nt/SKILL.md
 scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/ci.yml
 ```
@@ -360,7 +371,7 @@ scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/c
 4. `nt init ~/notes`, create the remote with `gh repo create <you>/notes --private`, and set the SSH remote.
 5. `nt import obsidian ~/Notes.obsidian --dry-run`, review the plan, then run it without `--dry-run` and `nt sync`.
 6. In nvim, remove `obsidian.lua` and `telekasten.lua`, and enable the Marksman LSP.
-7. `nt install --sync`, then `nt doctor`.
+7. `nt install --sync` and `nt install --nvim`, then `nt doctor`.
 
 ## Verification
 - **Unit tests:**
