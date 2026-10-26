@@ -146,7 +146,8 @@ Decisions taken with the user (2026-10-26):
 | `o` | Outline picker |
 | `i` | Image picker |
 | `v` | Open in `glow` |
-| `y` | Copy the path or a md link (OSC 52) |
+| `y` | Copy the text selected in the note, else the note's path: `pbcopy`, `wl-copy` or `xclip`, else OSC 52 |
+| `D` | Delete the note (with the images no other note uses, and its line in the journal of its day) or an empty folder, after a y/n question on the footer line |
 | `s` | Sync now |
 | `<` `>` | Narrower / wider list; dragging the divider with the mouse does the same |
 
@@ -155,7 +156,8 @@ Decisions taken with the user (2026-10-26):
 - The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
 - While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
 - `i` opens an image with `image_viewer`, else Quick Look, else `xdg-open` on a Linux desktop, else `nt _image` (chafa, full screen) in the terminal.
-- The mouse: dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag selects text in Ghostty and most terminals.
+- The mouse: dragging over the note selects its text, on `accent-soft`, within the note pane (the terminal's or tmux's own selection runs across both panes); `y` copies it without the margin, Escape clears it. Dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag still gives the terminal's own selection.
+- Deleting is plain: the files go, sync commits it, git keeps them. Other notes' links to a deleted note stay (the question says how many there are).
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
 - `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.

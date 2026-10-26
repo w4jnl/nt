@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The browser (nt with no arguments) in an isolated tmux server: folders and notes, the preview,
 # today, add, new note through the editor, live search, titles, links and "Linked from", the
-# outline, days, pins, help, sync, the mouse and a narrow screen.
+# outline, days, pins, help, sync, the mouse, selecting and copying text, deleting a note and
+# a narrow screen.
 source "$(dirname "$0")/lib.sh"
 
 git init --quiet --bare -b main "$T/remote.git"
@@ -24,8 +25,11 @@ printf '%s\n' "\$f" > "$T/edited"
 printf 'Written in the editor.\n' >> "\$f"
 ED
 chmod +x "$T/editor.sh"
+# the clipboard is a stand-in that keeps what it is given
+mkdir -p "$T/bin"
+for c in pbcopy wl-copy xclip; do printf '#!/bin/sh\ncat > "%s/copied"\n' "$T" > "$T/bin/$c"; chmod +x "$T/bin/$c"; done
 start() { S kill-server 2>/dev/null || true
-  S new-session -d -s e2e -x "${1:-120}" -y 30 -c "$T" "env VISUAL= EDITOR='$T/editor.sh' NT_CONFIG='$NT_CONFIG' NT_STATE='$NT_STATE' '$BIN'"
+  S new-session -d -s e2e -x "${1:-120}" -y 30 -c "$T" "env PATH='$T/bin:$PATH' VISUAL= EDITOR='$T/editor.sh' NT_CONFIG='$NT_CONFIG' NT_STATE='$NT_STATE' '$BIN'"
   expect_soon "the browser starts" '\[nt\]' capture; }
 key() { S send-keys -t e2e "$@"; }
 footer() { capture | tail -1; }
@@ -34,7 +38,7 @@ session() { if S has-session -t e2e 2>/dev/null; then echo running; else echo go
 start
 expect_soon "the root lists the folders" 'tech/' capture
 expect_soon "the brand line shows the sync state" '● synced' sh -c "tmux -L nt-e2e -f /dev/null capture-pane -p -t e2e | head -1"
-expect_soon "the footer shows the key hints" 't today.*\? help' footer
+expect_soon "the footer shows the key hints" 't today.*D delete +\? help' footer
 
 key 1
 expect_soon "1 opens the first pinned folder" '\[nt\]  work' capture
@@ -112,11 +116,37 @@ expect_soon "the width is remembered" '^56$' divider
 key q
 expect_soon "q quits" '^gone$' session
 
+# at TEXT: the SGR column;row of the first character of TEXT on screen
+at() { capture | python3 -c 'import sys
+for i, l in enumerate(sys.stdin.read().split("\n")):
+    c = l.find(sys.argv[1])
+    if c >= 0:
+        print(f"{c + 1};{i + 1}")
+        break' "$1"; }
+start
+key 2
+expect_soon "the new note shows" 'Written in the editor' capture
+p=$(at 'Written in the editor.'); c=${p%;*}; r=${p#*;}; e=$((c + 21))
+mouse "0;$c;$r" && mouse "32;$e;$r" && key -l $'\e[<0;'"$e;$r"'m'
+expect_soon "dragging over the note selects its text" 'y copy' footer
+key y
+expect_soon "y copies the selection, without the margin" '^Written in the editor\.$' cat "$T/copied"
+key D
+expect_soon "D asks before deleting" 'delete "Browser note"\?' footer
+key n
+expect "any other key keeps the note" '^1$' "$(ls "$N/tech" | grep -c browser-note)"
+key D
+key y
+expect_soon "y deletes it" '^0$' sh -c "ls '$N/tech' | grep -c browser-note"
+expect "and the journal no longer links it" '^0$' "$(grep -c 'Browser note' "$N"/daily/*/"$(date +%F)".md || true)"
+key q
+expect_soon "q quits" '^gone$' session
+
 start 60
 expect_soon "a narrow screen shows the list alone" 'tech/' capture
 key 2
 key Enter
-expect_soon "enter shows the note on its own" 'Written in the editor' capture
+expect_soon "enter shows the note on its own" 'The unicorn mount' capture
 key Escape
 expect_soon "escape goes back to the list" '▎' capture
 key q

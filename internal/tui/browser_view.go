@@ -269,9 +269,9 @@ func (b *browser) helpText(w, h int) string {
 		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
 		{"go", "t", "today's journal", "[ ]", "the day before, after", "1–9", "pinned folders", "A", "today's agent reports"},
 		{"find", "/", "search every note", "ctrl-p", "a note by its title"},
-		{"in a note", "l", "links in and to it", "o", "its outline", "i", "its images, full size", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy its path"},
+		{"in a note", "l", "links in and to it", "o", "its outline", "i", "its images, full size", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
 		{"write", "a", "add a line to today", "n", "a new note here", "s", "sync now", "r", "reload"},
-		{"layout", "< >", "narrower, wider list", "drag │", "the same, by mouse", "click", "select; again opens", "wheel", "scroll"},
+		{"mouse", "drag text", "select it in the note", "drag │", "resize the list (< > too)", "click", "select; again opens", "wheel", "scroll"},
 		{"", "?", "this help", "q", "quit"},
 	}
 	block := func(gs [][]string) []string {
@@ -318,14 +318,20 @@ func (b *browser) footer() string {
 	if b.input != nil {
 		return pad(lipgloss.NewStyle().Background(b.pal.Surface).Render(" ")+b.input.View(b.st, b.pal, b.width-1), b.width)
 	}
+	if b.ask != nil {
+		q := lipgloss.NewStyle().Background(b.pal.Surface).Foreground(b.pal.Ink).Render(" " + b.ask.text + " ")
+		return pad(q+"  "+hints(b.st, "y", "yes", "any key", "no"), b.width)
+	}
 	var left string
 	switch {
+	case b.p.mark != nil && !b.p.mark.empty():
+		left = hints(b.st, "y", "copy", "esc", "clear", "drag", "select more")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
 	case b.focus == onPreview:
-		left = hints(b.st, "j k", "scroll", "e", "edit", "l", "links", "o", "outline", "esc", "back")
+		left = hints(b.st, "j k", "scroll", "e", "edit", "l", "links", "o", "outline", "D", "delete", "esc", "back")
 	default:
-		left = hints(b.st, "t", "today", "[ ]", "day", "a", "add", "n", "new", "/", "search", "^p", "title", "?", "help")
+		left = hints(b.st, "t", "today", "[ ]", "day", "a", "add", "n", "new", "/", "search", "^p", "title", "D", "delete", "?", "help")
 	}
 	left = " " + left
 	right := ""

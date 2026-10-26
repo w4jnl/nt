@@ -317,3 +317,54 @@ func TestSaveAsset(t *testing.T) {
 		t.Error("an attachment was written under .nt")
 	}
 }
+
+func TestDelete(t *testing.T) {
+	v := newVault(t)
+	now := at("2026-10-26 14:03")
+	rel, err := v.NewNote("NAS setup", "tech", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _ := v.NewNote("Backups", "tech", now)
+	shot, _ := v.SaveAsset(rel, "rack", ".png", []byte("png"), now)
+	shared, _ := v.SaveAsset(rel, "diagram", ".png", []byte("png"), now)
+	_ = WriteFile(v.Abs(rel), []byte("# NAS setup\n\n![rack](assets/2026-10-26-rack.png)\n![diagram](assets/2026-10-26-diagram.png)\n"))
+	_ = WriteFile(v.Abs(other), []byte("# Backups\n\n![diagram](assets/2026-10-26-diagram.png)\n"))
+
+	own := v.Unshared(rel, []string{shot, shared})
+	if len(own) != 1 || own[0] != shot {
+		t.Fatalf("Unshared = %v, want only %s", own, shot)
+	}
+	if err := v.Delete(rel, own); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []string{rel, shot} {
+		if _, err := os.Stat(v.Abs(gone)); err == nil {
+			t.Errorf("%s is still there", gone)
+		}
+	}
+	if _, err := os.Stat(v.Abs(shared)); err != nil {
+		t.Errorf("the image another note uses went too: %v", err)
+	}
+	j := read(t, v, "daily/2026/2026-10-26.md")
+	if strings.Contains(j, "nas-setup") || !strings.Contains(j, "- [Backups](../../tech/2026-10-26-backups.md)") {
+		t.Errorf("the journal should lose the deleted note's line and keep the other:\n%s", j)
+	}
+
+	if err := v.DeleteFolder("tech"); err == nil {
+		t.Error("a folder with a note was deleted")
+	}
+	_ = os.MkdirAll(v.Abs("old/assets"), 0o755)
+	if !v.FolderEmpty("old") {
+		t.Error("a folder with only an empty assets folder is not empty")
+	}
+	if err := v.DeleteFolder("old"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(v.Abs("old")); err == nil {
+		t.Error("the empty folder is still there")
+	}
+	if v.FolderEmpty("") {
+		t.Error("the repository itself counts as an empty folder")
+	}
+}

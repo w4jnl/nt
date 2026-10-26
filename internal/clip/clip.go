@@ -133,6 +133,34 @@ func readLinux(png string) (Image, error) {
 	return Image{PNG: true}, nil
 }
 
+// ErrNoClipboard says this machine has no clipboard nt can write to: over ssh, or without
+// wl-copy or xclip. Callers fall back to OSC 52, which the terminal carries.
+var ErrNoClipboard = errors.New("no clipboard here")
+
+// Write puts text on the clipboard: pbcopy on macOS, wl-copy on Wayland, xclip on X11. It works
+// in tmux whatever its set-clipboard says, which OSC 52 does not.
+func Write(text string) error {
+	var argv []string
+	switch {
+	case runtime.GOOS == "darwin":
+		argv = []string{"pbcopy"}
+	case runtime.GOOS != "linux":
+	case os.Getenv("WAYLAND_DISPLAY") != "":
+		argv = []string{"wl-copy"}
+	case os.Getenv("DISPLAY") != "":
+		argv = []string{"xclip", "-selection", "clipboard", "-in"}
+	}
+	if argv == nil {
+		return ErrNoClipboard
+	}
+	if _, err := exec.LookPath(argv[0]); err != nil {
+		return ErrNoClipboard
+	}
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
+}
+
 // firstFile is the first file:// entry of a text/uri-list, as a path.
 func firstFile(list string) (string, bool) {
 	for _, l := range strings.Split(list, "\n") {

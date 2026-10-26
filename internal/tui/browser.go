@@ -16,6 +16,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/w4jnl/nt/internal/clip"
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/gitsync"
@@ -108,6 +109,12 @@ type pickItem struct {
 	text        string // a heading or matched text to scroll to
 }
 
+// question is asked on the footer line: y does it, any other key leaves things as they are.
+type question struct {
+	text string
+	yes  func() tea.Cmd
+}
+
 type picker struct {
 	title string
 	items []pickItem
@@ -126,6 +133,7 @@ type browser struct {
 	width, height int
 	listW, savedW int  // the list width asked for, and as read at start
 	dragging      bool // the divider is held with the mouse
+	selecting     bool // the mouse is down on the note, selecting text
 
 	dir     string
 	entries []entry
@@ -149,6 +157,7 @@ type browser struct {
 	searchStop context.CancelFunc
 
 	help bool
+	ask  *question // a yes-or-no question on the footer line
 
 	status    gitsync.Status
 	hasStatus bool
@@ -523,6 +532,13 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, nil
 	case tea.KeyPressMsg:
 		b.msg = ""
+		if q := b.ask; q != nil {
+			b.ask = nil
+			if msg.String() == "y" {
+				return b, q.yes()
+			}
+			return b, nil
+		}
 		if b.input != nil {
 			return b, b.inputKey(msg)
 		}
@@ -536,8 +552,9 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return b, nil
 }
 
-// mouse: dragging the divider resizes the list, the wheel scrolls the pane under the pointer, a
-// click selects a row (a second click opens it) or gives the note the focus.
+// mouse: dragging the divider resizes the list, dragging over the note selects its text (the
+// terminal's own selection would run across both panes), the wheel scrolls the pane under the
+// pointer, a click selects a row (a second click opens it) or gives the note the focus.
 func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	m := msg.Mouse()
 	lw, split := b.listWidth(), !b.full && !b.narrow()
@@ -545,14 +562,23 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	row := m.Y - 2 // under the brand line and the rule
 	switch msg.(type) {
 	case tea.MouseMotionMsg:
-		if b.dragging {
+		switch {
+		case b.dragging:
 			b.resize(m.X)
+		case b.selecting:
+			b.p.mark.head = b.notePoint(m.X, m.Y)
 		}
 		return nil
 	case tea.MouseReleaseMsg:
-		if b.dragging {
+		switch {
+		case b.dragging:
 			b.dragging = false
 			return b.p.sendImages()
+		case b.selecting:
+			b.selecting = false
+			if b.p.mark.empty() {
+				b.p.mark = nil // a click, not a drag
+			}
 		}
 		return nil
 	case tea.MouseWheelMsg:
@@ -581,6 +607,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	case onNote:
 		if b.showing != "" {
 			b.focus = onPreview
+			at := b.notePoint(m.X, m.Y)
+			b.p.mark, b.selecting = &span{anchor: at, head: at}, true
 		}
 		return nil
 	case b.pick != nil:
@@ -606,6 +634,34 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	b.sel, b.focus = i, onList
 	b.clampList()
 	return b.loadNow()
+}
+
+// notePoint is the place in the rendered note under the screen cell x, y. Above or below the
+// pane the note scrolls a line, so a selection can reach past what is on screen.
+func (b *browser) notePoint(x, y int) point {
+	left := 0
+	if !b.full {
+		left = b.listWidth() + 1
+	}
+	row := y - 2
+	switch {
+	case row < 0:
+		b.p.vp.ScrollUp(1)
+		row = 0
+	case row >= b.p.height:
+		b.p.vp.ScrollDown(1)
+		row = b.p.height - 1
+	}
+	return point{line: b.p.vp.YOffset() + row, col: max(0, x-left)}
+}
+
+// copy puts text on the clipboard with the OS, else through the terminal (OSC 52).
+func (b *browser) copy(text, what string) tea.Cmd {
+	b.say("copied "+what, false)
+	if clip.Write(text) == nil {
+		return nil
+	}
+	return tea.SetClipboard(text)
 }
 
 // resize makes the list w columns wide, between list-min and what leaves the note preview-min,
@@ -646,6 +702,10 @@ func (b *browser) poll() tea.Cmd {
 
 func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	s := k.String()
+	if s == "esc" && b.p.mark != nil {
+		b.p.mark = nil
+		return nil
+	}
 	if b.focus == onPreview {
 		switch s {
 		case "esc", "left", "h", "tab":
@@ -743,11 +803,17 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	case "v":
 		return b.glow()
 	case "y":
+		if text := b.p.selected(); text != "" {
+			n := strings.Count(text, "\n") + 1
+			b.p.mark = nil
+			return b.copy(text, plural(n, "line"))
+		}
 		if b.showing == "" {
 			return nil
 		}
-		b.say("copied "+b.showing, false)
-		return tea.SetClipboard(b.showing)
+		return b.copy(b.showing, b.showing)
+	case "D":
+		return b.askDelete()
 	case "s":
 		return b.sync()
 	case "r":
@@ -779,6 +845,95 @@ func (b *browser) enter() tea.Cmd {
 	}
 	return nil
 }
+
+// askDelete asks before deleting the selected row: a note with the images no other note uses,
+// or an empty folder. With the note in focus, it is the note on screen.
+func (b *browser) askDelete() tea.Cmd {
+	rel := b.showing
+	if b.focus == onList {
+		e, ok := b.selected()
+		if !ok {
+			return nil
+		}
+		if e.dir {
+			if !b.v.FolderEmpty(e.rel) {
+				b.say(e.rel+"/ is not empty: delete what is in it first", false)
+				return nil
+			}
+			b.ask = &question{"delete the empty folder " + e.rel + "/?", func() tea.Cmd {
+				if err := b.v.DeleteFolder(e.rel); err != nil {
+					b.say(err.Error(), true)
+					return nil
+				}
+				b.say("deleted "+e.rel+"/", false)
+				return b.afterDelete()
+			}}
+			return nil
+		}
+		rel = e.rel
+	}
+	if rel == "" {
+		return nil
+	}
+	raw, _ := os.ReadFile(b.v.Abs(rel))
+	var images []string
+	for _, l := range mdparse.Parse(raw).Links {
+		if !l.Image {
+			continue
+		}
+		if f, ok := localImage(b.v.Abs(rel), l.Dest); ok {
+			if r := b.v.RelPath(f); !strings.HasPrefix(r, "../") && strings.Contains("/"+r, "/assets/") && isFile(f) {
+				images = append(images, r)
+			}
+		}
+	}
+	images = b.v.Unshared(rel, images)
+	what := strconv.Quote(firstNonEmpty(render.Title(raw, rel), rel))
+	if len(images) > 0 {
+		what += " and " + plural(len(images), "image")
+	}
+	text := "delete " + what + "?"
+	if n := b.linkers(rel); n > 0 {
+		text += " " + plural(n, "note") + " link to it"
+	}
+	b.ask = &question{text, func() tea.Cmd {
+		if err := b.v.Delete(rel, images); err != nil {
+			b.say(err.Error(), true)
+			return nil
+		}
+		b.say("deleted "+rel, false)
+		return b.afterDelete()
+	}}
+	return nil
+}
+
+// linkers is how many notes link to rel, leaving out the journal line delete takes away.
+func (b *browser) linkers(rel string) int {
+	if b.ix == nil {
+		return 0
+	}
+	n := 0
+	day := datePrefix.FindString(path.Base(rel))
+	for _, from := range b.ix.Back[rel] {
+		if day == "" || from != b.journalRel(day) {
+			n++
+		}
+	}
+	return n
+}
+
+// afterDelete shows the list again with the row that took the deleted one's place.
+func (b *browser) afterDelete() tea.Cmd {
+	at := b.sel
+	b.list()
+	b.sel = max(0, min(at, len(b.entries)-1))
+	b.focus, b.full = onList, false
+	b.layout()
+	b.clampList()
+	return tea.Batch(b.loadNow(), b.reindex())
+}
+
+func isFile(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }
 
 // noteFolder is where n puts a note: the current folder, or the default folder when the browser
 // is at the root or in the journals or agent reports.

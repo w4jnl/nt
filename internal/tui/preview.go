@@ -10,6 +10,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/render"
@@ -54,6 +55,8 @@ type preview struct {
 	pal     theme.Palette
 	extra   string // shown after the note (the browser's "Linked from"), already styled
 	body    string
+	lines   []string                  // what the viewport shows, one rendered line each
+	mark    *span                     // text selected with the mouse, nil when none
 	img     *termimg.Terminal         // nil: images keep their alt text
 	images  map[string]*termimg.Image // by file
 	pending string                    // image data for the terminal, sent after the next frame
@@ -66,6 +69,9 @@ func newPreview(img *termimg.Terminal, dark bool) *preview {
 func (p *preview) setTheme(dark bool) { p.dark, p.pal = dark, theme.New(dark) }
 
 func (p *preview) setSize(w, h int) {
+	if max(1, w) != p.width {
+		p.mark = nil // the note wraps anew
+	}
 	p.width, p.height = max(1, w), max(1, h)
 	p.vp.SetWidth(p.width)
 	p.vp.SetHeight(p.height)
@@ -80,6 +86,7 @@ func (p *preview) open(path, dir string) {
 	}
 	if path != p.path {
 		p.vp.GotoTop()
+		p.mark = nil
 	}
 	p.path, p.rel = path, dir
 	p.load()
@@ -103,6 +110,7 @@ func (p *preview) changed() bool {
 }
 
 func (p *preview) render() {
+	p.lines = nil
 	if p.width <= 1 || p.path == "" {
 		p.vp.SetContent("")
 		return
@@ -128,6 +136,7 @@ func (p *preview) render() {
 			lines[i] = ansi.Truncate(l, p.width, "")
 		}
 	}
+	p.lines = lines
 	p.vp.SetContentLines(lines)
 }
 
@@ -234,7 +243,97 @@ func (p *preview) showText(text string) bool {
 	return false
 }
 
-func (p *preview) View() string { return p.vp.View() }
+// View is the visible part of the note, the selected text on accent-soft.
+func (p *preview) View() string {
+	v := p.vp.View()
+	if p.mark == nil || p.mark.empty() {
+		return v
+	}
+	a, b := p.mark.ordered()
+	st := lipgloss.NewStyle().Foreground(p.pal.Ink).Background(p.pal.AccentSoft)
+	rows := strings.Split(v, "\n")
+	for i, row := range rows {
+		n := p.vp.YOffset() + i
+		if n < a.line || n > b.line || isImageRow(row) {
+			continue
+		}
+		from, to := p.mark.cols(n, ansi.StringWidth(row))
+		if from < to {
+			rows[i] = ansi.Cut(row, 0, from) + st.Render(ansi.Strip(ansi.Cut(row, from, to))) + ansi.Cut(row, to, ansi.StringWidth(row))
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+// point is a place in the rendered note: a line and a cell in it.
+type point struct{ line, col int }
+
+// span is a selection from where the mouse went down to where it is now, either way round.
+type span struct{ anchor, head point }
+
+func (s *span) empty() bool { return s.anchor == s.head }
+
+func (s *span) ordered() (point, point) {
+	a, b := s.anchor, s.head
+	if b.line < a.line || b.line == a.line && b.col < a.col {
+		a, b = b, a
+	}
+	return a, b
+}
+
+// cols is the cells of line n inside the selection, as [from, to) of a line w cells wide: the
+// first line from where it starts, the last up to and with where it ends, those between whole.
+func (s *span) cols(n, w int) (int, int) {
+	a, b := s.ordered()
+	from, to := 0, w
+	if n == a.line {
+		from = a.col
+	}
+	if n == b.line {
+		to = min(w, b.col+1)
+	}
+	return min(from, w), to
+}
+
+// selected is the selected text, plain: the note's margin and a code block's indent are taken
+// off every line alike, spaces at the ends of lines dropped, and image rows left out.
+func (p *preview) selected() string {
+	if p.mark == nil || p.mark.empty() {
+		return ""
+	}
+	a, b := p.mark.ordered()
+	type frag struct {
+		text   string
+		from   int
+		indent int
+	}
+	var frags []frag
+	indent := -1
+	for n := a.line; n <= b.line && n < len(p.lines); n++ {
+		line := ansi.Strip(p.lines[n])
+		if isImageRow(line) {
+			continue
+		}
+		from, to := p.mark.cols(n, ansi.StringWidth(line))
+		f := frag{text: line, from: from, indent: -1}
+		if t := strings.TrimLeft(line, " "); strings.TrimSpace(ansi.Cut(line, from, to)) != "" {
+			f.indent = len(line) - len(t)
+			if indent < 0 || f.indent < indent {
+				indent = f.indent
+			}
+		}
+		f.text = ansi.Cut(line, 0, to)
+		frags = append(frags, f)
+	}
+	var out []string
+	for _, f := range frags {
+		out = append(out, strings.TrimRight(ansi.Cut(f.text, max(f.from, indent), ansi.StringWidth(f.text)), " "))
+	}
+	return strings.Trim(strings.Join(out, "\n"), "\n")
+}
+
+// isImageRow reports a row of image placeholders, which are no text to select.
+func isImageRow(s string) bool { return strings.ContainsRune(s, '\U0010EEEE') }
 
 // localImage resolves an image destination against the note's folder; false for a URL.
 func localImage(note, dest string) (string, bool) {

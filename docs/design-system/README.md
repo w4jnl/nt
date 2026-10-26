@@ -67,7 +67,7 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 - Set text in `ink`, secondary text (dates, paths, footer verbs) in `ink-muted`, placeholders
   only in `ink-faint`.
 - `accent` is the only interactive colour: the selection bar, footer keys, links and headings
-  in the preview, the syncing spinner. A highlighted search match sits on `accent-soft`.
+  in the preview, the syncing spinner. A highlighted search match, and text selected in the note (in `ink`), sit on `accent-soft`.
 - State colours mean state and nothing else: `ok`, `warn`, `alert`, with `-soft` fills where a
   fill is wanted (Mac app badges later). `alert` also marks destructive confirmations.
 - Every state has its own glyph shape and word, so the UI is readable in greyscale, to

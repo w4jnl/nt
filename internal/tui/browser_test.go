@@ -3,9 +3,11 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/vault"
@@ -113,5 +115,69 @@ func TestListWidthIsRemembered(t *testing.T) {
 	saveListWidth(state, 52)
 	if got := testBrowser(t, 200, state).listWidth(); got != 52 {
 		t.Fatalf("a new browser starts at %d, want the saved 52", got)
+	}
+}
+
+// screenAt is the screen cell where text begins in the rendered note, false when it is not on
+// screen.
+func screenAt(b *browser, text string) (x, y int, ok bool) {
+	for i, l := range b.p.lines {
+		if c := strings.Index(ansi.Strip(l), text); c >= 0 && i >= b.p.vp.YOffset() && i < b.p.vp.YOffset()+b.p.height {
+			return b.listWidth() + 1 + ansi.StringWidth(ansi.Strip(l)[:c]), 2 + i - b.p.vp.YOffset(), true
+		}
+	}
+	return 0, 0, false
+}
+
+func TestSelectText(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	note := "tech/2026-10-22-c.md"
+	if err := os.WriteFile(b.v.Abs(note), []byte("# Title\n\nA paragraph before.\n\n```\nadcli info example.com\n[domain]\n```\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.show(note)
+	x1, y1, ok1 := screenAt(b, "adcli")
+	x2, y2, ok2 := screenAt(b, "[domain]")
+	if !ok1 || !ok2 {
+		t.Fatalf("the code block is not on screen:\n%s", strings.Join(b.p.lines, "\n"))
+	}
+	b.Update(tea.MouseClickMsg{X: x1, Y: y1, Button: tea.MouseLeft})
+	b.Update(tea.MouseMotionMsg{X: x2 + len("[domain]") - 1, Y: y2, Button: tea.MouseLeft})
+	b.Update(tea.MouseReleaseMsg{X: x2 + len("[domain]") - 1, Y: y2, Button: tea.MouseLeft})
+	if got, want := b.p.selected(), "adcli info example.com\n[domain]"; got != want {
+		t.Fatalf("selected %q, want %q", got, want)
+	}
+	if !strings.Contains(ansi.Strip(b.View().Content), "y copy") {
+		t.Error("the footer does not offer to copy")
+	}
+	b.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.p.mark != nil {
+		t.Fatal("esc does not clear the selection")
+	}
+	b.Update(tea.MouseClickMsg{X: x1, Y: y1, Button: tea.MouseLeft})
+	b.Update(tea.MouseReleaseMsg{X: x1, Y: y1, Button: tea.MouseLeft})
+	if b.p.mark != nil || b.focus != onPreview {
+		t.Fatal("a click on the note selects text, or does not give the note the focus")
+	}
+}
+
+func TestDeleteAsks(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	first := b.entries[0].rel
+	b.Update(tea.KeyPressMsg{Code: 'D', Text: "D"})
+	if b.ask == nil || !strings.Contains(b.ask.text, "delete") {
+		t.Fatal("D does not ask")
+	}
+	b.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
+	if _, err := os.Stat(b.v.Abs(first)); err != nil || b.ask != nil {
+		t.Fatal("answering n deleted the note or kept asking")
+	}
+	b.Update(tea.KeyPressMsg{Code: 'D', Text: "D"})
+	b.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if _, err := os.Stat(b.v.Abs(first)); err == nil {
+		t.Fatal("answering y kept the note")
+	}
+	if len(b.entries) != 2 || b.sel != 0 || b.showing != b.entries[0].rel {
+		t.Fatalf("after the delete: %d rows, row %d selected, showing %q", len(b.entries), b.sel, b.showing)
 	}
 }

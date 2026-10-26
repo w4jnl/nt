@@ -78,6 +78,9 @@ func TestTextContrast(t *testing.T) {
 		if r := contrast(Hex("accent", dark), Hex("accent-soft", dark)); r < 4.5 {
 			t.Errorf("dark=%v accent on accent-soft: %.2f:1", dark, r)
 		}
+		if r := contrast(Hex("ink", dark), Hex("accent-soft", dark)); r < 4.5 { // selected text
+			t.Errorf("dark=%v ink on accent-soft: %.2f:1", dark, r)
+		}
 	}
 }
 
