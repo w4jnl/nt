@@ -2,6 +2,8 @@ package render
 
 import (
 	"bytes"
+	"html"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -17,8 +19,10 @@ import (
 // keep Glamour's own rendering (the alt text and the link).
 type Placer func(dest string, width int) (rows []string, ok bool)
 
-// imageBlock is an image that is the whole of a top-level paragraph: the only images the preview
-// draws in place. An image inside a sentence, a list or a table keeps its alt text.
+// imageBlock is an image that is the whole of a top-level block: a paragraph holding only
+// ![alt](path), or an HTML block holding only one <img src> (wrapper tags like <p align="center">
+// allowed). These are the images the preview draws in place; an image inside a sentence, a list
+// or a table keeps its alt text.
 type imageBlock struct {
 	dest, alt  string
 	start, end int // the paragraph's bytes in the body
@@ -28,23 +32,70 @@ func imageBlocks(body []byte) []imageBlock {
 	doc := goldmark.New(goldmark.WithExtensions(extension.GFM)).Parser().Parse(text.NewReader(body))
 	var out []imageBlock
 	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
-		p, ok := n.(*ast.Paragraph)
-		if !ok || p.ChildCount() != 1 || p.Lines().Len() == 0 {
+		lines := n.Lines()
+		if n.Type() != ast.TypeBlock || lines == nil || lines.Len() == 0 {
 			continue
 		}
-		img, ok := p.FirstChild().(*ast.Image)
-		if !ok {
-			continue
+		start, end := lines.At(0).Start, lines.At(lines.Len()-1).Stop
+		switch b := n.(type) {
+		case *ast.Paragraph:
+			if c, ok := b.FirstChild().(*ast.Image); ok && b.ChildCount() == 1 {
+				out = append(out, imageBlock{dest: string(c.Destination), alt: plainText(c, body), start: start, end: end})
+			} else if onlyHTML(b, body) {
+				// inline tags only, like <a href="…"><img src="…"></a>
+				if dest, alt, ok := htmlImage(body[start:end]); ok {
+					out = append(out, imageBlock{dest: dest, alt: alt, start: start, end: end})
+				}
+			}
+		case *ast.HTMLBlock:
+			if b.HasClosure() {
+				end = b.ClosureLine.Stop
+			}
+			if dest, alt, ok := htmlImage(body[start:end]); ok {
+				out = append(out, imageBlock{dest: dest, alt: alt, start: start, end: end})
+			}
 		}
-		lines := p.Lines()
-		out = append(out, imageBlock{
-			dest:  string(img.Destination),
-			alt:   plainText(img, body),
-			start: lines.At(0).Start,
-			end:   lines.At(lines.Len() - 1).Stop,
-		})
 	}
 	return out
+}
+
+var (
+	imgTag  = regexp.MustCompile(`(?is)<img\b[^>]*>`)
+	anyTag  = regexp.MustCompile(`(?s)<[^>]*>`)
+	imgAttr = regexp.MustCompile(`(?is)\b(src|alt)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`)
+)
+
+// onlyHTML reports a paragraph made of inline HTML tags and blanks, nothing else.
+func onlyHTML(p ast.Node, src []byte) bool {
+	for c := p.FirstChild(); c != nil; c = c.NextSibling() {
+		switch t := c.(type) {
+		case *ast.RawHTML:
+		case *ast.Text:
+			if strings.TrimSpace(string(t.Segment.Value(src))) != "" {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return p.ChildCount() > 0
+}
+
+// htmlImage reads the one <img> in a piece of HTML that holds nothing else but tags around it.
+func htmlImage(h []byte) (dest, alt string, ok bool) {
+	tags := imgTag.FindAll(h, -1)
+	if len(tags) != 1 || strings.TrimSpace(html.UnescapeString(string(anyTag.ReplaceAll(h, nil)))) != "" {
+		return "", "", false
+	}
+	for _, m := range imgAttr.FindAllSubmatch(tags[0], -1) {
+		v := html.UnescapeString(string(m[2]) + string(m[3]) + string(m[4]))
+		if strings.EqualFold(string(m[1]), "src") {
+			dest = v
+		} else {
+			alt = v
+		}
+	}
+	return dest, alt, dest != ""
 }
 
 func plainText(n ast.Node, src []byte) string {
@@ -83,7 +134,9 @@ func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 		}
 		m := drawn{marker: nonce + strconv.Itoa(i) + "x", alt: b.alt, rows: rows}
 		marks = append(marks, m)
-		src = append(append(append([]byte{}, src[:b.start]...), m.marker...), src[b.end:]...)
+		// keep the newlines the block ends with, so it stays a block of its own
+		repl := m.marker + strings.Repeat("\n", len(src[b.start:b.end])-len(bytes.TrimRight(src[b.start:b.end], "\n")))
+		src = append(append(append([]byte{}, src[:b.start]...), repl...), src[b.end:]...)
 	}
 	out, err := r.tr.Render(string(src))
 	if err != nil || len(marks) == 0 {

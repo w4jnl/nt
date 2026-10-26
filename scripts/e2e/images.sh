@@ -66,6 +66,20 @@ expect_soon "the text below the image follows it" 'Below the picture' capture
 S send-keys -t e2e q
 expect_soon "q quits" '^gone$' session
 
+# an <img> in an HTML block, as GitHub READMEs centre banners, is drawn the same way
+cat > "$T/notes/html.md" <<'MD'
+# HTML image
+
+<p align="center"><img src="assets/mark%.png" alt="The mark in HTML" width="200"></p>
+
+After the HTML image.
+MD
+S new-session -d -s e2e -x 100 -y 40 -c "$T/notes" "$BIN view --theme dark --images on html.md"
+expect_soon "an HTML <img> is drawn" '^rows=[1-9][0-9]* cols=[0-9]+ shape=1:2 marks=ok' rows
+expect_soon "the text after it stays its own paragraph" 'After the HTML image' capture
+S send-keys -t e2e q
+expect_soon "html: quits" '^gone$' session
+
 # auto: no terminal behind this tmux, so no images and no hint
 S new-session -d -s e2e -x 100 -y 40 -c "$T/notes" "$BIN view --theme dark note.md"
 expect_soon "auto keeps the alt text where images cannot be drawn" 'The nt mark' capture

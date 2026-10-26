@@ -161,8 +161,10 @@ Decisions taken with the user (2026-10-26):
 | Linux, headless, or over ssh | `tmux display-popup -E 'chafa … ; read'`. chafa draws with text symbols in any terminal, or uses kitty/sixel where it can. Without tmux, the TUI is suspended and chafa runs full screen. |
 
 **Inline images** (`internal/termimg`, proven in the phase 0 spike). An image that is the whole of a
-top-level paragraph is drawn in the preview; one inside a sentence, a list or a table keeps its alt
-text, and a remote image stays a link because nt fetches nothing.
+top-level paragraph is drawn in the preview, and so is an HTML block holding only one `<img src>`
+(wrapper tags allowed, as in GitHub READMEs); markdown is the form nt writes. An image inside a
+sentence, a list or a table keeps its alt text, and a remote image stays a link because nt fetches
+nothing.
 
 - **How.** The kitty graphics protocol with Unicode placeholders. The image is sent once under an
   id; the preview carries rows of placeholder characters (U+10EEEE with row, column and id marks)

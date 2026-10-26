@@ -99,3 +99,56 @@ func TestRenderImagesPlacesRows(t *testing.T) {
 		t.Errorf("placer asked for %v, want both images", asked)
 	}
 }
+
+func TestHTMLImageBlocks(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, dest, alt string
+	}{
+		{"centred banner", "<p align=\"center\"><img src=\"assets/brand/nt-hero.png\" alt=\"nt: notes\" width=\"800\"></p>\n", "assets/brand/nt-hero.png", "nt: notes"},
+		{"alone", "<img src='a b.png' alt='A &amp; B'>\n", "a b.png", "A & B"},
+		{"self-closing in a div", "<div>\n  <img alt=x src=pic.png />\n</div>\n", "pic.png", "x"},
+		{"linked", "<a href=\"https://example.com\"><img src=\"logo.png\"></a>\n", "logo.png", ""},
+	} {
+		got := imageBlocks([]byte(tc.body))
+		if len(got) != 1 || got[0].dest != tc.dest || got[0].alt != tc.alt {
+			t.Errorf("%s: got %+v, want %s %q", tc.name, got, tc.dest, tc.alt)
+		}
+	}
+	for name, body := range map[string]string{
+		"text beside the image":  "<p>Look: <img src=\"a.png\"></p>\n",
+		"two images":             "<p><img src=\"a.png\"><img src=\"b.png\"></p>\n",
+		"no src":                 "<p><img alt=\"nothing\"></p>\n",
+		"inline in a sentence":   "Look at <img src=\"a.png\"> here.\n",
+		"in a code block":        "```html\n<img src=\"a.png\">\n```\n",
+		"a different html block": "<details><summary>More</summary>text</details>\n",
+	} {
+		if got := imageBlocks([]byte(body)); len(got) != 0 {
+			t.Errorf("%s: drew %+v", name, got)
+		}
+	}
+}
+
+func TestRenderImagesDrawsHTMLImage(t *testing.T) {
+	r, err := New(60, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	note := []byte("<p align=\"center\"><img src=\"hero.png\" alt=\"Hero\" width=\"800\"></p>\n\nPlain markdown follows.\n\n![Mark](mark.png)\n")
+	var asked []string
+	out, err := r.RenderImages(note, func(dest string, width int) ([]string, bool) {
+		asked = append(asked, dest)
+		return []string{"ROW-" + dest}, true
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := xansi.Strip(out)
+	for _, want := range []string{"  ROW-hero.png\n", "Plain markdown follows.", "  ROW-mark.png"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("output lacks %q:\n%s", want, plain)
+		}
+	}
+	if len(asked) != 2 {
+		t.Errorf("placer asked for %v, want both images", asked)
+	}
+}

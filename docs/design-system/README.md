@@ -147,9 +147,9 @@ t today  [ ] day  a append  n new  / search  ? help
   palette drawn from the tokens.
 - Block quotes in `ink-muted` with a `line` rule on the left.
 - Tables use `line` for borders and `ink` for cells; links in tables stay inline.
-- Frontmatter is never rendered. An image alone in its paragraph is drawn in place where the
-  terminal can (Ghostty, kitty, also through tmux), indented with the text and never wider than
-  it; elsewhere it shows its alt text. `i` opens images full size in the OS viewer.
+- Frontmatter is never rendered. An image alone in its paragraph (`![alt](path)`, or one HTML
+  `<img src>` alone in its block) is drawn in place where the terminal can (Ghostty, kitty, also
+  through tmux), indented with the text and never wider than it; elsewhere it shows its alt text. `i` opens images full size in the OS viewer.
 - `nt theme --glamour` writes the same style to `~/.config/nt/glamour-dark.json` and
   `glamour-light.json`, so `glow -s` and the `v` key render notes exactly as the preview does.
 

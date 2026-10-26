@@ -87,6 +87,10 @@ Put an image in a paragraph of its own to have it shown as a picture: clients th
 (nt in Ghostty and kitty) draw it there. An image inside a sentence, a list or a table is shown as
 its alt text. Always write alt text; it is what every other client shows.
 
+Clients write markdown images. They should also draw an HTML `<img src="…">` that is the only
+thing in its block, wrappers like `<p align="center">` or `<a href="…">` included, because
+GitHub READMEs and pasted snippets use that form to centre or size an image.
+
 ### Not written by clients
 
 Clients must not write `[[wikilinks]]`, `![[embeds]]`, callouts, `%%comments%%`, or block references. They don't render on GitHub.
