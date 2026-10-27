@@ -500,18 +500,30 @@ func TestSettings(t *testing.T) {
 	read := func(p string) string { s, _ := os.ReadFile(p); return string(s) }
 	pick := func(key string) {
 		t.Helper()
-		for i, it := range b.pick.items {
-			if it.target == key {
-				b.pick.sel = i
+		for i, s := range config.Settings {
+			if s.Key == key {
+				b.set.sel = i
 				return
 			}
 		}
-		t.Fatalf("%s is not in the settings", key)
+		t.Fatalf("%s is not a setting", key)
 	}
 
 	press(b, ",")
-	if b.pick == nil || !b.pick.settings || len(b.pick.items) < 15 {
-		t.Fatalf(", does not list the settings: %+v", b.pick)
+	if b.set == nil {
+		t.Fatal(", does not show the settings")
+	}
+	screen := ansi.Strip(b.View().Content)
+	lw := b.listWidth()
+	var left, right []string
+	for _, l := range strings.Split(screen, "\n") {
+		if r := []rune(l); len(r) > lw {
+			left, right = append(left, string(r[:lw])), append(right, string(r[lw:]))
+		}
+	}
+	if l, r := strings.Join(left, "\n"), strings.Join(right, "\n"); !strings.Contains(l, "a.md") || !strings.Contains(r, "this machine") ||
+		!strings.Contains(r, "the repository") || !strings.Contains(r, "summary.model") {
+		t.Errorf("the settings are not in the right pane beside the folder list:\n%s", screen)
 	}
 	if f := ansi.Strip(b.footer()); !strings.Contains(f, "enter change") || !strings.Contains(f, "the notes repository this machine works on") {
 		t.Errorf("the footer: %s", f)
@@ -530,8 +542,8 @@ func TestSettings(t *testing.T) {
 	}
 	press(b, "haiku")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if !strings.Contains(read(machine), "[summary]\nmodel = \"haiku\"") || b.pick == nil || !b.pick.settings {
-		t.Fatalf("the prompt does not set summary.model, or leaves the list:\n%s", read(machine))
+	if !strings.Contains(read(machine), "[summary]\nmodel = \"haiku\"") || b.set == nil {
+		t.Fatalf("the prompt does not set summary.model, or closes the settings:\n%s", read(machine))
 	}
 
 	pick("pins")
@@ -551,8 +563,13 @@ func TestSettings(t *testing.T) {
 	if !b.alert || !strings.Contains(b.msg, "a time like 04:00") || read(b.v.Abs(".nt/config.toml")) != before {
 		t.Errorf("a bad value: %q; the file changed: %v", b.msg, read(b.v.Abs(".nt/config.toml")) != before)
 	}
+
+	press(b, "j") // j moves in the settings, not in the folder list
+	if config.Settings[b.set.sel].Key != "pins" || b.sel != 0 {
+		t.Errorf("j selected %s, folder row %d", config.Settings[b.set.sel].Key, b.sel)
+	}
 	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if b.pick != nil {
+	if b.set != nil {
 		t.Error("esc does not close the settings")
 	}
 }

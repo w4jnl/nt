@@ -58,6 +58,9 @@ func (b *browser) brandLine() string {
 	if b.cal != nil {
 		where = "calendar"
 	}
+	if b.set != nil {
+		where = "settings"
+	}
 	if b.full && b.showing != "" {
 		where = b.showing
 	}
@@ -153,6 +156,9 @@ func pad(s string, w int) string {
 func (b *browser) previewPane(w, h int) string {
 	if b.help {
 		return b.helpText(w, h)
+	}
+	if b.set != nil {
+		return b.settingsPane(w, h)
 	}
 	if b.showing == "" {
 		if b.cal != nil {
@@ -354,8 +360,8 @@ func (b *browser) footer() string {
 			check, other = "open again", "open ones"
 		}
 		left = hints(b.st, "x", check, "d", "due", "a", "add", "X", other, "e", "edit", "D", "delete", "esc", "back")
-	case b.pick != nil && b.pick.settings:
-		left = hints(b.st, "enter", "change", "e", "edit the file", "esc", "back")
+	case b.set != nil:
+		left = hints(b.st, "j k", "move", "enter", "change", "e", "edit the file", "esc", "back")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
 	case b.cal != nil && b.focus == onList:

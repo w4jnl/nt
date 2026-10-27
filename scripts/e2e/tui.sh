@@ -142,10 +142,10 @@ expect "and the journal no longer links it" '^0$' "$(grep -c 'Browser note' "$N"
 key q
 expect_soon "q quits" '^gone$' session
 
-# the settings: , lists them, the selected one's meaning on the footer line
+# the settings: , shows them in the note's pane, the selected one's meaning on the footer line
 start
 key ,
-expect_soon ", lists the settings" 'settings · enter changes' capture
+expect_soon ", shows the settings beside the folders" 'tech/ +│  this machine' capture
 expect_soon "with the selected one's meaning" 'enter change.*the notes repository this machine works on' footer
 key Escape
 expect_soon "esc closes them" 't today' footer

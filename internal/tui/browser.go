@@ -132,8 +132,6 @@ type picker struct {
 
 	folders []string // the move picker's folders, before what is typed filters them
 	day     string   // the todo list from the calendar: only the todos due or done that day
-
-	settings bool // the settings list (settings.go)
 }
 
 type browser struct {
@@ -178,7 +176,8 @@ type browser struct {
 
 	moving string // the note or folder m or R was pressed on
 
-	cal *calendar // the calendar, in the list pane's place (calendar.go)
+	cal *calendar     // the calendar, in the list pane's place (calendar.go)
+	set *settingsView // the settings, in the note pane's place (settings.go)
 
 	history []visit // the notes links were followed from, for b (follow.go)
 	hinted  string  // the letters typed after f so far
@@ -378,10 +377,6 @@ func (b *browser) followPick() tea.Cmd {
 	}
 	it := b.pick.items[b.pick.sel]
 	switch it.kind {
-	case "setting":
-		if s, ok := config.FindSetting(it.target); ok {
-			b.say(s.Help, false)
-		}
 	case "heading":
 		if !b.p.showText(it.text) {
 			b.p.showLine(it.line)
@@ -612,6 +607,11 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if b.p.hints != nil {
 			return b, b.hintKey(msg)
 		}
+		if b.set != nil {
+			if cmd, ok := b.settingsKey(msg); ok {
+				return b, cmd
+			}
+		}
 		if b.pick != nil {
 			return b, b.pickKey(msg)
 		}
@@ -664,6 +664,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 		d := map[tea.MouseButton]int{tea.MouseWheelDown: 1, tea.MouseWheelUp: -1}[m.Button]
 		switch {
 		case d == 0:
+		case onNote && b.set != nil:
+			b.settingMove(d)
 		case onNote && d > 0:
 			b.p.vp.ScrollDown(3)
 		case onNote:
@@ -683,6 +685,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	case split && m.X >= lw-1 && m.X <= lw+1:
 		b.dragging = true
 		return nil
+	case onNote && b.set != nil:
+		return b.settingsClick(row)
 	case onNote:
 		if b.showing != "" {
 			b.focus = onPreview
@@ -1393,11 +1397,7 @@ func (b *browser) pickKey(k tea.KeyPressMsg) tea.Cmd {
 			return cmd
 		}
 	}
-	if b.pick.settings {
-		if cmd, ok := b.settingKeys(k); ok {
-			return cmd
-		}
-	}
+
 	switch k.String() {
 	case "esc", "q", "left", "h":
 		return b.closePick()
