@@ -225,5 +225,7 @@ The browser uses [Bubble Tea](https://github.com/charmbracelet/bubbletea),
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and renders notes with
 [Glamour](https://github.com/charmbracelet/glamour) and [goldmark](https://github.com/yuin/goldmark);
 configuration is read with [BurntSushi/toml](https://github.com/BurntSushi/toml). The README
-recordings are made with [vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`).
+recordings are made with [vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`);
+`assets/demo/ghostty.sh` records the browser from a real [Ghostty](https://ghostty.org) window,
+so the notes' images show.
 JetBrains Mono, in `docs/design-system/fonts/`, is under the SIL Open Font License.

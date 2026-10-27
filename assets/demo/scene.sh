@@ -36,6 +36,8 @@ tags: [homelab, storage]
 Four disks in RAID-Z1, shared over NFS. Nightly [backups](../$backups) go to a second
 box; the [home network](../$network) note has the VLANs.
 
+![The NAS between the laptops and the backup box](assets/$(day -6)-nas-diagram.png)
+
 | Disk | Size | Role |
 |---|---|---|
 | sda | 8 TB | data |
@@ -147,6 +149,8 @@ tags: [reading]
 Chapter 5, replication. Leaderless replication trades read repair for availability; quorums
 \`w + r > n\` do not guarantee linearizability.
 EOF
+
+mkdir -p "$N/homelab/assets" && cp "$R/assets/demo/nas-diagram.png" "$N/homelab/assets/$(day -6)-nas-diagram.png"
 
 note todo.md <<EOF
 # Todo

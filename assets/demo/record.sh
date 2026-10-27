@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Records the README's GIFs, assets/readme/browser.gif and cli.gif (or the tapes named on the
 # command line): scene.sh builds a notes repository, vhs (brew install vhs) plays each tape into
-# a frames folder, and ffmpeg assembles the GIF. As in flok, vhs runs in a temp folder on the
+# a frames folder, and ffmpeg assembles the GIF. vhs cannot draw the notes' images; ghostty.sh
+# records the browser from a real Ghostty window, with them. As in flok, vhs runs in a temp folder on the
 # system volume, where it can write, and ffmpeg makes the GIF, since vhs 0.12's own encoder
 # writes an empty one with ffmpeg 9.
 set -euo pipefail
