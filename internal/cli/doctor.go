@@ -109,12 +109,14 @@ func runDoctor(args []string) int {
 
 // linkCheck finds the links in the notes that point at nothing: a note deleted or renamed by
 // hand, or a link to a note's old place written on a machine that did not have its move yet.
-// The journals' links to the days around them and to the agents' digest may point at days
-// without one, so they are left out.
+// The journals' links to the days around them and to the agents' digest, and the weekly
+// digests' links to the weeks around them, may point at days or weeks without one, so they are
+// left out.
 func linkCheck(v *vault.Vault) check {
 	c := v.Cfg.Folders
 	dated := regexp.MustCompile(`^(` + regexp.QuoteMeta(c.Daily) + `/\d{4}/\d{4}-\d{2}-\d{2}\.md|` +
-		regexp.QuoteMeta(c.Agents) + `/\d{4}/\d{4}-\d{2}-\d{2}/README\.md)$`)
+		regexp.QuoteMeta(c.Agents) + `/\d{4}/\d{4}-\d{2}-\d{2}/README\.md|` +
+		regexp.QuoteMeta(c.Weekly) + `/\d{4}/\d{4}-W\d{2}\.md)$`)
 	broken := scan.BrokenLinks(v.Root, dated.MatchString)
 	if len(broken) == 0 {
 		return check{Check: "links", State: "ok", Detail: "every link in the notes points at a file"}

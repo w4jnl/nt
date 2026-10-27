@@ -84,6 +84,13 @@ browser, `m` moves the selected note or folder (type to filter the folders, or n
 | `nt rename <folder> <name>` | the folder's new name; `pins` and `default_folder` follow it |
 | `nt mkdir <folder>` | a new folder, with a `.gitkeep` so git keeps it while it is empty |
 
+### Weekly digest
+
+One machine, the one with `weekly = true` in `~/.config/nt/config.toml`, compiles the week into
+`weekly/2026/2026-W44.md` on every sync: the notes made and changed that week, the todos done
+and due, the agent sessions per project, and each day's journal lines. Edit the notes, not the
+digest: it is written again when they change. `nt week [date|last]` compiles a week by hand.
+
 ### Agents
 
 `nt install --hooks` gives every Claude Code and Copilot CLI session a report in

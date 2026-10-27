@@ -95,6 +95,19 @@ func (v *Vault) AgentsRel(day time.Time) string {
 	return fmt.Sprintf("%s/%s/%s", v.Cfg.Folders.Agents, day.Format("2006"), day.Format("2006-01-02"))
 }
 
+// WeekStart is the Monday of day's ISO week, at midnight.
+func WeekStart(day time.Time) time.Time {
+	d := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+	return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7))
+}
+
+// WeekRel is the repository path of the digest of day's week: weekly/GGGG/GGGG-Www.md, named by
+// the ISO week-year, so the days around New Year go to the right week.
+func (v *Vault) WeekRel(day time.Time) string {
+	y, w := WeekStart(day).ISOWeek()
+	return fmt.Sprintf("%s/%04d/%04d-W%02d.md", v.Cfg.Folders.Weekly, y, y, w)
+}
+
 // Slug makes a file name part from a title (docs/format.md §3): lowercase, accents folded,
 // every other run of characters one "-", at most 60 characters cut at a "-".
 func Slug(title string) string {
