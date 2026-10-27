@@ -53,7 +53,7 @@ Decisions taken with the user (2026-10-26):
 
 **Each cycle:**
 1. Recover first. If `MERGE_HEAD` exists or there are unmerged files, resolve them before anything else. If a rebase is in progress, HEAD is detached, or the branch is wrong, stop and record the error in `status.json`.
-2. `git add -A`.
+2. Put the `## Log` of the week's past journals back in time order where merges left them out of it (docs/format.md §5); today's is left alone. Then `git add -A`.
    - Files over 20 MB are skipped, with a warning.
    - Commit message: `nt: <host> · 3 files (daily, agents)`.
 3. `git fetch`, then `git merge --no-edit origin/main`. This is explicit, so the global `pull.rebase` doesn't apply, and it fast-forwards when possible.
@@ -202,7 +202,7 @@ Decisions taken with the user (2026-10-26):
 
 It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same `_editor` calls and `nt paste`.
 
-**Following links in the note** (`internal/tui/follow.go`). Glamour writes every link as an OSC 8 hyperlink carrying its target as written, so after each render nt reads which cells of which line belong to which link. A click on one follows it (a drag still selects text); `f` puts a label of one or two letters, on `accent`, over the first cells of each link on screen, one per target, and typing it follows; the notes under "Linked from" are hyperlinks too. A note opens at the heading its anchor names, a folder in the list, an image as `i` opens it, any other file or a URL with the OS. `b` goes back through the notes links were followed from (at most 50).
+**Following links in the note** (`internal/tui/follow.go`). Glamour writes every link as an OSC 8 hyperlink carrying its target as written, so after each render nt reads which cells of which line belong to which link. A link to a file that is not there is drawn in `ink-faint` and struck through, so it reads as broken before a click says so. A click on a link follows it (a drag still selects text); `f` puts a label of one or two letters, on `accent`, over the first cells of each link on screen, one per target, and typing it follows; the notes under "Linked from" are hyperlinks too. A note opens at the heading its anchor names, a folder in the list, an image as `i` opens it, any other file or a URL with the OS. `b` goes back through the notes links were followed from (at most 50).
 
 **Deferred:** multiple views.
 

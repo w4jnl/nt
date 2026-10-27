@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/mdparse"
@@ -17,10 +20,12 @@ import (
 // Glamour writes every link as an OSC 8 hyperlink with its target as written in the note, so the
 // rendered lines say which cells belong to which link.
 
-// linkSpot is a link's cells on one rendered line, [from, to), and where it points.
+// linkSpot is a link's cells on one rendered line, [from, to), and where it points; text is the
+// bytes of the line between its hyperlink's start and end.
 type linkSpot struct {
 	line, from, to int
 	dest           string
+	text           [2]int
 }
 
 // findLinks reads the OSC 8 hyperlinks in the rendered lines: the cells each one covers. A link
@@ -28,10 +33,10 @@ type linkSpot struct {
 func findLinks(lines []string) []linkSpot {
 	var out []linkSpot
 	for n, l := range lines {
-		col, start, dest := 0, 0, ""
-		end := func() {
+		col, start, bstart, dest := 0, 0, 0, ""
+		end := func(at int) {
 			if dest != "" && col > start {
-				out = append(out, linkSpot{n, start, col, dest})
+				out = append(out, linkSpot{n, start, col, dest, [2]int{bstart, at}})
 			}
 		}
 		for i := 0; i < len(l); {
@@ -42,14 +47,15 @@ func findLinks(lines []string) []linkSpot {
 					for j < len(l) && l[j] != 0x07 && !(l[j] == 0x1b && j+1 < len(l) && l[j+1] == '\\') {
 						j++
 					}
-					if rest, ok := strings.CutPrefix(l[i+2:j], "8;"); ok {
-						end()
-						_, uri, _ := strings.Cut(rest, ";")
-						dest, start = uri, col
-					}
+					osc := l[i+2 : j]
+					end(i)
 					i = j + 1
 					if j < len(l) && l[j] == 0x1b {
 						i = j + 2
+					}
+					if rest, ok := strings.CutPrefix(osc, "8;"); ok {
+						_, uri, _ := strings.Cut(rest, ";")
+						dest, start, bstart = uri, col, i
 					}
 				case '[': // CSI, up to its final byte
 					j := i + 2
@@ -66,7 +72,7 @@ func findLinks(lines []string) []linkSpot {
 			col += ansi.StringWidth(string(r))
 			i += size
 		}
-		end()
+		end(len(l))
 	}
 	return out
 }
@@ -233,4 +239,45 @@ func (b *browser) back() tea.Cmd {
 	}
 	b.say("no note to go back to", false)
 	return nil
+}
+
+// markMissing draws the links whose file is not there in ink-faint, struck through: they show
+// as broken before a click says so (docs/design-system, link states).
+func (p *preview) markMissing(lines []string) {
+	gone := lipgloss.NewStyle().Foreground(p.pal.InkFaint).Strikethrough(true)
+	missing := map[string]bool{}
+	for i := len(p.links) - 1; i >= 0; i-- { // from the end, so the byte offsets before stay true
+		s := p.links[i]
+		m, ok := missing[s.dest]
+		if !ok {
+			m = p.missing(s.dest)
+			missing[s.dest] = m
+		}
+		if !m {
+			continue
+		}
+		l := lines[s.line]
+		a, b := s.text[0], min(s.text[1], len(l))
+		lines[s.line] = l[:a] + gone.Render(ansi.Strip(l[a:b])) + l[b:]
+	}
+}
+
+// missing reports a link, as written in the note, to a local file that is not there. URLs and
+// links to a heading in the note are never missing.
+func (p *preview) missing(dest string) bool {
+	if mdparse.External(dest) {
+		return false
+	}
+	f, _, _ := strings.Cut(dest, "#")
+	if f == "" {
+		return false
+	}
+	if d, err := url.PathUnescape(f); err == nil {
+		f = d
+	}
+	if !filepath.IsAbs(f) {
+		f = filepath.Join(filepath.Dir(p.path), filepath.FromSlash(f))
+	}
+	_, err := os.Stat(f)
+	return err != nil
 }

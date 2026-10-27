@@ -158,6 +158,13 @@ func (r *run) cycle() error {
 			r.logf("weekly: %s", w)
 		}
 	}
+	sorted, err := r.v.SortPastLogs(r.v.Now()) // merges can leave a day's lines out of time order
+	if err != nil {
+		return err
+	}
+	for _, rel := range sorted {
+		r.logf("journal in time order: %s", rel)
+	}
 	if err := r.locked(r.commit); err != nil {
 		return err
 	}

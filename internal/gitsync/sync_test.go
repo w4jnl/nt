@@ -339,3 +339,14 @@ func TestCommitMessageAndConflictName(t *testing.T) {
 		}
 	}
 }
+
+func TestPastJournalsInTimeOrder(t *testing.T) {
+	w := newWorld(t)
+	v := w.seeded("a")[0]
+	yesterday := v.JournalRel(v.Day(w.now).AddDate(0, 0, -1))
+	write(t, v, yesterday, "# D\n\n## Log\n\n- 10:05 from b\n- 10:01 from a\n")
+	sync(t, v)
+	if got := w.git(v.Root, "show", "HEAD:"+yesterday); got != "# D\n\n## Log\n\n- 10:01 from a\n- 10:05 from b" {
+		t.Errorf("sync committed yesterday's journal as\n%s", got)
+	}
+}

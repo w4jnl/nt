@@ -6,6 +6,13 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- **Links that point at nothing look broken.** In the browser's preview a link to a file that is
+  not there is grey and struck through; a click still says what it pointed to.
+- **Journals in time order.** When two machines add lines to the same day, the merge puts one
+  machine's after the other's. Once the day is over, sync puts its Log back in time order (lines
+  after midnight but before `day_starts` last) and drops a line the merge left twice. Today's
+  journal is left alone: moving lines another machine is still adding to would duplicate them.
+  The weekly digest shows every day's lines in time order, today's too.
 - **Follow links in the note.** In the browser a click on a link in the note follows it, and `f`
   puts letters on the links on screen: type them to follow one. `b` goes back to the note before,
   scrolled as it was. A note opens at the heading the link names; folders, images, other files

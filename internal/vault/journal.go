@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -273,4 +276,111 @@ func (v *Vault) NewNote(title, folder string, t time.Time) (string, error) {
 		return rel, err
 	}
 	return rel, nil
+}
+
+var logTime = regexp.MustCompile(`^- (\d{2}):(\d{2})\b`)
+
+// SortLog puts the items of a journal's ## Log in the order of their times and drops an item
+// that is there twice, word for word, as a line-by-line merge can leave it. An item is a line
+// "- HH:MM …" with the lines under it that have no time of their own; times before dayStart
+// belong to the end of the day. The rest of the journal stays byte for byte.
+func SortLog(doc []byte, dayStart time.Duration) []byte {
+	lines := strings.Split(string(doc), "\n")
+	head := -1
+	for i, l := range lines {
+		if strings.TrimRight(l, " \t\r") == "## Log" {
+			head = i
+			break
+		}
+	}
+	if head < 0 {
+		return doc
+	}
+	end := len(lines)
+	for i := head + 1; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], "## ") || strings.HasPrefix(lines[i], "# ") {
+			end = i
+			break
+		}
+	}
+	body := lines[head+1 : end]
+	tail := len(body)
+	for tail > 0 && strings.TrimSpace(body[tail-1]) == "" {
+		tail--
+	}
+	type item struct {
+		at    int
+		lines []string
+	}
+	var lead []string
+	var items []item
+	for _, l := range body[:tail] {
+		if m := logTime.FindStringSubmatch(l); m != nil {
+			h, _ := strconv.Atoi(m[1])
+			mi, _ := strconv.Atoi(m[2])
+			at := h*60 + mi
+			if time.Duration(at)*time.Minute < dayStart {
+				at += 24 * 60
+			}
+			items = append(items, item{at, []string{l}})
+			continue
+		}
+		if len(items) == 0 {
+			lead = append(lead, l)
+			continue
+		}
+		items[len(items)-1].lines = append(items[len(items)-1].lines, l)
+	}
+	seen := map[string]bool{}
+	kept := items[:0]
+	for _, it := range items {
+		if k := strings.Join(it.lines, "\n"); !seen[k] {
+			seen[k] = true
+			kept = append(kept, it)
+		}
+	}
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].at < kept[j].at })
+	out := append([]string{}, lines[:head+1]...)
+	out = append(out, lead...)
+	for _, it := range kept {
+		out = append(out, it.lines...)
+	}
+	out = append(out, body[tail:]...)
+	out = append(out, lines[end:]...)
+	if s := strings.Join(out, "\n"); s != string(doc) {
+		return []byte(s)
+	}
+	return doc
+}
+
+// SortPastLogs puts the ## Log of the journals of the week before today in time order, where
+// merges of lines added on two devices at once left them out of it (docs/format.md §5). Today's
+// journal is left as it is: lines moved in a file another device is still adding to would come
+// back twice from the line-by-line merge. It returns the journals it wrote.
+func (v *Vault) SortPastLogs(now time.Time) ([]string, error) {
+	start, _ := v.Cfg.DayStart()
+	today := v.Day(now)
+	var wrote []string
+	for i := 1; i <= 7; i++ {
+		rel := v.JournalRel(today.AddDate(0, 0, -i))
+		if !isFile(v.Abs(rel)) {
+			continue
+		}
+		changed := false
+		err := v.Update(rel, func(old []byte) ([]byte, error) {
+			if old == nil {
+				return old, nil
+			}
+			out := SortLog(old, start)
+			changed = !bytes.Equal(out, old)
+			return out, nil
+		})
+		if err != nil {
+			return wrote, err
+		}
+		if changed {
+			wrote = append(wrote, rel)
+		}
+	}
+	return wrote, nil
 }

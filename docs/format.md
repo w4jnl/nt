@@ -146,6 +146,12 @@ type: daily
 - **Creating a topic note** adds `- [Title](relative/path.md)` at the end of `## Notes` in that day's journal.
 - Everything else in the journal is the person's to edit.
 - `daily/** merge=union` in `.gitattributes` keeps lines added on two devices without a conflict.
+- **Order.** The line-by-line merge puts lines two devices added at the same time one device's
+  after the other's, not in time order. Once a day is over, a client may put that day's `## Log`
+  back in time order: by `HH:MM`, a time before `day_starts` after the others, a line without a
+  time staying with the one above it, and a line that is there twice word for word, as the merge
+  can leave it, kept once. Nothing else in the journal moves. Today's journal is left as it is,
+  because lines moved in a file another device is still adding to come back twice from the merge.
 
 ## 6. Agent reports
 

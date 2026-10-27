@@ -120,7 +120,8 @@ func Text(v *vault.Vault, monday time.Time) ([]byte, bool) {
 			continue
 		}
 		days.WriteString("\n### " + day.Format("Monday 2 January") + "\n\n")
-		if log := logOf(raw, journal, rel); log != "" {
+		start, _ := v.Cfg.DayStart()
+		if log := logOf(vault.SortLog(raw, start), journal, rel); log != "" {
 			days.WriteString(log + "\n\n")
 		}
 		var links []string
