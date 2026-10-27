@@ -53,6 +53,21 @@ nt doctor                          # check the setup
 Commands that print data take `--json`. Without Homebrew or Go, a static binary for Linux or macOS
 is on the [releases page](https://github.com/w4jnl/nt/releases).
 
+### Todos
+
+A todo is a task line in any note, `- [ ] Renew passport due:2026-11-03`; new ones go to
+`todo.md`, and a folder can have its own `todo.md`. In the browser, `x` lists them all, overdue
+first, with the note each is in beside it: `x` checks one, `d` sets its due date, `a` adds one to
+the `todo.md` of the folder you are in, `X` shows the done ones. In nvim, `<leader>tx` checks the
+todo under the cursor.
+
+| Command | What it does |
+|---|---|
+| `nt todo [folder] [--done\|--all]` | the open todos in every note, or under folder, overdue first; or the done ones, or all |
+| `nt todo add "text" [--due fri] [--in work]` | add one to `todo.md`, or to `work/todo.md`; `--due` takes `YYYY-MM-DD`, `today`, `mon`…`sun`, `+3d`, `+2w` |
+| `nt todo done\|undo\|rm <todo>` | check, uncheck or delete one, named by `path:line` or words from its text |
+| `nt todo due <todo> <when>` | set its due date; `none` clears it |
+
 ### Agents
 
 `nt install --hooks` gives every Claude Code and Copilot CLI session a report in

@@ -9,14 +9,15 @@ import (
 	"github.com/w4jnl/nt/internal/nvim"
 )
 
-// nt _editor repo|hold|kick: what an editor plugin needs from nt (internal/nvim).
+// nt _editor repo|hold|kick|day: what an editor plugin needs from nt (internal/nvim).
 //
 //	repo  prints the notes repository's folder.
 //	hold  holds .git/nt-edit (shared) until its input ends: sync commits but does not merge.
 //	kick  starts a background sync when sync.auto is on, and returns at once.
+//	day   prints the day as nt counts it (day_starts), YYYY-MM-DD, for a todo's done: date.
 func runEditorHelper(args []string) int {
 	if len(args) != 1 {
-		return fail(errors.New("_editor: use repo, hold or kick"))
+		return fail(errors.New("_editor: use repo, hold, kick or day"))
 	}
 	v, m, err := openVault()
 	if err != nil {
@@ -34,8 +35,10 @@ func runEditorHelper(args []string) int {
 		release()
 	case "kick":
 		kickSync(m)
+	case "day":
+		fmt.Println(v.Day(v.Now()).Format("2006-01-02"))
 	default:
-		return fail(fmt.Errorf("_editor: unknown %q: use repo, hold or kick", args[0]))
+		return fail(fmt.Errorf("_editor: unknown %q: use repo, hold, kick or day", args[0]))
 	}
 	return 0
 }

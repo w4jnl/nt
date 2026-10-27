@@ -33,7 +33,7 @@ S new-session -d -s e2e -x 100 -y 30 -c "$T" "env PATH='$T/bin:$PATH' NT_CONFIG=
 expect_soon "nvim opens the note" 'First line' capture
 key() { S send-keys -t e2e "$@"; }
 ex() { S send-keys -t e2e -l ":$1"; S send-keys -t e2e Enter; }
-mapped() { rm -f "$T/map"; ex "lua vim.fn.writefile({vim.fn.maparg('<leader>ip', 'n') ~= '' and 'mapped' or 'none'}, '$T/map')"; sleep 0.3; cat "$T/map" 2>/dev/null; }
+mapped() { rm -f "$T/map"; ex "lua vim.fn.writefile({vim.fn.maparg('<leader>ip', 'n') ~= '' and vim.fn.maparg('<leader>tx', 'n') ~= '' and 'mapped' or 'none'}, '$T/map')"; sleep 0.3; cat "$T/map" 2>/dev/null; }
 edit_lock() { python3 -c 'import fcntl, sys
 f = open(sys.argv[1], "a")
 try:
@@ -41,7 +41,7 @@ try:
 except OSError:
     print("held")' "$N/.git/nt-edit"; }
 
-expect_soon "a note gets the paste key" '^mapped$' mapped
+expect_soon "a note gets the paste and todo keys" '^mapped$' mapped
 expect "an unchanged note holds nothing" '^free$' "$(edit_lock)"
 key '\' i p
 expect_soon "the key asks for a name" 'image name' capture
@@ -71,6 +71,13 @@ expect_soon "a file outside the repository gets no key" '^none$' mapped
 
 ex "e $N/tech/nas.md"
 key G o
+key -l -- '- [ ] Buy cables'
+key Escape
+key '\' t x
+expect_soon "<leader>tx checks the todo, with the day" '\[x\] Buy cables done:[0-9]{4}-[0-9]{2}-[0-9]{2}' capture
+key '\' t x
+expect_soon "and again opens it" '\[ \] Buy cables *$' capture
+key o
 key -l 'Third line.'
 key Escape
 ex w

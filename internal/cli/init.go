@@ -17,7 +17,7 @@ import (
 // The files every notes repository has (docs/format.md §11).
 var (
 	ignoreLines    = []string{".nt-tmp-*", "*~", "4913", ".*.sw?", ".DS_Store", ".obsidian/"}
-	attributeLines = []string{"daily/** merge=union"}
+	attributeLines = []string{"daily/** merge=union", "todo.md merge=union"}
 )
 
 // nt init [dir] [--clone url]: make dir a notes repository, or clone one. Either way the
@@ -122,6 +122,9 @@ agent working in this repository.
 - ` + "`daily/YYYY/YYYY-MM-DD.md`" + `: one journal per day. Add to it with ` + "`nt a \"text\"`" + `.
 - ` + "`agents/YYYY/YYYY-MM-DD/`" + `: agent session reports, one file per session, and the day's
   ` + "`README.md`" + `, which is generated from them: do not edit it.
+- ` + "`todo.md`" + `: the todo list; a folder can have its own. A todo is a task line in any note,
+  ` + "`- [ ] text due:YYYY-MM-DD`" + `; nt marks one done as ` + "`- [x] text done:YYYY-MM-DD`" + `. Add one with
+  ` + "`nt todo add \"text\" --due fri`" + ` (` + "`--in folder`" + ` for a folder's list).
 - Every other folder holds topic notes named ` + "`YYYY-MM-DD-<slug>.md`" + `, with attachments in an
   ` + "`assets/`" + ` folder beside them.
 
@@ -135,7 +138,8 @@ agent working in this repository.
 - Your session's report: ` + "`nt agent write --status done --summary \"one line\"`" + ` with ` + "`## Done`" + `,
   ` + "`## Decisions` and `## Open`" + ` on stdin. No secrets and no transcripts: this repository is
   pushed to GitHub.
-- Find things with ` + "`nt s \"words\" --json` and `nt ls folder --json`" + `.
+- Find things with ` + "`nt s \"words\" --json` and `nt ls folder --json`" + `; the open todos with
+  ` + "`nt todo --json`" + `.
 
 The full format is docs/format.md in github.com/w4jnl/nt.
 `

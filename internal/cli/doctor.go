@@ -123,7 +123,11 @@ func gitChecks(root string, add func(name, state, format string, a ...any)) {
 	attrs, _ := os.ReadFile(filepath.Join(root, ".gitattributes"))
 	ignore, _ := os.ReadFile(filepath.Join(root, ".gitignore"))
 	_, agentsErr := os.Stat(filepath.Join(root, "AGENTS.md"))
-	if !strings.Contains(string(attrs), "merge=union") || !strings.Contains(string(ignore), ".nt-tmp-*") || agentsErr != nil {
+	missing := agentsErr != nil || !strings.Contains(string(ignore), ".nt-tmp-*")
+	for _, l := range attributeLines {
+		missing = missing || !strings.Contains("\n"+string(attrs)+"\n", "\n"+l+"\n")
+	}
+	if missing {
 		add("files", "warn", "AGENTS.md, .gitattributes or .gitignore is missing nt's part: nt init %s adds it", tilde(root))
 	} else {
 		add("files", "ok", "AGENTS.md, .gitattributes and .gitignore")

@@ -1,6 +1,6 @@
 ---
 name: nt
-description: The person's notes, kept by the nt command in a git-synced folder of markdown. Use it to look something up in their notes, add a line to today's journal, make a note, or — at the end of a piece of work, or when blocked — write this session's report with Done, Decisions and Open.
+description: The person's notes and todos, kept by the nt command in a git-synced folder of markdown. Use it to look something up in their notes, add a line to today's journal, make a note, add or check off a todo, or — at the end of a piece of work, or when blocked — write this session's report with Done, Decisions and Open.
 ---
 
 # nt: the person's notes
@@ -26,6 +26,19 @@ repository: `nt sync` is its only git writer.
   print the `![…](assets/…)` line to put in it.
 - Notes are GitHub markdown: `[Title](relative/path.md)` links, `![alt](assets/x.png)` images,
   flat YAML frontmatter (`title`, `date`, `tags`). No wikilinks, embeds or callouts.
+
+## Todos
+
+A todo is a task line in any note: `- [ ] text due:YYYY-MM-DD`, and once done
+`- [x] text done:YYYY-MM-DD`. New ones go to `todo.md`, the root's or a folder's.
+
+- `nt todo [folder] --json`: the open todos, overdue first, in every note or under folder
+  (`--done`: the done ones, `--all`: both); each has `rel`, `line`, `text`, `due`.
+- `nt todo add "text" --due fri`: add one when the person asks you to remember something for
+  them; `--in work` puts it in `work/todo.md`. `--due` takes YYYY-MM-DD, today, tomorrow,
+  mon…sun, +3d, +2w.
+- `nt todo done <todo>`, `nt todo due <todo> <when>`, `nt todo undo <todo>`, `nt todo rm <todo>`:
+  `<todo>` is `path:line` from the list, or words from its text.
 
 ## This session's report
 

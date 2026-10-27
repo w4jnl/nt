@@ -51,6 +51,9 @@ c nt completion ""
 c nt import ""
 c nt agent ""
 c nt agent write --status b
+c nt todo ""
+c nt todo add --due f
+c nt todo add --in t
 `
 	out, err := exec.Command("bash", "-c", probe).CombinedOutput()
 	if err != nil {
@@ -71,6 +74,9 @@ c nt agent write --status b
 		"obsidian",
 		"start turn end write",
 		"blocked",
+		"add done undo due rm",
+		"fri",
+		"tech", // --in takes a folder
 	}
 	got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(got) != len(want) {

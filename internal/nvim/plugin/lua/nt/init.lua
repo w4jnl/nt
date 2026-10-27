@@ -1,6 +1,7 @@
 -- nt in nvim (docs/design.md §4, nvim). In a markdown note inside the notes repository:
 --   <leader>ip   pastes the clipboard's image: nt paste saves it beside the note, the line
 --                that shows it goes below the cursor.
+--   <leader>tx   checks the todo on the cursor line, adding done:<the day>, or opens it again.
 --   While a note has unsaved changes, sync commits but does not merge (nt holds .git/nt-edit),
 --   so a merge never lands under text you have not written yet.
 --   A note sync changed on disk is reloaded when it has no unsaved changes.
@@ -10,7 +11,7 @@ local M = {}
 
 local defaults = {
   cmd = "nt", -- the nt binary
-  keys = { paste = "<leader>ip" }, -- false turns a key off
+  keys = { paste = "<leader>ip", todo = "<leader>tx" }, -- false turns a key off
   reload = 3000, -- ms between checks for notes changed on disk; 0 turns them off
 }
 
@@ -104,6 +105,32 @@ local function paste(buf)
   end)
 end
 
+-- day is the day as nt counts it (day_starts), for done:.
+local function day()
+  local res = vim.system({ M.opts.cmd, "_editor", "day" }, { text = true }):wait()
+  return res.code == 0 and vim.trim(res.stdout) or os.date("%Y-%m-%d")
+end
+
+-- toggle checks the todo on the cursor line, "- [ ] text" to "- [x] text done:YYYY-MM-DD", or
+-- opens a done one again. It changes the buffer only; writing it is yours.
+local function toggle()
+  local line = vim.api.nvim_get_current_line()
+  local pre, mark, rest = line:match("^(%s*[-*+]%s+%[)([ xX])(%].*)$")
+  if not pre then
+    pre, mark, rest = line:match("^(%s*%d+[.)]%s+%[)([ xX])(%].*)$")
+  end
+  if not pre then
+    vim.notify("nt: not a todo; a todo is a line like - [ ] text", vim.log.levels.WARN)
+    return
+  end
+  rest = rest:gsub("%s+done:%d%d%d%d%-%d%d%-%d%d", ""):gsub("%s+$", "")
+  if mark == " " then
+    vim.api.nvim_set_current_line(pre .. "x" .. rest .. " done:" .. day())
+  else
+    vim.api.nvim_set_current_line(pre .. " " .. rest)
+  end
+end
+
 local function attach(buf)
   if vim.b[buf].nt_note ~= nil then
     return
@@ -117,6 +144,9 @@ local function attach(buf)
     vim.keymap.set("n", M.opts.keys.paste, function()
       paste(buf)
     end, { buffer = buf, desc = "nt: paste the clipboard's image" })
+  end
+  if M.opts.keys.todo then
+    vim.keymap.set("n", M.opts.keys.todo, toggle, { buffer = buf, desc = "nt: check or uncheck the todo" })
   end
   if not timer and M.opts.reload > 0 then
     timer = vim.uv.new_timer()

@@ -116,6 +116,9 @@ Decisions taken with the user (2026-10-26):
 | `nt f` | `rg --files \| fzf --preview 'nt _preview {}'` (nt's own style), then open the pick in `$EDITOR` |
 | `nt s <query>` | Search with `rg` |
 | `nt ls <folder>` | List notes in a folder |
+| `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
+| `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
+| `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
 | `nt paste <note> [--name words]` | Save the clipboard's image as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it |
 | `nt sync`, `nt doctor` | Sync now; check the setup |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
@@ -142,6 +145,7 @@ Decisions taken with the user (2026-10-26):
 | `t` | Today |
 | `[` `]` | Previous / next day |
 | `A` | Agents day folder, which opens on its digest |
+| `x` | The todo list (Todos, below) |
 | `1`–`9` | Pinned folders, so preselected subfolders are one key away |
 | `a` | One-line append (text input) |
 | `n` | Title prompt, then a note in the current folder, opened in nvim |
@@ -168,13 +172,21 @@ Decisions taken with the user (2026-10-26):
 
 - `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.
 
+**Todos** (`internal/todo`, docs/format.md §12). A todo is a task line, `- [ ] text due:YYYY-MM-DD`, in any note; `nt todo add` and the browser add new ones to `## Inbox` in a `todo.md`: the root's, or a folder's (`--in work`, or the folder the browser is in). Like the backlinks they are read from the files each time, with no index: `todo.Collect` walks the notes (leaving out agent reports, conflict copies and hidden folders) and a change rewrites one line under the repository lock, only when the line is still as it was read.
+- **Order:** open todos by due date, the overdue first, then the undated ones (the todo lists in file order, the root's first, then other notes newest first); done ones by their `done:` date, latest first.
+- **Dates in words:** `2d late` (in `warn`, so it reads without colour too), `today`, `tomorrow`, a weekday within the week, else `3 nov`. Input takes `YYYY-MM-DD`, `today`, `tomorrow`, `mon`…`sun` (the next one), `+3d`, `+2w`, `+1m`, and `none` to clear.
+- **The browser's todo list** (`x`) is a picker whose rows are todos: `○` open, `✓` done in `done`, the date at the right edge; the preview shows the todo's note at its line. Its keys: `x`/space check or uncheck, `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), `e` edit the note at the todo, `X` the done ones and back, `D` delete the line after asking, `r` read again; enter opens the note and esc goes back, as in every picker.
+- **nvim:** `<leader>tx` checks or unchecks the todo on the cursor line in the buffer, with the day from `nt _editor day`.
+- **Calendar** (step 2, after review): `c` shows a month in the list pane, with the days that have a journal, todos due and agent sessions marked; the preview shows the day's journal.
+
 **nvim** (`internal/nvim`). A small Lua plugin carried inside the binary, so it always matches the `nt` that runs it. `nt install --nvim` writes it to `$XDG_DATA_HOME/nt/nvim` (`~/.local/share/nt/nvim`); a lazy.nvim config loads it with `{ dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }`, and `require("nt").setup(opts)` changes `cmd`, `keys.paste` or `reload`. `nt doctor` warns when it is missing or older than `nt`. In a markdown note inside the repository it:
 - maps `<leader>ip` to `nt paste` with a name prompt, the line going below the cursor;
+- maps `<leader>tx` to checking or unchecking the todo on the cursor line, in the buffer (`nt _editor day` gives the date);
 - holds `.git/nt-edit` while a note has unsaved changes (`nt _editor hold`, until its input ends);
 - reloads notes that changed on disk and have no unsaved changes, every 3 s in normal mode;
 - starts a background sync when nvim exits after a note was written (`nt _editor kick`).
 
-It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same three `_editor` calls and `nt paste`.
+It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same `_editor` calls and `nt paste`.
 
 **Deferred:** back stack and multiple views.
 
@@ -320,6 +332,7 @@ internal/scan       in-memory backlinks/titles (no persisted index)
 internal/search     rg --json wrapper, fuzzy titles
 internal/gitsync    cycle above, conflict resolver, status.json, launchd/systemd unit install, notify
 internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest, hook installers
+internal/todo       todos: parse task lines, collect, sort, dates in words, add/check/due/remove one line
 skills/             skills/nt/SKILL.md, embedded; nt install --skill
 internal/theme      tokens → lipgloss v2 styles, state glyphs; termtheme (OSC 11) ported from flok
 internal/render     glamour: style from tokens, strip frontmatter, rewrite [[x]] → links, width
@@ -362,6 +375,10 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 - Reports are readable in nvim, glow and GitHub before the TUI exists.
 
 **3. TUI** as described in §4, with inline images (§5) in the preview from the start.
+
+**Todos and calendar (after 3).**
+- Step 1: todos as above: the format (docs/format.md §12), `nt todo`, the browser's `x` list, `<leader>tx` in nvim, the skill.
+- Step 2, after step 1 is reviewed: the calendar.
 
 **4. Remote hosts.**
 - Each host keeps its own reports. It is their only writer and never deletes them mid-session; it prunes ended ones after 14 days.

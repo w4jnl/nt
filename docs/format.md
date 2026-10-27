@@ -19,10 +19,11 @@ Rules are marked **must** or **should**. A client that cannot follow a must rule
 <repo>/
   .nt/config.toml                 repository settings (§9)
   .nt/templates/                  daily.md, note.md (§8)
-  .gitattributes                  daily/** merge=union
+  .gitattributes                  daily/** and todo.md merge=union
   .gitignore                      §11
   AGENTS.md                       layout and rules for agents working in the repository
   README.md                       optional, owned by the person
+  todo.md                         the todo list; a folder can have its own, and todos can be in any note (§12)
   daily/YYYY/YYYY-MM-DD.md        daily journal, one per day (§5)
   daily/YYYY/assets/              attachments pasted into journals
   agents/YYYY/YYYY-MM-DD/         agent reports for that day (§6)
@@ -290,8 +291,48 @@ These rules apply to every client that writes to the repository.
 
 ```
 daily/** merge=union
+todo.md merge=union
 ```
 
-## 12. Changes to this format
+## 12. Todos
+
+A todo is a task list item in any note. A `todo.md` is where clients add new ones: the one at the root, or the one in a folder the person names.
+
+```markdown
+# Todo
+
+## Inbox
+
+- [ ] Renew passport due:2026-11-03
+- [x] Pay the invoice done:2026-10-27
+
+## Work
+
+- [ ] Review the Q3 report due:2026-10-30
+```
+
+- **A todo** is a list item whose text starts with a checkbox: `- [ ] text` is open, `- [x] text`
+  (or `[X]`) is done. The bullet can be `-`, `*`, `+` or a number (`1.`); any indent is allowed.
+  A checkbox with no text is not a todo.
+- **Not todos:** lines in frontmatter or in fenced code blocks, and task lines in the agents
+  folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`.
+- **Due date:** `due:YYYY-MM-DD` anywhere in the text. Clients accept words such as `fri` or
+  `+3d` when a person types a date, and always write the date as `YYYY-MM-DD`.
+- **Done date:** checking a todo appends `done:YYYY-MM-DD`, the day it was done as `day_starts`
+  counts it. Unchecking it takes the date away. A todo checked in an editor, with no `done:`,
+  is done all the same.
+- **The text** a client shows is the line after the checkbox without `due:` and `done:`.
+- **`todo.md`** starts as `# Todo` and `## Inbox`. A client adds a new todo, `- [ ] text` with
+  its `due:` when it has one, at the end of `## Inbox` of the root's `todo.md`, or of
+  `<folder>/todo.md` when the person names a folder, and adds the file or the section when it is
+  missing. The agents folder and hidden folders have no todo list. The rest of the file is the
+  person's: other sections, order, notes between items.
+- **Changing a todo** rewrites its one line, and only when the line is still as the client read
+  it.
+- **Merging:** `todo.md merge=union`, which matches a `todo.md` in any folder, keeps todos added
+  on two devices without a conflict, as it does for journals. In the rare case that one device changes the last todo while the other adds
+  one right after it, both versions of the changed todo are kept, and the person deletes one.
+
+## 13. Changes to this format
 
 A change that older clients would misread raises `format` in `.nt/config.toml`. A client must not write to a repository with a higher `format` than it knows. Adding an optional frontmatter key is not such a change.

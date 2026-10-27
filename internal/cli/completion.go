@@ -34,6 +34,7 @@ var commands = []command{
 	{[]string{"ls"}, "the folders and notes in a folder", []flag{jsonFlag}, []string{"folder"}},
 	{[]string{"view"}, "show one note rendered", []flag{{"--theme", "light or dark", "(auto dark light)"}, {"--images", "draw images", "(auto on off)"}}, []string{"note"}},
 	{[]string{"paste"}, "save the clipboard's image beside a note", []flag{{"--name", "what the image shows", "name"}, jsonFlag}, []string{"note"}},
+	{[]string{"todo"}, "the todo list: add, check, due dates", []flag{{"--done", "the done ones", ""}, {"--all", "open and done", ""}, {"--due", "when it is due", "(today tomorrow mon tue wed thu fri sat sun none)"}, {"--in", "add to this folder's todo.md", "folder"}, jsonFlag}, []string{"(add done undo due rm)"}},
 	{[]string{"init"}, "make a folder a notes repository", []flag{{"--clone", "clone this repository", "url"}, jsonFlag}, []string{"dir"}},
 	{[]string{"sync"}, "commit, merge and push now", []flag{jsonFlag}, nil},
 	{[]string{"install"}, "the sync job, the nvim plugin, agent hooks, the skill", []flag{{"--sync", "nt sync every sync.interval", ""}, {"--nvim", "nt's nvim plugin", ""}, {"--hooks", "reports for Claude Code and Copilot CLI sessions", ""}, {"--skill", "teach the agents nt", ""}}, nil},
@@ -133,6 +134,8 @@ _nt() {
 			seen[f.name] = true
 			if words, ok := wordList(f.value); ok {
 				fmt.Fprintf(&b, "        %s) COMPREPLY=( $(compgen -W \"%s\" -- \"$cur\") ); return 0 ;;\n", f.name, words)
+			} else if f.value == "folder" {
+				fmt.Fprintf(&b, "        %s) %s; return 0 ;;\n", f.name, bashArg("folder"))
 			} else {
 				fmt.Fprintf(&b, "        %s) return 0 ;;\n", f.name)
 			}
@@ -228,6 +231,8 @@ _nt() {
 			switch words, ok := wordList(f.value); {
 			case ok:
 				s += ":" + strings.TrimPrefix(f.name, "--") + ":(" + words + ")"
+			case f.value == "folder":
+				s += ":folder:_nt_folders"
 			case f.value != "":
 				s += ":" + f.value + ": "
 			}

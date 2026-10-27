@@ -187,7 +187,7 @@ func TestAddToSection(t *testing.T) {
 		{"", "## Log\n\n- x\n"},
 		{"## Log\n- a", "## Log\n- a\n- x\n"},
 	} {
-		if got := string(addToSection([]byte(tc.doc), "Log", "- x")); got != tc.want {
+		if got := string(AddToSection([]byte(tc.doc), "Log", "- x")); got != tc.want {
 			t.Errorf("%q:\ngot  %q\nwant %q", tc.doc, got, tc.want)
 		}
 	}

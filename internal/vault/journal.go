@@ -167,7 +167,7 @@ func (v *Vault) Append(text string, t time.Time) (rel, line string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	err = v.Update(rel, func(old []byte) ([]byte, error) { return addToSection(old, "Log", line), nil })
+	err = v.Update(rel, func(old []byte) ([]byte, error) { return AddToSection(old, "Log", line), nil })
 	return rel, line, err
 }
 
@@ -184,15 +184,15 @@ func (v *Vault) LinkFromJournal(title, note string, t time.Time) (string, error)
 		if bytes.Contains(old, []byte("]("+link+")")) {
 			return old, nil
 		}
-		return addToSection(old, "Notes", item), nil
+		return AddToSection(old, "Notes", item), nil
 	})
 	return rel, err
 }
 
-// addToSection puts item at the end of the "## <name>" section: after its last non-blank line,
+// AddToSection puts item at the end of the "## <name>" section: after its last non-blank line,
 // with a blank line after the heading and before the next heading. A missing section is added
 // at the end of the file.
-func addToSection(doc []byte, name, item string) []byte {
+func AddToSection(doc []byte, name, item string) []byte {
 	lines := strings.Split(string(doc), "\n")
 	head := -1
 	for i, l := range lines {

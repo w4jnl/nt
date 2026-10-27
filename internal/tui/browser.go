@@ -26,6 +26,7 @@ import (
 	"github.com/w4jnl/nt/internal/search"
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
@@ -106,7 +107,8 @@ type pickItem struct {
 	kind        string // note, url, image, heading
 	target      string // repository path, URL or file
 	line        int
-	text        string // a heading or matched text to scroll to
+	text        string     // a heading or matched text to scroll to
+	todo        *todo.Item // a row of the todo list
 }
 
 // question is asked on the footer line: y does it, any other key leaves things as they are.
@@ -116,10 +118,14 @@ type question struct {
 }
 
 type picker struct {
-	title string
-	items []pickItem
-	sel   int
-	top   int
+	title  string
+	items  []pickItem
+	sel    int
+	top    int
+	todos  bool   // the todo list (todos.go)
+	done   bool   // its done todos, not the open ones
+	ready  bool   // its todos are read
+	folder string // whose todo.md a todo added there goes to; "" is the root's
 }
 
 type browser struct {
@@ -159,6 +165,9 @@ type browser struct {
 	help bool
 	ask  *question // a yes-or-no question on the footer line
 
+	todoSeq int
+	todoAt  *todo.Item // the todo the due prompt is for
+
 	status    gitsync.Status
 	hasStatus bool
 	statusMod time.Time
@@ -185,7 +194,12 @@ type (
 		err     error
 	}
 	syncedMsg struct{ st gitsync.Status }
-	notedMsg  struct {
+	todosMsg  struct {
+		seq   int
+		keep  string
+		items []todo.Item
+	}
+	notedMsg struct {
 		rel string
 		err error
 	}
@@ -480,9 +494,7 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return b, nil
 		}
 		cmd := b.show(it.target)
-		if it.text == "" || !b.p.showText(strings.ReplaceAll(it.text, "-", " ")) {
-			b.p.showLine(it.line)
-		}
+		b.scrollTo(it)
 		return b, cmd
 	case indexMsg:
 		if msg.seq != b.indexSeq {
@@ -499,6 +511,8 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, b.p.sendImages()
 	case searchMsg:
 		return b, b.searched(msg)
+	case todosMsg:
+		return b, b.setTodos(msg)
 	case syncedMsg:
 		return b, b.synced(msg.st)
 	case editedMsg:
@@ -514,6 +528,13 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		b.p.forget()
 		b.list()
+		if b.pick != nil && b.pick.todos {
+			keep := ""
+			if it := b.todoSelected(); it != nil {
+				keep = todoRef(it)
+			}
+			return b, tea.Batch(b.loadTodos(keep), b.reindex())
+		}
 		return b, tea.Batch(b.loadNow(), b.reindex())
 	case notedMsg:
 		if msg.err != nil {
@@ -776,6 +797,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.day(map[string]int{"[": -1, "]": 1}[s])
 	case "A":
 		return b.agents()
+	case "x":
+		return b.openTodos(false)
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		return b.pin(int(s[0] - '1'))
 	case "a":
@@ -1014,15 +1037,17 @@ func (b *browser) pin(i int) tea.Cmd {
 
 // edit hands the terminal to the editor for the note at rel, holding back sync's merge until it
 // closes.
-func (b *browser) edit(rel string) tea.Cmd {
+func (b *browser) edit(rel string) tea.Cmd { return b.editAt(rel, 0) }
+
+// editAt is edit at line; 0 is the line on screen in the preview, or a journal's last line.
+func (b *browser) editAt(rel string, line int) tea.Cmd {
 	release, err := b.v.LockEdit()
 	if err != nil {
 		b.say(err.Error(), true)
 		return nil
 	}
 	b.editing = release
-	line := 0
-	if rel == b.showing {
+	if line == 0 && rel == b.showing {
 		line = b.p.sourceLine()
 	}
 	if line == 0 {
@@ -1096,6 +1121,8 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			}
 		case "search", "find":
 			return b.choose()
+		case "due", "todo":
+			return b.todoInput(kind, text)
 		}
 		return nil
 	}
@@ -1266,6 +1293,11 @@ func (b *browser) imagesPicker() tea.Cmd {
 }
 
 func (b *browser) pickKey(k tea.KeyPressMsg) tea.Cmd {
+	if b.pick.todos {
+		if cmd, ok := b.todoKeys(k); ok {
+			return cmd
+		}
+	}
 	switch k.String() {
 	case "esc", "q", "left", "h":
 		return b.closePick()
@@ -1316,11 +1348,7 @@ func (b *browser) choose() tea.Cmd {
 			return nil
 		}
 		cmd := b.reveal(it.target)
-		switch {
-		case it.text != "" && b.p.showText(strings.ReplaceAll(it.text, "-", " ")):
-		case it.line > 0:
-			b.p.showLine(it.line)
-		}
+		b.scrollTo(it)
 		return cmd
 	case "heading":
 		if !b.p.showText(it.text) {
@@ -1337,6 +1365,17 @@ func (b *browser) choose() tea.Cmd {
 		b.say(it.hint+": the link points to nothing", true)
 	}
 	return nil
+}
+
+// scrollTo scrolls the preview to what a picker row points at: a todo's text, a heading or a
+// search hit, else its line.
+func (b *browser) scrollTo(it pickItem) {
+	switch {
+	case it.todo != nil && b.p.showText(it.todo.Text):
+	case it.todo == nil && it.text != "" && b.p.showText(strings.ReplaceAll(it.text, "-", " ")):
+	case it.line > 0:
+		b.p.showLine(it.line)
+	}
 }
 
 // openImage opens a picture full size: image_viewer from the config, else Quick Look on macOS,

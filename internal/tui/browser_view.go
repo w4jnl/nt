@@ -239,6 +239,10 @@ func (b *browser) pickerPane(w, h int) string {
 	rows := []string{" " + b.st.Muted.Render(p.title)}
 	for i := p.top; i < len(p.items) && len(rows) < h; i++ {
 		it := p.items[i]
+		if it.todo != nil {
+			rows = append(rows, b.todoRow(*it.todo, i == p.sel, w))
+			continue
+		}
 		text, muted := b.st.Text, b.st.Faint
 		lead := " "
 		if i == p.sel {
@@ -257,8 +261,13 @@ func (b *browser) pickerPane(w, h int) string {
 		}
 		rows = append(rows, line)
 	}
-	if len(p.items) == 0 && b.input != nil && b.input.Value() != "" && b.inputKind == "search" {
+	switch {
+	case len(p.items) == 0 && b.input != nil && b.input.Value() != "" && b.inputKind == "search":
 		rows = append(rows, "  "+b.st.Faint.Render("no lines match"))
+	case len(p.items) == 0 && p.todos && p.ready && p.done:
+		rows = append(rows, "  "+b.st.Faint.Render("nothing done yet"))
+	case len(p.items) == 0 && p.todos && p.ready:
+		rows = append(rows, "  "+b.st.Faint.Render("no open todos · a adds one"))
 	}
 	return strings.Join(rows, "\n")
 }
@@ -269,6 +278,7 @@ func (b *browser) helpText(w, h int) string {
 		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
 		{"go", "t", "today's journal", "[ ]", "the day before, after", "1–9", "pinned folders", "A", "today's agent reports"},
 		{"find", "/", "search every note", "ctrl-p", "a note by its title"},
+		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
 		{"in a note", "l", "links in and to it", "o", "its outline", "i", "its images, full size", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
 		{"write", "a", "add a line to today", "n", "a new note here", "s", "sync now", "r", "reload"},
 		{"mouse", "drag text", "select it in the note", "drag │", "resize the list (< > too)", "click", "select; again opens", "wheel", "scroll"},
@@ -291,7 +301,7 @@ func (b *browser) helpText(w, h int) string {
 	}
 	lines := append([]string{""}, block(groups)...)
 	if len(lines) > h && w >= 66 {
-		left, right := block(groups[:3]), block(groups[3:])
+		left, right := block(groups[:4]), block(groups[4:])
 		lines = []string{""}
 		for i := range max(len(left), len(right)) {
 			l, r := "", ""
@@ -326,12 +336,18 @@ func (b *browser) footer() string {
 	switch {
 	case b.p.mark != nil && !b.p.mark.empty():
 		left = hints(b.st, "y", "copy", "esc", "clear", "drag", "select more")
+	case b.pick != nil && b.pick.todos:
+		check, other := "done", "done ones"
+		if b.pick.done {
+			check, other = "open again", "open ones"
+		}
+		left = hints(b.st, "x", check, "d", "due", "a", "add", "X", other, "e", "edit", "D", "delete", "esc", "back")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
 	case b.focus == onPreview:
 		left = hints(b.st, "j k", "scroll", "e", "edit", "l", "links", "o", "outline", "D", "delete", "esc", "back")
 	default:
-		left = hints(b.st, "t", "today", "[ ]", "day", "a", "add", "n", "new", "/", "search", "^p", "title", "D", "delete", "?", "help")
+		left = hints(b.st, "t", "today", "[ ]", "day", "a", "add", "n", "new", "/", "search", "^p", "title", "x", "todos", "D", "delete", "?", "help")
 	}
 	left = " " + left
 	right := ""

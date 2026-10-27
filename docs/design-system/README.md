@@ -85,6 +85,9 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 | report | blocked | `●` | `blocked` → `warn` | orange |
 | report | failed | `◆` | `failed` → `alert` | red |
 | report | abandoned | `○` | `abandoned` → `ink-muted` | grey |
+| todo | open | `○` | `ink-muted` | grey; its due date in words at the right |
+| todo | late | `○` and "2d late" | `warn` on the words | orange; the word says it, the colour repeats it |
+| todo | done | `✓` | `done` → `ok` | green; when it was done in words |
 
 - `◐` is only ever a spinner frame, so a still `◐` means in-progress and never offline.
 - All text pairs named in the token notes are 4.5:1 or better in both themes; `ink-faint` is

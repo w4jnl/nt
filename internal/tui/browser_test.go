@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -179,5 +180,89 @@ func TestDeleteAsks(t *testing.T) {
 	}
 	if len(b.entries) != 2 || b.sel != 0 || b.showing != b.entries[0].rel {
 		t.Fatalf("after the delete: %d rows, row %d selected, showing %q", len(b.entries), b.sel, b.showing)
+	}
+}
+
+// run sends msg to the browser, then the todo list's reading of the notes when msg started one.
+func run(b *browser, msg tea.Msg) {
+	if _, cmd := b.Update(msg); cmd != nil {
+		if m, ok := cmd().(todosMsg); ok {
+			b.Update(m)
+		}
+	}
+}
+
+func press(b *browser, keys string) {
+	for _, r := range keys {
+		run(b, tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+}
+
+func TestTodoList(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.v.Now = func() time.Time { return time.Date(2026, 10, 27, 10, 0, 0, 0, time.Local) }
+	if err := os.WriteFile(b.v.Abs("todo.md"), []byte("# Todo\n\n## Inbox\n\n- [ ] Renew passport due:2026-11-03\n- [ ] Call the plumber due:2026-10-25\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b.v.Abs("tech/2026-10-20-a.md"), []byte("# a\n\n- [ ] from a note\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read := func() string { s, _ := os.ReadFile(b.v.Abs("todo.md")); return string(s) }
+	rows := func() (out []string) {
+		for _, it := range b.pick.items {
+			out = append(out, it.todo.Text)
+		}
+		return out
+	}
+
+	press(b, "x")
+	if b.pick == nil || !b.pick.todos || b.pick.title != "todo · 3 open · 1 late" {
+		t.Fatalf("x does not show the todo list: %+v", b.pick)
+	}
+	if got := strings.Join(rows(), ", "); got != "Call the plumber, Renew passport, from a note" {
+		t.Fatalf("the open todos: %s", got)
+	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "○ Call the plumber") || !strings.Contains(screen, "2d late") {
+		t.Fatalf("the list on screen:\n%s", screen)
+	}
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "x done") || !strings.Contains(f, "d due") {
+		t.Errorf("footer: %s", f)
+	}
+
+	press(b, "x") // checks the selected one
+	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") || len(b.pick.items) != 2 {
+		t.Fatalf("x does not check the todo:\n%s", read())
+	}
+
+	press(b, "d") // the selected one, Renew passport, is due friday
+	press(b, "fri")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(), "- [ ] Renew passport due:2026-10-30\n") || b.msg != "due fri: Renew passport" {
+		t.Fatalf("d does not set the due date (%s):\n%s", b.msg, read())
+	}
+
+	press(b, "a") // the browser is in tech/, so tech/todo.md
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in tech/todo.md:") {
+		t.Errorf("the add prompt does not say where: %s", f)
+	}
+	press(b, "Buy milk")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	list, _ := os.ReadFile(b.v.Abs("tech/todo.md"))
+	if string(list) != "# Todo\n\n## Inbox\n\n- [ ] Buy milk\n" || b.todoSelected() == nil || b.todoSelected().Text != "Buy milk" {
+		t.Fatalf("a does not add a todo to the folder's list:\n%s", list)
+	}
+
+	press(b, "X")
+	if got := strings.Join(rows(), ", "); got != "Call the plumber" || !strings.Contains(ansi.Strip(b.footer()), "x open again") {
+		t.Fatalf("X does not show the done ones: %s", got)
+	}
+	press(b, "D")
+	press(b, "y")
+	if strings.Contains(read(), "plumber") || len(b.pick.items) != 0 {
+		t.Fatalf("D y does not delete the todo:\n%s", read())
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.pick != nil {
+		t.Fatal("esc does not close the todo list")
 	}
 }

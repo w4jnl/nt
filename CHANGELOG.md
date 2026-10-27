@@ -6,6 +6,16 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- **Todos.** A todo is a task line in any note, `- [ ] text due:YYYY-MM-DD`; new ones go to
+  `todo.md`, the root's or a folder's (docs/format.md §12). `nt todo [folder]` lists the open
+  ones, overdue first; `nt todo add [--in folder]`, `done`, `undo`, `due` and `rm` change them,
+  by `path:line` or words from their text. In the browser `x` opens the todo list, with the note
+  each todo is in beside it: `x` checks one, `d` sets its due date, `a` adds one to the `todo.md`
+  of the folder you are in, `X` shows the done ones. In nvim `<leader>tx` checks the todo
+  under the cursor. The skill and `AGENTS.md` teach agents the same. `todo.md` merges line by
+  line like the journals: run `nt init <repo>` once in an existing repository to add the
+  `.gitattributes` line, which `nt doctor` checks.
+
 ## 0.1.0 (2026-10-27)
 
 The first release: phases 0 to 3 of [the design](docs/design.md#phases-each-ends-in-something-usable).

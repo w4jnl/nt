@@ -40,6 +40,12 @@ notes
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
 
+todos
+  todo [folder]        the open todos in every note, or under folder, overdue first [--done] [--all]
+  todo add <text>      a new todo at the end of Inbox in todo.md [--due fri|+3d|YYYY-MM-DD]
+                       [--in folder]: in that folder's todo.md
+  todo done <todo>     check it; undo, rm, and due <todo> <when> too. <todo>: words or path:line
+
 agents
   agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin)
   agent write             the agent's own Done, Decisions and Open on stdin [--status s] [--summary text]
@@ -105,6 +111,8 @@ func Main(args []string) int {
 		return runView(args[1:])
 	case "paste":
 		return runPaste(args[1:])
+	case "todo":
+		return runTodo(args[1:])
 	case "theme":
 		return runTheme(args[1:])
 	case "agent":
