@@ -4,7 +4,9 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
-## Unreleased
+## 0.2.0 (2026-10-27)
+
+Todos, folders and the calendar.
 
 - **Todos.** A todo is a task line in any note, `- [ ] text due:YYYY-MM-DD`; new ones go to
   `todo.md`, the root's or a folder's (docs/format.md §12). `nt todo [folder]` lists the open
@@ -15,7 +17,6 @@ updates this file first. Dates are the tag dates.
   under the cursor. The skill and `AGENTS.md` teach agents the same. `todo.md` merges line by
   line like the journals: run `nt init <repo>` once in an existing repository to add the
   `.gitattributes` line, which `nt doctor` checks.
-
 - **Folders.** `nt mv` moves a note or a folder and `nt rename` gives a note a new title (the
   file name follows, its date kept) or a folder a new name. Every link to what moves and in it
   is fixed in the same pass, the images only that note uses go along, `[[wikilinks]]` to it

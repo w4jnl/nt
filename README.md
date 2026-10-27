@@ -5,8 +5,8 @@ day, dated topic notes, and a folder where coding agents report what they did, w
 digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the
 way.
 
-Current version: 0.1.0 · [release notes](CHANGELOG.md). The everyday commands, git sync, the
-browser and agent reports work; remote hosts come next
+Current version: 0.2.0 · [release notes](CHANGELOG.md). The everyday commands, git sync, the
+browser, agent reports, todos, folders and the calendar work; remote hosts come next
 ([phases](docs/design.md#phases-each-ends-in-something-usable)).
 
 ## Why
