@@ -46,7 +46,9 @@ const (
 	noteChars   = 1500
 	reportChars = 1200
 	inputChars  = 40000
-	summaryMax  = 1500 // the summary's own length, cut at a sentence
+	summaryMax  = 1500 // a summary that is not in lists: one paragraph, cut at a sentence
+	bulletMax   = 200  // a bullet's length
+	bulletsMax  = 4    // bullets per list
 )
 
 // Input is what was written on host in the week that starts on monday, as the tool reads it, or
@@ -152,11 +154,22 @@ func Input(v *vault.Vault, host string, monday time.Time) string {
 // prompt is what the tool is asked; the week follows it.
 const prompt = `You write the weekly summary in a personal notes repository. The text that follows lists what
 was written on one machine in one week: journal lines, todos added or done, notes made or changed
-with the lines added, and coding-agent sessions with what they did. Write one paragraph of three
-to six sentences in English: what got done, the decisions made, and what is still open. Name the
-projects and notes it is about. Say only what the text says. Leave out passwords, tokens, keys,
-and personal data such as phone numbers and addresses. Plain text: no heading, no list, no
-markdown.`
+with the lines added, and coding-agent sessions with what they did.
+
+Answer with exactly three labelled lists and nothing else:
+
+**Done**
+- ...
+**Decided**
+- ...
+**Open**
+- ...
+
+Each list has one to four bullets; each bullet is one short line, about outcomes: what got done,
+what was decided, what is still open. Name the projects and notes. Do not retell what a note
+says, and skip entries that are plainly tests. When a list has nothing, write "- nothing". Say
+only what the text says. Leave out passwords, tokens, keys, and personal data such as phone
+numbers and addresses. No headings, no other text.`
 
 // Summarize has tool write the summary of the week that starts on monday, for this machine
 // (v.Host), and writes it. It returns the summary's path, or "" when nothing was written on this
@@ -265,7 +278,7 @@ func run(ctx context.Context, tool Tool, in string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("summary: %s: %v: %s", tool.Name, err, firstLine(errOut.String()))
 	}
-	text := paragraph(out.String())
+	text := sections(out.String())
 	if text == "" {
 		return "", fmt.Errorf("summary: %s answered nothing", tool.Name)
 	}
@@ -287,8 +300,60 @@ func LookTool(name string) (string, error) {
 	return "", fmt.Errorf("summary: %s is not installed (not on PATH, nor in ~/.local/bin or Homebrew's bin)", name)
 }
 
-// paragraph makes the tool's answer one paragraph of plain text, at most summaryMax characters,
-// cut after a sentence: no heading, list or task line can come of it.
+// labels are the summary's lists, in their order.
+var labels = []string{"Done", "Decided", "Open"}
+
+var (
+	labelLine = regexp.MustCompile(`(?i)^[#*_\s]*(done|decided|decisions|open)[*_\s]*:?[*_\s]*$`)
+	bullet    = regexp.MustCompile(`^\s*(?:[-*+•]|\d{1,3}[.)])\s+(.*)$`)
+	checkbox  = regexp.MustCompile(`^\[[ xX]?\]\s*`)
+)
+
+// sections makes the tool's answer the summary's three lists, Done, Decided and Open, each a
+// bold label and at most bulletsMax bullets of plain text: no heading, no other text, and no
+// bullet a task line, so nothing of it reads as a todo or breaks the digest. "nothing" bullets
+// and empty lists are left out. An answer without the labels becomes one paragraph.
+func sections(s string) string {
+	items := map[string][]string{}
+	cur := ""
+	found := false
+	for _, l := range strings.Split(s, "\n") {
+		if m := labelLine.FindStringSubmatch(strings.TrimSpace(l)); m != nil {
+			cur, found = strings.ToUpper(m[1][:1])+strings.ToLower(m[1][1:]), true
+			if cur == "Decisions" {
+				cur = "Decided"
+			}
+			continue
+		}
+		m := bullet.FindStringSubmatch(l)
+		if cur == "" || m == nil {
+			continue
+		}
+		text := strings.Join(strings.Fields(checkbox.ReplaceAllString(m[1], "")), " ")
+		text = strings.TrimLeft(text, "#> ")
+		if text == "" || strings.EqualFold(strings.Trim(text, ". "), "nothing") || len(items[cur]) == bulletsMax {
+			continue
+		}
+		if len(text) > bulletMax {
+			text = strings.TrimSpace(text[:bulletMax]) + "…"
+		}
+		items[cur] = append(items[cur], text)
+	}
+	if !found {
+		return paragraph(s)
+	}
+	var out []string
+	for _, l := range labels {
+		if len(items[l]) == 0 {
+			continue
+		}
+		out = append(out, "**"+l+"**\n\n- "+strings.Join(items[l], "\n- "))
+	}
+	return strings.Join(out, "\n\n")
+}
+
+// paragraph makes an answer without lists one paragraph of plain text, at most summaryMax
+// characters, cut after a sentence: no heading, list or task line can come of it.
 func paragraph(s string) string {
 	var words []string
 	for _, l := range strings.Split(s, "\n") {

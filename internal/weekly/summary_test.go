@@ -68,7 +68,7 @@ func fakeTool(t *testing.T) string {
 	script := "#!/bin/sh\ncat > \"" + dir + "/$(basename \"$0\").in\"\nprintf '%s\\n' \"$@\" > \"" + dir + "/$(basename \"$0\").args\"\n" +
 		"echo \"$NT_NO_REPORT\" > \"" + dir + "/$(basename \"$0\").noreport\"\n" +
 		"[ -f \"" + dir + "/fail\" ] && { echo 'not logged in' >&2; exit 1; }\n" +
-		"printf '# Summary\\n\\nThe NAS got its disks.\\n- And the domain was renewed.\\n'\n"
+		"printf '**Done**\\n- The NAS got its disks.\\n- The domain was renewed.\\n**Decided**\\n- nothing\\n**Open**\\n- Order the cables.\\n'\n"
 	for _, name := range []string{"claude", "copilot"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
@@ -117,7 +117,7 @@ func TestSummarize(t *testing.T) {
 		t.Fatalf("Summarize = %q, %v", rel, err)
 	}
 	b, _ := os.ReadFile(v.Abs(rel))
-	want := "---\ntitle: \"Week 44, 2026 · home\"\ndate: 2026-10-26\ntype: weekly-summary\nhost: home\ntool: claude\nmodel: haiku\n---\n\nSummary The NAS got its disks. And the domain was renewed.\n"
+	want := "---\ntitle: \"Week 44, 2026 · home\"\ndate: 2026-10-26\ntype: weekly-summary\nhost: home\ntool: claude\nmodel: haiku\n---\n\n**Done**\n\n- The NAS got its disks.\n- The domain was renewed.\n\n**Open**\n\n- Order the cables.\n"
 	if string(b) != want {
 		t.Errorf("the summary file:\n%s\nwant:\n%s", b, want)
 	}
@@ -137,7 +137,7 @@ func TestSummarize(t *testing.T) {
 	}
 
 	digest, _ := Text(v, at("2026-10-28 10:00"))
-	if !strings.Contains(string(digest), "## Summary\n\n### home · claude\n\nSummary The NAS got its disks.") {
+	if !strings.Contains(string(digest), "## Summary\n\n### home · claude\n\n**Done**\n\n- The NAS got its disks.") {
 		t.Errorf("the digest does not show the summary:\n%s", digest)
 	}
 
@@ -195,6 +195,21 @@ func TestRefreshSummaries(t *testing.T) {
 	}
 	if got := Due(v, nextWeek); len(got) != 0 {
 		t.Errorf("a week with its summary is still due: %v", got)
+	}
+}
+
+func TestSections(t *testing.T) {
+	for _, c := range []struct{ name, in, want string }{
+		{"the asked form", "**Done**\n- a\n- b\n**Decided**\n- c\n**Open**\n- d\n", "**Done**\n\n- a\n- b\n\n**Decided**\n\n- c\n\n**Open**\n\n- d"},
+		{"labels written otherwise, numbered bullets", "## Done:\n1. a\n2) b\nDecisions\n* c\nOPEN:\n• d", "**Done**\n\n- a\n- b\n\n**Decided**\n\n- c\n\n**Open**\n\n- d"},
+		{"no task lines, no headings, no prose", "Here you go.\n**Done**\n- [x] shipped it\n- # loud\nsome prose\n**Open**\n- [ ] the rest", "**Done**\n\n- shipped it\n- loud\n\n**Open**\n\n- the rest"},
+		{"nothing and empty lists left out", "**Done**\n- a\n**Decided**\n- nothing\n**Open**\n- Nothing.", "**Done**\n\n- a"},
+		{"at most four bullets", "**Done**\n- 1\n- 2\n- 3\n- 4\n- 5", "**Done**\n\n- 1\n- 2\n- 3\n- 4"},
+		{"no labels: a paragraph", "The week went well.\n\n- and more.", "The week went well. and more."},
+	} {
+		if got := sections(c.in); got != c.want {
+			t.Errorf("%s:\n%q\nwant\n%q", c.name, got, c.want)
+		}
 	}
 }
 

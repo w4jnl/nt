@@ -7,8 +7,8 @@ updates this file first. Dates are the tag dates.
 ## Unreleased
 
 - **Weekly summaries.** A machine whose config names a tool (`[summary] tool = "claude"` or
-  `"copilot"`) has it write, once a week is over, a paragraph on what was written on that
-  machine: its journal lines, todos, notes and agent sessions, read from the commits sync made
+  `"copilot"`) has it write, once a week is over, what was written on that machine in three
+  short lists, Done, Decided and Open: its journal lines, todos, notes and agent sessions, read from the commits sync made
   there. Each machine writes its own file, `weekly/GGGG/GGGG-Www-<host>.md`, so a week written at
   work goes only to the work machine's tool. The weekly digest shows them all;
   `nt week --summarize` writes one by hand, and `nt doctor` checks the tool.

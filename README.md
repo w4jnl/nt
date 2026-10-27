@@ -106,8 +106,9 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   rewrites every link to what moved and in it, and takes along the images only that note uses.
 - **The weekly digest.** One machine compiles each week into `weekly/2026/2026-W44.md`: the notes
   made and changed, the todos done and due, the agent sessions, and every day's journal lines.
-  With a summary tool set, each machine adds a paragraph on its own week, written by Claude Code
-  or Copilot CLI: what was written at work goes only to the work machine's tool.
+  With a summary tool set, each machine adds its own week in three short lists, Done, Decided and
+  Open, written by Claude Code or Copilot CLI: what was written at work goes only to the work
+  machine's tool.
 - **Agents.** `nt install --hooks` gives every Claude Code and Copilot CLI session a report in
   `agents/YYYY/YYYY-MM-DD/`; the skill teaches them to search your notes, add to the journal and
   write their own Done, Decisions and Open.

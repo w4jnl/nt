@@ -275,8 +275,8 @@ Compiled by nt from the week's notes; it is written again when they change.
 
 ### Weekly summaries
 
-`weekly/GGGG/GGGG-Www-<host>.md` is one machine's summary of a week: a paragraph written by an AI
-tool on that machine, about what was written on that machine.
+`weekly/GGGG/GGGG-Www-<host>.md` is one machine's summary of a week, written by an AI tool on
+that machine, about what was written on that machine: three short lists, Done, Decided and Open.
 
 - A machine writes summaries only when its machine config names a tool (`[summary] tool`, §9),
   and writes only its own file, once the week is over, so every summary has one writer.
@@ -286,10 +286,15 @@ tool on that machine, about what was written on that machine.
   machine's week stays with the work machine's tool, whatever folder it is in.
 - What the tool reads: the week's journal lines, the todos added or done, the notes made (their
   text) or changed (the lines added), a commit of more than 20 notes only counted, and each agent
-  session's summary, Done, Decisions and Open, at most about 40,000 characters. It is asked for one
-  paragraph of plain text, without secrets or personal data.
+  session's summary, Done, Decisions and Open, at most about 40,000 characters. It is asked for
+  the three lists, about outcomes rather than what the notes say, without tests, secrets or
+  personal data.
+- The body is what is kept of the answer: each list as a bold label (`**Done**`, `**Decided**`,
+  `**Open**`) and one to four bullets of plain text, at most 200 characters each. Headings, other
+  text and checkboxes are dropped, so no bullet is a todo; a list with nothing is left out. An
+  answer without the labels is kept as one paragraph.
 - The file has `type: weekly-summary` frontmatter with `host`, `tool` and, when one is set,
-  `model`, then the paragraph. It is not rewritten when the week's notes change later.
+  `model`, then the body. It is not rewritten when the week's notes change later.
 - The weekly digest shows each machine's summary under `## Summary`, after its title.
 
 ```markdown
@@ -301,9 +306,18 @@ host: mbp
 tool: claude
 ---
 
-The NAS got four disks in RAID-Z1 and its nightly restic backup; a decision was recorded to drop
-the Synology job. The infra project's Terraform for the new cron host was finished; the website
-waits on a DNS change.
+**Done**
+
+- The NAS got four disks in RAID-Z1 and a nightly restic backup.
+- infra: the Terraform for the new cron host is finished.
+
+**Decided**
+
+- Keep restic and drop the Synology Hyper Backup job.
+
+**Open**
+
+- website: waits on the DNS change.
 ```
 
 ## 8. Templates
