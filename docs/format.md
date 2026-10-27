@@ -375,7 +375,10 @@ Sync commits a move as files deleted and added, and git's merge finds the rename
 - A note another device deleted stays, at its new place: a change wins over a deletion (§10).
 - A note two devices moved to different places at once is kept in both. Nothing is lost; delete
   the one you do not want.
+- A note whose links the move rewrote, changed on another device near those lines at the same
+  time, gives a conflict copy, as any note changed on both sides does.
 - A link to the old path that another device wrote before it had the move points at nothing.
+  `nt doctor` lists such links.
 
 ## 14. Changes to this format
 

@@ -72,7 +72,8 @@ sessions, its journal beside it. In nvim, `<leader>tx` checks the todo under the
 ### Folders
 
 Move and rename with nt rather than `mv`: it fixes every link to what moves and in it, takes the
-images only that note uses along, and keeps the journal's line pointing at the note. In the
+images only that note uses along, and keeps the journal's line pointing at the note. `nt doctor`
+lists any link that points at nothing. In the
 browser, `m` moves the selected note or folder (type to filter the folders, or name a new one),
 `R` renames it, `N` makes a folder in the one you are in (`/name` from the root).
 

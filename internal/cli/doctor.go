@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -16,17 +17,20 @@ import (
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/gitsync"
 	"github.com/w4jnl/nt/internal/nvim"
+	"github.com/w4jnl/nt/internal/scan"
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/internal/vault"
 	"github.com/w4jnl/nt/skills"
 )
 
 // check is one line of nt doctor: ok, warn (works, but something is missing) or fail (nt will
 // not work as it should).
 type check struct {
-	Check  string `json:"check"`
-	State  string `json:"state"`
-	Detail string `json:"detail"`
+	Check  string   `json:"check"`
+	State  string   `json:"state"`
+	Detail string   `json:"detail"`
+	Items  []string `json:"items,omitempty"` // what the detail counts, one per line
 }
 
 // nt doctor: check the repository, git, the sync timer, the tools nt uses and images.
@@ -38,7 +42,7 @@ func runDoctor(args []string) int {
 	m, merr := config.LoadMachine()
 	var checks []check
 	add := func(name, state, format string, a ...any) {
-		checks = append(checks, check{name, state, fmt.Sprintf(format, a...)})
+		checks = append(checks, check{Check: name, State: state, Detail: fmt.Sprintf(format, a...)})
 	}
 	if merr != nil {
 		add("config", "fail", "%v", merr)
@@ -51,6 +55,7 @@ func runDoctor(args []string) int {
 	} else {
 		add("repository", "ok", "%s (format %d)", tilde(v.Root), v.Cfg.Format)
 		gitChecks(v.Root, add)
+		checks = append(checks, linkCheck(v))
 	}
 	syncChecks(m, add)
 	toolChecks(add)
@@ -87,11 +92,41 @@ func runDoctor(args []string) int {
 		s := map[string]theme.State{"ok": theme.Done, "warn": theme.Blocked, "fail": theme.Failed}[c.State]
 		mark := lipgloss.NewStyle().Foreground(pal.Color(s)).Render(fmt.Sprintf("%s %-4s", theme.Glyph(s, 0), c.State))
 		lipgloss.Println(mark + "  " + st.Text.Render(fmt.Sprintf("%-12s", c.Check)) + st.Muted.Render(c.Detail))
+		const shown = 10
+		for i, item := range c.Items {
+			if i == shown {
+				lipgloss.Println(strings.Repeat(" ", 20) + st.Faint.Render(fmt.Sprintf("… and %d more: nt doctor --json lists them all", len(c.Items)-shown)))
+				break
+			}
+			lipgloss.Println(strings.Repeat(" ", 20) + st.Faint.Render(item))
+		}
 	}
 	if failed {
 		return 1
 	}
 	return 0
+}
+
+// linkCheck finds the links in the notes that point at nothing: a note deleted or renamed by
+// hand, or a link to a note's old place written on a machine that did not have its move yet.
+// The journals' links to the days around them and to the agents' digest may point at days
+// without one, so they are left out.
+func linkCheck(v *vault.Vault) check {
+	c := v.Cfg.Folders
+	dated := regexp.MustCompile(`^(` + regexp.QuoteMeta(c.Daily) + `/\d{4}/\d{4}-\d{2}-\d{2}\.md|` +
+		regexp.QuoteMeta(c.Agents) + `/\d{4}/\d{4}-\d{2}-\d{2}/README\.md)$`)
+	broken := scan.BrokenLinks(v.Root, dated.MatchString)
+	if len(broken) == 0 {
+		return check{Check: "links", State: "ok", Detail: "every link in the notes points at a file"}
+	}
+	out := check{Check: "links", State: "warn", Detail: plural(len(broken), "link") + " point at nothing"}
+	if len(broken) == 1 {
+		out.Detail = "1 link points at nothing"
+	}
+	for _, l := range broken {
+		out.Items = append(out.Items, fmt.Sprintf("%s:%d → %s", l.From, l.Line, l.Dest))
+	}
+	return out
 }
 
 func gitChecks(root string, add func(name, state, format string, a ...any)) {

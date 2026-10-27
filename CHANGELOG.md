@@ -6,6 +6,9 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- `nt doctor` lists the links in the notes that point at nothing: a note deleted or renamed by
+  hand, or a link to a note's old place written on a machine that did not have its move yet.
+  The journals' links to days without a journal are left out; `--json` lists every link.
 - Copilot CLI sessions no longer end as `abandoned`. Its `agentStop` hook carries no message
   text, so its turns left no line in the report's log, and a session with no turns counts as
   abandoned. Every turn now adds a line, `turn ended` when there is no text.

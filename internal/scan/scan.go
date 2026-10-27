@@ -117,3 +117,59 @@ func shared(a, b string) int {
 	}
 	return n
 }
+
+// BrokenLink is a link in a note that points at nothing.
+type BrokenLink struct {
+	From string `json:"from"` // the note it is in
+	Line int    `json:"line"`
+	Dest string `json:"dest"` // as written
+}
+
+// BrokenLinks lists the links in the notes under root that point at nothing: relative links and
+// images to files that are not there, and legacy wikilinks no note answers to. Code, URLs, links
+// to a heading in the same note and conflict copies are left out, and so are the targets skip
+// says may be missing by design, such as the journal of a day that has none. A reference
+// definition counts only when its destination looks like a path, so "[Note]: call Bob" is prose.
+func BrokenLinks(root string, skip func(rel string) bool) []BrokenLink {
+	ix := Build(root)
+	var out []BrokenLink
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && p != root && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") || strings.HasPrefix(d.Name(), ".") || strings.Contains(d.Name(), ".conflict-") {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, p)
+		from := filepath.ToSlash(rel)
+		for _, l := range mdparse.Parse(b).Links {
+			switch {
+			case l.Dest == "" || mdparse.External(l.Dest) || strings.HasPrefix(l.Dest, "#"):
+				continue
+			case l.Ref && !strings.ContainsAny(l.Dest, "./"):
+				continue
+			case l.Wiki:
+				if _, ok := ix.Target(from, l); !ok && !l.Image {
+					out = append(out, BrokenLink{from, l.Line, "[[" + l.Dest + "]]"})
+				}
+				continue
+			}
+			to, _, ok := mdparse.Resolve(from, l.Dest)
+			if !ok || skip != nil && skip(to) {
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(to))); err != nil {
+				out = append(out, BrokenLink{from, l.Line, l.Dest})
+			}
+		}
+		return nil
+	})
+	return out
+}
