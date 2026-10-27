@@ -362,6 +362,8 @@ internal/clip       the clipboard's image for nt paste: AppKit via osascript, wl
 internal/nvim       the nvim plugin (Lua, embedded) and nt install --nvim
 assets/brand/ · docs/design-system/ · docs/{research,format}.md · skills/nt/SKILL.md
 scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/ci.yml
+assets/demo/ (scene.sh, *.tape, record.sh) → assets/readme/*.gif   the README recordings, made with vhs
+CONTRIBUTING.md · SECURITY.md · .github/ISSUE_TEMPLATE/ · .github/dependabot.yml
 scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarballs, Homebrew tap bump
 ```
 

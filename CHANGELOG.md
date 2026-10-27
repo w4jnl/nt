@@ -4,7 +4,9 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
-## Unreleased
+## 0.3.0 (2026-10-27)
+
+Follow links in the note, the weekly digest, journals in time order.
 
 - **Links that point at nothing look broken.** In the browser's preview a link to a file that is
   not there is grey and struck through; a click still says what it pointed to.
@@ -12,7 +14,9 @@ updates this file first. Dates are the tag dates.
   machine's after the other's. Once the day is over, sync puts its Log back in time order (lines
   after midnight but before `day_starts` last) and drops a line the merge left twice. Today's
   journal is left alone: moving lines another machine is still adding to would duplicate them.
-  The weekly digest shows every day's lines in time order, today's too.
+  The weekly digest shows every day's lines in time order, today's too. Like `nt doctor`, the
+  preview does not count a journal's links to the days around it, or to a digest not written
+  yet, as broken.
 - **Follow links in the note.** In the browser a click on a link in the note follows it, and `f`
   puts letters on the links on screen: type them to follow one. `b` goes back to the note before,
   scrolled as it was. A note opens at the heading the link names; folders, images, other files
@@ -25,6 +29,9 @@ updates this file first. Dates are the tag dates.
 - `nt doctor` lists the links in the notes that point at nothing: a note deleted or renamed by
   hand, or a link to a note's old place written on a machine that did not have its move yet.
   The journals' links to days without a journal are left out; `--json` lists every link.
+- The README shows the browser and the command line in two recordings, and says how nt is
+  designed; `CONTRIBUTING.md`, `SECURITY.md` and an issue form say how to report a bug or a
+  vulnerability.
 - Copilot CLI sessions no longer end as `abandoned`. Its `agentStop` hook carries no message
   text, so its turns left no line in the report's log, and a session with no turns counts as
   abandoned. Every turn now adds a line, `turn ended` when there is no text.

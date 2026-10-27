@@ -42,26 +42,29 @@ type imagesSentMsg struct{}
 // preview is one note rendered in a viewport, images drawn in place: the whole of nt view and
 // the right pane of the browser.
 type preview struct {
-	path    string // the file
-	rel     string // its folder's path from the root links are shown from ("" outside a repository)
-	raw     []byte
-	title   string
-	err     error
-	mod     time.Time
-	vp      viewport.Model
-	width   int
-	height  int
-	dark    bool
-	pal     theme.Palette
-	extra   string // shown after the note (the browser's "Linked from"), already styled
-	body    string
-	lines   []string                  // what the viewport shows, one rendered line each
-	links   []linkSpot                // where the links are in lines (follow.go)
-	hints   map[string]linkSpot       // f's labels on the links on screen, nil when off
-	mark    *span                     // text selected with the mouse, nil when none
-	img     *termimg.Terminal         // nil: images keep their alt text
-	images  map[string]*termimg.Image // by file
-	pending string                    // image data for the terminal, sent after the next frame
+	path   string // the file
+	rel    string // its folder's path from the root links are shown from ("" outside a repository)
+	raw    []byte
+	title  string
+	err    error
+	mod    time.Time
+	vp     viewport.Model
+	width  int
+	height int
+	dark   bool
+	pal    theme.Palette
+	extra  string // shown after the note (the browser's "Linked from"), already styled
+	body   string
+	lines  []string            // what the viewport shows, one rendered line each
+	links  []linkSpot          // where the links are in lines (follow.go)
+	hints  map[string]linkSpot // f's labels on the links on screen, nil when off
+	// expected reports a file a link may point to before it exists (a day's journal), which
+	// is not drawn as broken; nil: none
+	expected func(file string) bool
+	mark     *span                     // text selected with the mouse, nil when none
+	img      *termimg.Terminal         // nil: images keep their alt text
+	images   map[string]*termimg.Image // by file
+	pending  string                    // image data for the terminal, sent after the next frame
 }
 
 func newPreview(img *termimg.Terminal, dark bool) *preview {

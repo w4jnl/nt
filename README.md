@@ -1,116 +1,229 @@
 <p align="center"><img src="assets/brand/nt-hero.png" alt="nt: plain markdown notes, synced by git" width="800"></p>
 
-Plain markdown notes in a folder, synced by git, read and written from the terminal. A journal per
-day, dated topic notes, and a folder where coding agents report what they did, with a daily
-digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the
-way.
+[![ci](https://github.com/w4jnl/nt/actions/workflows/ci.yml/badge.svg)](https://github.com/w4jnl/nt/actions/workflows/ci.yml)
 
-Current version: 0.2.0 · [release notes](CHANGELOG.md). The everyday commands, git sync, the
-browser, agent reports, todos, folders and the calendar work; a weekly digest comes next
-([phases](docs/design.md#phases-each-ends-in-something-usable)).
+Plain markdown notes in a folder, synced by git, read and written from the terminal. A journal
+per day, dated topic notes in folders you name, todos in any note, a calendar, a weekly digest,
+and a folder where coding agents report what they did. Your editor edits, git syncs, `rg`
+searches; nt keeps them together and stays out of the way.
 
-## Why
+nt is a two-pane browser and a plain command line over the same folder. On the left the folders,
+notes, the todo list or the month; on the right the note, rendered, with its images in terminals
+that draw them. A click on a link follows it; `f` and a letter do the same from the keyboard.
+Every note is GitHub markdown, so the repository reads the same on github.com, in nvim and in any
+other editor.
+
+<p align="center"><img src="assets/readme/browser.gif" alt="A 25-second recording of the browser: the homelab folder, the NAS setup note rendered with a table, a code block and its tasks; f labels the links and a follows the one to the backups note, b goes back; x lists the open todos with one two days late; c shows October with dots on days with todos due, h selects yesterday and its journal shows beside the month; a search for restic lists the matching lines" width="900"></p>
+
+<p align="center"><img src="assets/readme/cli.gif" alt="An 18-second recording of the command line: nt a adds a timestamped line to today's journal, nt todo add adds a todo due Friday, nt todo lists the open todos overdue first with the note each is in, nt s restic shows the matching lines per note, nt ls homelab lists the folder's notes newest first" width="760"></p>
+
+## Setup
+
+Current version: 0.3.0 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
+search and find; details under [Requirements](#requirements).
+
+1. Install the binary. Homebrew, on macOS or Linux:
+   ```sh
+   brew install w4jnl/tap/nt
+   ```
+   Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
+   (Linux and macOS, `amd64` and `arm64`, no Go, no root):
+   ```sh
+   ver=0.3.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+   curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
+   curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
+   shasum -a 256 -c --ignore-missing sha256sums.txt
+   mkdir -p ~/.local/bin && tar -xzf "nt_${ver}_${os}_${arch}.tar.gz" --strip-components=1 -C ~/.local/bin "nt_${ver}_${os}_${arch}/nt"
+   ```
+2. Make the notes repository, and give it a private remote:
+   ```sh
+   nt init ~/notes
+   git -C ~/notes remote add origin git@github.com:<you>/notes.git
+   ```
+   On a second machine, clone it instead: `nt init --clone git@github.com:<you>/notes.git ~/notes`.
+   Coming from Obsidian: `nt import obsidian <vault> --dry-run` shows the plan, then run it
+   without `--dry-run`.
+3. Sync in the background, every 2 minutes (launchd on macOS, a systemd user timer on Linux):
+   ```sh
+   nt install --sync
+   ```
+4. Optional: the nvim plugin, and the agent hooks and skill:
+   ```sh
+   nt install --nvim            # lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
+   nt install --hooks --skill   # a report for every Claude Code and Copilot CLI session
+   ```
+5. Open the browser with `nt`, or one folder with `nt <folder>`; `?` lists the keys.
+
+`nt doctor` checks every step: the repository, git and the remote, the sync timer, the tools nt
+uses, the nvim plugin, the hooks and the skill, images, and the links in the notes.
+
+### More install options
+
+- From source (Go 1.27): `git clone https://github.com/w4jnl/nt.git && cd nt && make install`
+  builds `bin/nt` and copies it to `~/.local/bin`.
+- Shell completion, with the repository's folders and notes:
+  ```sh
+  echo 'eval "$(nt completion bash)"' >> ~/.bashrc
+  echo 'eval "$(nt completion zsh)"'  >> ~/.zshrc     # after compinit
+  ```
+- One machine writes what nt compiles: set `digest = true` (the agents' daily digest) and
+  `weekly = true` (the weekly digest) in that machine's `~/.config/nt/config.toml`.
+- glow in nt's colours: `nt theme --glamour`, then `glow -s ~/.config/nt/glamour-dark.json`.
+
+## Why nt
 
 Obsidian does a lot, and most of it gets in the way: views, plugins, canvases, a config folder
 that conflicts in git, and sync that is either paid or fragile. nt does less:
 
 - **Files are the truth.** GitHub-flavoured markdown in folders you name. Every note renders on
-  github.com as it is, and opens in any editor.
+  github.com as it is, and opens in any editor. There is no database and no index on disk.
 - **git is the sync**, not an add-on. One process per machine commits and merges; agents and the
-  TUI only write files. Conflicts never leave markers: the other version is kept beside the note.
-- **Agents report in.** Each agent session writes its own report into `agents/<day>/`, so many
-  agents on many machines never conflict, and the day's digest is one file.
-- **The terminal first.** A two-pane TUI and a plain CLI, both with `--json`; a Mac app and an
-  iOS app can follow the same [format](docs/format.md).
+  browser only write files. Conflicts never leave markers: the other version is kept beside the
+  note.
+- **Agents report in.** Each agent session writes its own report, so many agents on many machines
+  never conflict, and each day gets one digest.
+- **The terminal first.** A browser and a plain CLI, both with `--json`, and the OS's own tools
+  for the rest: `$EDITOR`, `rg`, `fzf`, Quick Look.
 
-## Use it
+## Features
 
-```sh
-brew install w4jnl/tap/nt          # macOS or Linux; or make install from a clone, into ~/.local/bin
-nt init ~/notes                    # a notes repository; --clone <url> on a second machine
-git -C ~/notes remote add origin git@github.com:<you>/notes.git
-nt install --sync                  # nt sync in the background every 2 minutes
-nt install --nvim                  # the nvim plugin; lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
-nt install --hooks --skill         # agent session reports, and the skill that teaches agents nt
-echo 'eval "$(nt completion zsh)"' >> ~/.zshrc   # without Homebrew, after compinit; bash: nt completion bash
-nt doctor                          # check the setup
-```
+- **The browser.** Folders and notes on the left, newest first; the note on the right, rendered,
+  with "Linked from" under it. Links in the note follow by click or by `f` and a letter, `b` goes
+  back, and a link to a note that is not there is struck through. Search with `/`, a note by its
+  title with `ctrl-p`, its links, outline and images with `l`, `o`, `i`. Images draw inline in
+  Ghostty and kitty, tmux included.
+- **Journals.** `nt t` opens today's, `nt a "text"` adds a timestamped line, `nt n "Title"` makes a
+  dated note and links it from the day. Journals from two machines merge line by line, and once
+  a day is over its lines are put back in time order.
+- **Todos and the calendar.** A todo is a task line in any note, `- [ ] text due:2026-11-03`.
+  `x` lists them all, overdue first; `x` checks one, `d` sets its due date. `c` shows the month,
+  with the days that have a journal and the days with todos due marked. `nt todo` does the same
+  from the shell.
+- **Folders.** `nt mv`, `nt rename` and `nt mkdir`, or `m`, `R` and `N` in the browser. A move
+  rewrites every link to what moved and in it, and takes along the images only that note uses.
+- **The weekly digest.** One machine compiles each week into `weekly/2026/2026-W44.md`: the notes
+  made and changed, the todos done and due, the agent sessions, and every day's journal lines.
+- **Agents.** `nt install --hooks` gives every Claude Code and Copilot CLI session a report in
+  `agents/YYYY/YYYY-MM-DD/`; the skill teaches them to search your notes, add to the journal and
+  write their own Done, Decisions and Open.
+- **Sync.** `nt sync` commits, fetches, merges and pushes: on a timer, when the browser starts,
+  and when nvim exits after a note was written. It never rebases, and it does not merge while a
+  note has unsaved changes in an editor.
+- **nvim.** `<leader>ip` pastes the clipboard's image beside the note, `<leader>tx` checks the
+  todo under the cursor, and notes changed on disk reload.
+- **`nt doctor`** checks the setup and lists the links that point at nothing.
+
+## Commands
+
+Every command that prints data takes `--json`.
 
 | Command | What it does |
 |---|---|
-| `nt` / `nt <folder>` | the browser: folders and notes on the left, the rendered note on the right, images included; click a link to follow it, or press `f` and the letters on it; `b` goes back; `?` lists the keys |
+| `nt` / `nt <folder>` | the browser; `?` lists its keys |
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
-| `nt n "title" [folder]` | a new dated note, linked from today's journal |
+| `nt n "Title" [folder]` | a new dated note, linked from today's journal |
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
-| `nt view <file>` | one note rendered in nt's style, images included; `e` edits it |
-| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line; in nvim, `<leader>ip` |
-| `nt sync` | commit, merge, push; conflicts never leave markers, the other version is kept beside the note |
-| `nt import obsidian <vault>` | bring an Obsidian vault over once; `--dry-run` shows the plan |
-| `nt theme --glamour` | nt's preview style for glow: `glow -s ~/.config/nt/glamour-dark.json` |
+| `nt view <file>` | one note rendered, images included; `e` edits it |
+| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line |
+| `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
+| `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
+| `nt week [date\|last]` | compile a week's digest now |
+| `nt sync`, `nt doctor` | sync now; check the setup |
+| `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent hooks and skill |
+| `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |
+| `nt import obsidian <vault>` | bring an Obsidian vault over once |
+| `nt completion bash\|zsh` | shell completion |
 
-Commands that print data take `--json`. Without Homebrew or Go, a static binary for Linux or macOS
-is on the [releases page](https://github.com/w4jnl/nt/releases).
+## Keys
 
-### Todos
+In the browser:
 
-A todo is a task line in any note, `- [ ] Renew passport due:2026-11-03`; new ones go to
-`todo.md`, and a folder can have its own `todo.md`. In the browser, `x` lists them all, overdue
-first, with the note each is in beside it: `x` checks one, `d` sets its due date, `a` adds one to
-the `todo.md` of the folder you are in, `X` shows the done ones. `c` shows the month: the days
-with a journal, `•` on days with todos due, and under it the selected day's todos and agent
-sessions, its journal beside it. In nvim, `<leader>tx` checks the todo under the cursor.
-
-| Command | What it does |
+| Key | Action |
 |---|---|
-| `nt todo [folder] [--done\|--all]` | the open todos in every note, or under folder, overdue first; or the done ones, or all |
-| `nt todo add "text" [--due fri] [--in work]` | add one to `todo.md`, or to `work/todo.md`; `--due` takes `YYYY-MM-DD`, `today`, `mon`…`sun`, `+3d`, `+2w` |
-| `nt todo done\|undo\|rm <todo>` | check, uncheck or delete one, named by `path:line` or words from its text |
-| `nt todo due <todo> <when>` | set its due date; `none` clears it |
+| `j` `k`, `enter`, `h` | move, open a folder or note, up a folder |
+| `tab` | to the note and back; `j` `k` then scroll it |
+| `t`, `[` `]`, `c`, `A` | today's journal, the day before or after, the calendar, today's agent reports |
+| `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
+| `/`, `ctrl-p` | search every note, find a note by its title |
+| `f`, `b` | follow a link by its letters (a click works too), back to the note before |
+| `l`, `o`, `i` | the note's links, its outline, its images full size |
+| `x` | the todo list: `x` check, `d` due date, `a` add, `X` the done ones |
+| `a`, `n`, `N` | add a line to today, a new note here, a new folder here |
+| `e`, `v`, `y` | edit in `$EDITOR`, read in glow, copy the selection or the path |
+| `m`, `R`, `D` | move, rename, delete (after asking) |
+| `s`, `r`, `?`, `q` | sync, reload, help, quit |
 
-### Folders
+The mouse selects text in the note, resizes the list by dragging the divider, and scrolls.
 
-Move and rename with nt rather than `mv`: it fixes every link to what moves and in it, takes the
-images only that note uses along, and keeps the journal's line pointing at the note. `nt doctor`
-lists any link that points at nothing. In the
-browser, `m` moves the selected note or folder (type to filter the folders, or name a new one),
-`R` renames it, `N` makes a folder in the one you are in (`/name` from the root).
+## Requirements
 
-| Command | What it does |
-|---|---|
-| `nt mv <note\|folder> <to>` | move it: into `to` when that ends in `/` or is a folder, else to that path; `--dry-run` shows what changes |
-| `nt rename <note> "New title"` | the title in its frontmatter and heading, and the file name, its date kept; links that showed the old title show the new one |
-| `nt rename <folder> <name>` | the folder's new name; `pins` and `default_folder` follow it |
-| `nt mkdir <folder>` | a new folder, with a `.gitkeep` so git keeps it while it is empty |
+- macOS or Linux, and git. The remote is reached over ssh, so a key that works without a prompt.
+- `rg` for search and `fzf` for `nt f`. Optional: `glow` for `v`, `chafa` for images over ssh.
+- Images inside the note need a terminal with the kitty graphics protocol (Ghostty, kitty); in
+  tmux, `set -g allow-passthrough on`. Other terminals show the alt text.
+- The agent reports need Claude Code or Copilot CLI.
+- Go 1.27 only if you build from source.
 
-### Weekly digest
+## Design
 
-One machine, the one with `weekly = true` in `~/.config/nt/config.toml`, compiles the week into
-`weekly/2026/2026-W44.md` on every sync: the notes made and changed that week, the todos done
-and due, the agent sessions per project, and each day's journal lines. Edit the notes, not the
-digest: it is written again when they change. `nt week [date|last]` compiles a week by hand.
+nt is designed in the open; the documents in `docs/` are the source of truth, and the code
+follows them.
 
-### Agents
+- **The format** ([docs/format.md](docs/format.md)) is the contract for a notes repository:
+  layout, names, frontmatter, journals, agent reports, digests, todos, moving and renaming, and
+  how clients write and sync. Any client can follow it: nt, the agents, a script, or a Mac or
+  iOS app later. A repository that follows it reads well without nt.
+- **How nt works** ([docs/design.md](docs/design.md)): sync, agents, the CLI and the browser,
+  images, the code layout and the phases it is built in. [docs/research.md](docs/research.md) is
+  the survey of notes tools behind it.
+- **The design system** ([docs/design-system](docs/design-system/README.md)) is shared with the
+  other w4jnl tools, [flok](https://github.com/w4jnl/flok) and
+  [vink](https://github.com/w4jnl/vink): the bracket mark with one inner glyph, `[nt]` set in
+  JetBrains Mono, colour tokens for a dark and a light theme in `tokens.json`, and one rule for
+  states: a glyph and a word, never colour alone. Accent is the only interactive colour: the
+  selection bar, the keys in the footer, links. `internal/theme` reads the same tokens, and a
+  test keeps the two equal.
+- **The voice** of help text, messages and these docs: technical, direct, short sentences;
+  `nt` in lowercase; errors say what is wrong and how to fix it.
 
-`nt install --hooks` gives every Claude Code and Copilot CLI session a report in
-`agents/YYYY/YYYY-MM-DD/`: when it started and where, a line per turn, when it ended. `nt install --skill`
-teaches the agents nt, so they add their own Done, Decisions and Open with `nt agent write`. The machine
-with `digest = true` keeps each day's `README.md` digest, which GitHub shows when you open the folder.
+## Documentation
 
-| Command | What it does |
-|---|---|
-| `nt agent start\|turn\|end` | the hooks: a session's start, each turn, its end, from the hook payload on stdin |
-| `nt agent write` | the agent's own account on stdin, `--status done\|blocked\|failed`, `--summary "…"` |
-| `nt digest [date]` | write and list a day's digest |
+- [docs/format.md](docs/format.md): the repository format
+- [docs/design.md](docs/design.md): how nt works, and its phases
+- [docs/design-system](docs/design-system/README.md): voice, colour, the mark, the terminal UI
+- [docs/research.md](docs/research.md): the notes tools surveyed before nt was designed
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md)
+- [Release notes](CHANGELOG.md), newest first
 
-## Docs
+## Scope and status
 
-- [design.md](docs/design.md): how nt works, and the phases it is built in.
-- [format.md](docs/format.md): the repository format.
-- [design-system](docs/design-system/README.md): voice, colour, the mark and the terminal UI rules.
-- [research.md](docs/research.md): the tools and apps surveyed before nt was designed.
+nt is a personal tool. I built it to replace Obsidian in my own workflow: notes in a private
+GitHub repository, nvim, tmux and Ghostty, Claude Code and Copilot CLI writing reports on the side.
+It is published because there is no reason not to, and because the approach (plain files, git as
+the only sync, agents reporting into the notes) may be useful to others.
 
-## Licence
+What that means in practice:
 
-MIT. JetBrains Mono (in `docs/design-system/fonts/`) is under the SIL Open Font License.
+- Features are the ones I need. Requests that do not fit that workflow will probably be declined,
+  politely.
+- macOS is the first-class platform; Linux works, and the end-to-end suites run on both in CI.
+- There is no compatibility promise between versions yet, beyond the repository format, which
+  says how it changes. Read the release notes before `brew upgrade`.
+- Bug reports with a reproduction are welcome; support is best effort.
+
+nt is at 0.3.0 (2026-10-27). [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
+newest first; the same text is on each GitHub release.
+
+## Credits and license
+
+nt is MIT licensed (see `LICENSE`).
+
+The browser uses [Bubble Tea](https://github.com/charmbracelet/bubbletea),
+[Bubbles](https://github.com/charmbracelet/bubbles) and
+[Lip Gloss](https://github.com/charmbracelet/lipgloss), and renders notes with
+[Glamour](https://github.com/charmbracelet/glamour) and [goldmark](https://github.com/yuin/goldmark);
+configuration is read with [BurntSushi/toml](https://github.com/BurntSushi/toml). The README
+recordings are made with [vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`).
+JetBrains Mono, in `docs/design-system/fonts/`, is under the SIL Open Font License.

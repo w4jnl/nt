@@ -166,3 +166,25 @@ func TestMissingLinksLookBroken(t *testing.T) {
 		t.Error("the struck-through link is no longer a link: a click would not say where it pointed")
 	}
 }
+
+func TestDatedLinksAreNotBroken(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	note := "# Day\n\n[← 2026-10-19](2026-10-19.md) · [agents](../../agents/2026/2026-10-20/README.md) · [gone](../../tech/nope.md)\n"
+	if err := os.MkdirAll(b.v.Abs("daily/2026"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b.v.Abs("daily/2026/2026-10-20.md"), []byte(note), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.reveal("daily/2026/2026-10-20.md")
+	struck := regexp.MustCompile(`\x1b\[(?:[0-9:]+;)*9(?:;[0-9:]+)*m([^\x1b]*)`)
+	var gone []string
+	for _, l := range b.p.lines {
+		for _, m := range struck.FindAllStringSubmatch(l, -1) {
+			gone = append(gone, m[1])
+		}
+	}
+	if got := strings.Join(gone, ""); !strings.Contains(got, "gone") || strings.Contains(got, "agents") || strings.Contains(got, "2026-10-19") {
+		t.Errorf("struck through: %q; want only the link to a note that is gone, not the day before or its digest", got)
+	}
+}

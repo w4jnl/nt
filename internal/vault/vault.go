@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -106,6 +107,24 @@ func WeekStart(day time.Time) time.Time {
 func (v *Vault) WeekRel(day time.Time) string {
 	y, w := WeekStart(day).ISOWeek()
 	return fmt.Sprintf("%s/%04d/%04d-W%02d.md", v.Cfg.Folders.Weekly, y, y, w)
+}
+
+// Dated reports a file whose path is a date nt fills in, which may not exist yet: a day's
+// journal, a day's agent digest, a week's digest. The journals link the days around them and
+// their digest, the weekly digests the weeks around them, so such a link to nothing is expected,
+// not broken.
+func (v *Vault) Dated(rel string) bool {
+	c := v.Cfg.Folders
+	for _, f := range []struct{ dir, re string }{
+		{c.Daily, `\d{4}/\d{4}-\d{2}-\d{2}\.md`},
+		{c.Agents, `\d{4}/\d{4}-\d{2}-\d{2}/README\.md`},
+		{c.Weekly, `\d{4}/\d{4}-W\d{2}\.md`},
+	} {
+		if rest, ok := strings.CutPrefix(rel, f.dir+"/"); ok && regexp.MustCompile(`^`+f.re+`$`).MatchString(rest) {
+			return true
+		}
+	}
+	return false
 }
 
 // Slug makes a file name part from a title (docs/format.md §3): lowercase, accents folded,
