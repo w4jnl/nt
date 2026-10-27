@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Folders: nt mkdir, mv and rename on one machine, every link still pointing at a file after each;
-# the moves reach a second clone through sync; the browser's N, m and R in an isolated tmux server.
+# the moves reach a second clone through sync, and nt doctor catches the one link a move cannot
+# fix; the browser's N, m and R in an isolated tmux server.
 source "$(dirname "$0")/lib.sh"
 
 git init --quiet --bare -b main "$T/remote.git"
@@ -87,6 +88,16 @@ A sync >/dev/null 2>&1; B sync >/dev/null 2>&1; A sync >/dev/null 2>&1
 expect "one note moved two ways at once is kept in both places" '^x/[0-9-]+-nas-at-home.md y/[0-9-]+-nas-at-home.md$' "$(cd "$T/a" && echo x/*.md y/*.md)"
 expect "and the journal links both" '^2$' "$(grep -c 'nas-at-home.md)' "$T/a/$day")"
 expect "with every link working" '^ok$' "$(fine "$T/a")"
+links() { A doctor --json | json '" ".join([c["state"]] + c.get("items", [])) if (c := next(c for c in d["checks"] if c["check"] == "links")) else ""'; }
+expect "nt doctor finds no link that points at nothing" '^ok$' "$(links)"
+nas=$(cd "$T/a" && ls x/*-nas-at-home.md)
+A mv "$nas" lab/ >/dev/null
+hw=$(B n "Hardware" lab | sed "s#^$T/b/##")
+printf 'See [NAS](../%s).\n' "$nas" >> "$T/b/$hw"
+A sync >/dev/null 2>&1; B sync >/dev/null 2>&1; A sync >/dev/null 2>&1
+expect "a link to the old place, written before the move arrived, is caught by nt doctor" \
+  "^warn $hw:[0-9]+ → \.\./x/[0-9-]+-nas-at-home.md\$" "$(links)"
+sed -i.bak '/nas-at-home/d' "$T/a/$hw" && rm "$T/a/$hw.bak" # the browser's checks start with every link working
 
 # --- the browser: N, m, R
 export NT_CONFIG=$T/a.toml NT_STATE=$T/a.state

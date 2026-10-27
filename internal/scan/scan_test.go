@@ -3,6 +3,7 @@ package scan
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/w4jnl/nt/internal/mdparse"
@@ -104,5 +105,45 @@ func TestMatchAndFind(t *testing.T) {
 	}
 	if got := ix.Find("nas mount", 10); len(got) != 1 || got[0].Title != "NAS Mount Setup" {
 		t.Errorf("find nas mount: %+v", got)
+	}
+}
+
+func TestBrokenLinks(t *testing.T) {
+	root := t.TempDir()
+	for f, body := range map[string]string{
+		"tech/nas.md": "# NAS\n\n[backups](backups.md#plan) [gone](old.md) ![shot](assets/shot.png) ![lost](assets/lost.png)\n" +
+			"[web](https://x.org) [top](#nas) `[code](nope.md)` [[backups]] [[nobody]] ![[pic.png]]\n" +
+			"<img src=\"assets/none.png\">\n\n[Note]: call Bob\n[r]: ../inbox/none.md\n",
+		"tech/backups.md":                        "# Backups\n\n[tech](../tech/) [up](../inbox/)\n",
+		"tech/assets/shot.png":                   "png",
+		"daily/2026/2026-10-27.md":               "# Day\n\n[← 2026-10-26](2026-10-26.md) · [agents](../../agents/2026/2026-10-27/README.md)\n",
+		"tech/nas.conflict-b-20261027T100000.md": "[gone](old.md)\n",
+		".hidden/x.md":                           "[gone](old.md)\n",
+	} {
+		p := filepath.Join(root, filepath.FromSlash(f))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dated := func(rel string) bool { return strings.HasPrefix(rel, "daily/") || strings.HasPrefix(rel, "agents/") }
+	want := []BrokenLink{
+		{"tech/backups.md", 3, "../inbox/"},
+		{"tech/nas.md", 3, "old.md"},
+		{"tech/nas.md", 3, "assets/lost.png"},
+		{"tech/nas.md", 4, "[[nobody]]"},
+		{"tech/nas.md", 5, "assets/none.png"},
+		{"tech/nas.md", 8, "../inbox/none.md"},
+	}
+	got := BrokenLinks(root, dated)
+	if len(got) != len(want) {
+		t.Fatalf("broken links:\n%+v\nwant\n%+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("%d: %+v, want %+v", i, got[i], want[i])
+		}
 	}
 }

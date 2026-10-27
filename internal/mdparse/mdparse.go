@@ -19,6 +19,7 @@ type Link struct {
 	Line  int    // 1-based source line
 	Image bool
 	Wiki  bool // [[target]] or ![[target]]: Dest is a note name, not a path
+	Ref   bool // a reference definition, [label]: dest
 }
 
 // Heading is an ATX heading (# to ######).
@@ -55,7 +56,7 @@ func Parse(note []byte) Doc {
 			d.Headings = append(d.Headings, Heading{Level: len(m[1]), Text: m[2], Line: i + 1})
 		}
 		if m := refDef.FindStringSubmatch(l); m != nil {
-			d.Links = append(d.Links, Link{Text: m[2], Dest: strings.Trim(m[3], "<>"), Line: i + 1})
+			d.Links = append(d.Links, Link{Text: m[2], Dest: strings.Trim(m[3], "<>"), Line: i + 1, Ref: true})
 			continue
 		}
 		for _, part := range outsideCode(l) {
@@ -123,7 +124,7 @@ func Rewrite(note []byte, fn func(l *Link) bool) (out []byte, n int) {
 			continue
 		}
 		if m := refDef.FindStringSubmatch(l); m != nil {
-			k := Link{Text: m[2], Dest: strings.Trim(m[3], "<>"), Line: i + 1}
+			k := Link{Text: m[2], Dest: strings.Trim(m[3], "<>"), Line: i + 1, Ref: true}
 			if fn(&k) {
 				lines[i] = m[1] + k.Dest + m[4]
 				n++
