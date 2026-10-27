@@ -392,15 +392,24 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 
 **Folders (after todos step 1).** `nt mv`, `nt rename` and `nt mkdir`, and `m`, `R` and `N` in the browser, with every link kept (docs/format.md §13).
 
-**4. Remote hosts.**
-- Each host keeps its own reports. It is their only writer and never deletes them mid-session; it prunes ended ones after 14 days.
-- The Mac pulls copies with `ssh host nt agent export --since <cursor>`, which streams a tar that `nt` unpacks under the repo lock. This follows the `flok serve --stdio` style.
-- Servers need no GitHub credentials. Don't use `rsync --remove-source-files`: it loses updates to reports that are rewritten during a session, and macOS ships openrsync.
+**4. Remote hosts: parked (2026-10-27).** Not built: there are no remote servers for now. The plan, kept for when there are:
+- **On a server:** the `nt` binary and `nt install --hooks --skill`; no notes repository, no timer, no GitHub access, nothing running. With no repository, `nt agent` writes reports to `~/.local/share/nt/reports/agents/YYYY/YYYY-MM-DD/`, in the repository's layout. The server is their only writer; it prunes ended reports after 14 days, on a hook call or an export, never mid-session.
+- **One collecting machine** lists the servers in its machine config. Two machines collecting from one server would commit different versions of the same report and make conflict copies, so, as with `digest = true`, there is one:
+  ```toml
+  [[hosts]]
+  name = "build1"        # an ssh name: user, port, keys and jump hosts come from ~/.ssh/config
+  nt = "/opt/nt/bin/nt"  # optional, when nt is not in ~/.local/bin or Homebrew's Linux prefix
+  ```
+- **Each sync run** collects: `ssh -oBatchMode=yes <host> nt agent export --since <cursor>` streams a tar of the reports changed since the cursor (one per host, in the state folder), which `nt` unpacks under the repository lock; the sync commits and pushes them. A report rewritten during a session is sent again. An unreachable host is skipped and shown in the status. This follows the `flok serve --stdio` style.
+- **Commands:** `nt host add <name>` (checks ssh and the server's `nt` version, then adds it), `nt host rm`, `nt host ls [--json]`; `nt doctor` checks each host.
+- **Not done:** nt does not install itself on servers (no network calls but git and ssh): one `curl … | tar xz -C ~/.local/bin` line or the server's provisioning. Not `rsync --remove-source-files` either: it loses updates to reports rewritten during a session, and macOS ships openrsync.
 
-**5. Later:**
+**5. Next:**
 - `nt mcp` (official go-sdk).
 - `nt digest --summarize` (`claude -p` with `disableAllHooks`).
 - Weekly notes (ISO week-year).
+
+**6. Apps:**
 - Mac app: SwiftUI over the same folder; it can shell out to `nt` and `git`.
 - iOS: swift-libgit2 or the GitHub API; sync on open, background and push; App Intent "append to today".
 
