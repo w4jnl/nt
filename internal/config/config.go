@@ -83,10 +83,14 @@ func (r Repo) DayStart() (time.Duration, error) {
 
 // Machine is ~/.config/nt/config.toml.
 type Machine struct {
-	Repo         string `toml:"repo"`
-	Host         string `toml:"host"`
-	Digest       bool   `toml:"digest"`
-	Weekly       bool   `toml:"weekly"`
+	Repo    string `toml:"repo"`
+	Host    string `toml:"host"`
+	Digest  bool   `toml:"digest"`
+	Weekly  bool   `toml:"weekly"`
+	Summary struct {
+		Tool  string `toml:"tool"`  // claude or copilot: this machine's weekly summary; "" none
+		Model string `toml:"model"` // the model the tool uses; "" its default
+	} `toml:"summary"`
 	ImageViewer  string `toml:"image_viewer"`
 	InlineImages string `toml:"inline_images"`
 	Sync         struct {
@@ -123,6 +127,10 @@ interval = "2m"
 
 [theme]
 mode = "auto"              # auto | dark | light
+
+[summary]
+tool = ""                  # claude | copilot: summarize what was written on this machine each week
+model = ""                 # optional: the model the tool uses, e.g. "haiku"
 `
 
 // MachinePath is the machine config file: $NT_CONFIG, else ~/.config/nt/config.toml (on macOS

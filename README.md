@@ -68,6 +68,9 @@ uses, the nvim plugin, the hooks and the skill, images, and the links in the not
   ```
 - One machine writes what nt compiles: set `digest = true` (the agents' daily digest) and
   `weekly = true` (the weekly digest) in that machine's `~/.config/nt/config.toml`.
+- A weekly summary of what each machine wrote: `[summary] tool = "claude"` (or `"copilot"`) in
+  that machine's config; optional `model = "haiku"`. It calls the tool once a week, on your
+  account, and `nt doctor` checks the tool is installed.
 - glow in nt's colours: `nt theme --glamour`, then `glow -s ~/.config/nt/glamour-dark.json`.
 
 ## Why nt
@@ -103,6 +106,9 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   rewrites every link to what moved and in it, and takes along the images only that note uses.
 - **The weekly digest.** One machine compiles each week into `weekly/2026/2026-W44.md`: the notes
   made and changed, the todos done and due, the agent sessions, and every day's journal lines.
+  With a summary tool set, each machine adds its own week in three short lists, Done, Decided and
+  Open, written by Claude Code or Copilot CLI: what was written at work goes only to the work
+  machine's tool.
 - **Agents.** `nt install --hooks` gives every Claude Code and Copilot CLI session a report in
   `agents/YYYY/YYYY-MM-DD/`; the skill teaches them to search your notes, add to the journal and
   write their own Done, Decisions and Open.
@@ -129,7 +135,7 @@ Every command that prints data takes `--json`.
 | `nt paste <note>` | save the clipboard's image beside the note and print its markdown line |
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
 | `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
-| `nt week [date\|last]` | compile a week's digest now |
+| `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
 | `nt sync`, `nt doctor` | sync now; check the setup |
 | `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent hooks and skill |
 | `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |

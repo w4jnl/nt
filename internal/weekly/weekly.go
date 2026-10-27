@@ -46,6 +46,11 @@ func Text(v *vault.Vault, monday time.Time) ([]byte, bool) {
 	b.WriteString("Compiled by nt from the week's notes; it is written again when they change.\n")
 	filled := false
 
+	if s := summaries(v, monday); len(s) > 0 {
+		b.WriteString("\n## Summary\n\n" + strings.Join(s, "\n\n") + "\n")
+		filled = true
+	}
+
 	if notes := notesOf(v, monday, sunday, rel); len(notes) > 0 {
 		b.WriteString("\n## Notes\n\n" + strings.Join(notes, "\n") + "\n")
 		filled = true
@@ -172,6 +177,18 @@ func Refresh(v *vault.Vault, now time.Time) ([]string, error) {
 		}
 	}
 	var wrote []string
+	// a summary written late, on a machine that was off, still reaches its week's digest
+	for m := cur.AddDate(0, 0, -7*4); m.Before(from); m = m.AddDate(0, 0, 7) {
+		if newerSummary(v, m) {
+			changed, err := Write(v, m)
+			if err != nil {
+				return wrote, err
+			}
+			if changed {
+				wrote = append(wrote, strings.TrimSuffix(path.Base(v.WeekRel(m)), ".md"))
+			}
+		}
+	}
 	for m := from; !m.After(cur); m = m.AddDate(0, 0, 7) {
 		changed, err := Write(v, m)
 		if err != nil {
@@ -182,6 +199,22 @@ func Refresh(v *vault.Vault, now time.Time) ([]string, error) {
 		}
 	}
 	return wrote, nil
+}
+
+// newerSummary reports a summary of monday's week newer than its digest, or a digest missing.
+func newerSummary(v *vault.Vault, monday time.Time) bool {
+	digest, err := os.Stat(v.Abs(v.WeekRel(monday)))
+	prefix := strings.TrimSuffix(path.Base(v.WeekRel(monday)), ".md") + "-"
+	des, _ := os.ReadDir(v.Abs(path.Dir(v.WeekRel(monday))))
+	for _, d := range des {
+		if !strings.HasPrefix(d.Name(), prefix) {
+			continue
+		}
+		if info, e := d.Info(); e == nil && (err != nil || info.ModTime().After(digest.ModTime())) {
+			return true
+		}
+	}
+	return false
 }
 
 // latestWeek is the Monday of the newest weekly digest in the repository.

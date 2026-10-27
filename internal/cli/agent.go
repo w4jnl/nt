@@ -36,6 +36,9 @@ func runAgent(args []string) int {
 // prints nothing and always exits 0, so a hook never holds up or fails the agent; what goes
 // wrong is written to agent.log in the state folder. The end of a session starts a sync.
 func runAgentHook(kind string, args []string) (code int) {
+	if os.Getenv("NT_NO_REPORT") != "" {
+		return 0 // nt's own call to an agent, for the weekly summary: not a session to report
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			agentLog("%s: panic: %v", kind, r)
