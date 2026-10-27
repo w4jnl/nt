@@ -1,0 +1,60 @@
+name: release
+
+# nt binaries for each tagged release: Linux and macOS tarballs, cgo-free and static. Homebrew
+# builds from source (w4jnl/homebrew-tap); the tarballs are for a machine without Homebrew or Go.
+# The tag push creates the GitHub release, or refreshes its notes when the tag was moved;
+# workflow_dispatch can repair or rebuild an existing tag.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "existing release tag, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  tarballs:
+    name: tarballs
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: build and package
+        run: |
+          set -euo pipefail
+          ver=${TAG#v}; mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}; arch=${target#*/}
+            name=nt_${ver}_${os}_${arch}; d=dist/$name; mkdir -p "$d"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X github.com/w4jnl/nt/internal/cli.Version=$TAG" -o "$d/nt" ./cmd/nt
+            cp README.md LICENSE CHANGELOG.md "$d/"
+            tar -C dist -czf "$d.tar.gz" "$name" && rm -r "$d"
+          done
+          (cd dist && sha256sum *.tar.gz > sha256sums.txt && cat sha256sums.txt)
+      - name: create the release (or refresh its notes from CHANGELOG.md)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes=$(awk -v v="${TAG#v}" '/^## /{p = ($2 == v)} p && !/^## /' CHANGELOG.md | sed '/./,$!d')
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            printf '%s\n' "$notes" | gh release edit "$TAG" --title "nt $TAG" --notes-file -
+          else
+            printf '%s\n' "$notes" | gh release create "$TAG" --title "nt $TAG" --notes-file -
+          fi
+      - name: upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/*.tar.gz dist/sha256sums.txt --clobber

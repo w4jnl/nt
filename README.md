@@ -5,8 +5,9 @@ day, dated topic notes, and a folder where coding agents report what they did, w
 digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the
 way.
 
-nt is in its third phase: the everyday commands, git sync and the browser work; agent reports
-come next ([phases](docs/design.md#phases-each-ends-in-something-usable)).
+Current version: 0.1.0 · [release notes](CHANGELOG.md). The everyday commands, git sync, the
+browser and agent reports work; remote hosts come next
+([phases](docs/design.md#phases-each-ends-in-something-usable)).
 
 ## Why
 
@@ -25,13 +26,13 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 ## Use it
 
 ```sh
-make install                       # nt into ~/.local/bin
+brew install w4jnl/tap/nt          # macOS or Linux; or make install from a clone, into ~/.local/bin
 nt init ~/notes                    # a notes repository; --clone <url> on a second machine
 git -C ~/notes remote add origin git@github.com:<you>/notes.git
 nt install --sync                  # nt sync in the background every 2 minutes
 nt install --nvim                  # the nvim plugin; lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
 nt install --hooks --skill         # agent session reports, and the skill that teaches agents nt
-echo 'eval "$(nt completion zsh)"' >> ~/.zshrc   # after compinit; bash: nt completion bash
+echo 'eval "$(nt completion zsh)"' >> ~/.zshrc   # without Homebrew, after compinit; bash: nt completion bash
 nt doctor                          # check the setup
 ```
 
@@ -49,7 +50,8 @@ nt doctor                          # check the setup
 | `nt import obsidian <vault>` | bring an Obsidian vault over once; `--dry-run` shows the plan |
 | `nt theme --glamour` | nt's preview style for glow: `glow -s ~/.config/nt/glamour-dark.json` |
 
-Commands that print data take `--json`.
+Commands that print data take `--json`. Without Homebrew or Go, a static binary for Linux or macOS
+is on the [releases page](https://github.com/w4jnl/nt/releases).
 
 ### Agents
 

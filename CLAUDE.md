@@ -50,3 +50,5 @@ person's notes live in their own repository.
 - `make test`, `make vet`, `make fmt`.
 - `make brand`: regenerate `assets/brand` (needs fontTools and brotli, headless Chrome, rsvg-convert).
 - `make e2e`: end-to-end suites in `scripts/e2e/` (isolated tmux servers).
+- `scripts/release.sh <version>`: tag a release and bump `Formula/nt.rb` in w4jnl/homebrew-tap.
+  It needs a `## <version> (YYYY-MM-DD)` section in `CHANGELOG.md`, the release notes.
