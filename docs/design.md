@@ -130,6 +130,7 @@ Decisions taken with the user (2026-10-26):
 | `nt install --hooks`, `--skill` | Agent hooks for Claude Code and Copilot CLI; the agent skill (§3) |
 | `nt agent start\|turn\|end`, `nt agent write` | Agent session reports (§3) |
 | `nt digest [date]` | Write and list a day's agent digest (§3) |
+| `nt week [date\|last]` | Compile a week's digest now (Weekly digest, below); the machine with `weekly = true` does it on every sync |
 | `nt completion bash\|zsh` | Print a completion script: commands, flags and their values, and the repository's folders and notes (from the hidden `nt _complete folders\|notes`), as flok's |
 | `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
@@ -187,6 +188,8 @@ Decisions taken with the user (2026-10-26):
 - **The calendar** (`c`) shows a month in the list pane, Monday first, 7 days of 4 columns (`list-min`). A day with a journal is in `ink`, one without in `ink-faint`, today in `accent`; `•` after a day with open todos due, in `warn` when that day has passed. Under the month, the selected day: its date, whether it has a journal, its todos (due or done that day) and its agent sessions. The preview shows the day's journal, or says it has none. Keys: `h` `l` day, `j` `k` week, `[` `]` month, `t` today, enter goes to the journal in the list, `e` edits it (starting it when missing), `x` the todo list of that day (a todo added there is due that day), `tab` to the journal, esc back; a click selects a day, a second click opens it. Journals and agent sessions are read with a few stat calls on every move and poll, the todos with `todo.Collect` in the background. It writes nothing but a journal `e` starts.
 
 **Folders** (`internal/move`, docs/format.md §13). A move or a rename is one pass under the repository lock: it works out every file that moves (the note and the images only it uses, or all a folder holds) and every note whose links change, then moves the files and writes those notes. Links are read with `mdparse`, so code is left alone, and rewritten with `vault.RelLink`; legacy wikilinks to what moved become markdown links. `--dry-run` prints the same plan without writing. nt refuses while a note has unsaved changes in an editor (`.git/nt-edit`), since saving it afterwards would bring back the old path. The one link a move cannot fix, to an old path written on another device before the move reached it, `nt doctor` finds: `scan.BrokenLinks` checks every relative link and image, leaving out code, URLs, conflict copies and the journals' links to days without a journal or digest.
+
+**Weekly digest** (`internal/weekly`, docs/format.md §7). `weekly/GGGG/GGGG-Www.md`, compiled before each sync commits by the one machine with `weekly = true`, like the agent digests on the one with `digest = true`: the week's new and changed notes, its todos, its agent sessions per project, and each day's Log lines. The changed notes come from `git log --since --until` over the week (read only: sync stays the only git writer); the rest from the files. It is written only when its bytes change, so a sync with nothing new makes no commit; a change a merge brings in reaches it on the next run. In a conflict the remote digest is taken and compiled again, as the agent digests are. Its AI summary (`weekly_summary`) comes later.
 
 **nvim** (`internal/nvim`). A small Lua plugin carried inside the binary, so it always matches the `nt` that runs it. `nt install --nvim` writes it to `$XDG_DATA_HOME/nt/nvim` (`~/.local/share/nt/nvim`); a lazy.nvim config loads it with `{ dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }`, and `require("nt").setup(opts)` changes `cmd`, `keys.paste` or `reload`. `nt doctor` warns when it is missing or older than `nt`. In a markdown note inside the repository it:
 - maps `<leader>ip` to `nt paste` with a name prompt, the line going below the cursor;
@@ -343,6 +346,7 @@ internal/gitsync    cycle above, conflict resolver, status.json, launchd/systemd
 internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest, hook installers
 internal/todo       todos: parse task lines, collect, sort, dates in words, add/check/due/remove one line
 internal/move       mv, rename, mkdir: move files and rewrite the links to and in them, under the lock
+internal/weekly     the weekly digest: compile a week from its journals, notes, todos and agent reports
 skills/             skills/nt/SKILL.md, embedded; nt install --skill
 internal/theme      tokens → lipgloss v2 styles, state glyphs; termtheme (OSC 11) ported from flok
 internal/render     glamour: style from tokens, strip frontmatter, rewrite [[x]] → links, width

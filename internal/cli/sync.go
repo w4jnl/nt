@@ -29,7 +29,7 @@ func runSync(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	o := gitsync.Options{Wait: !background, Digest: m.Digest}
+	o := gitsync.Options{Wait: !background, Digest: m.Digest, Weekly: m.Weekly}
 	if background {
 		o.Log, o.Notify = stamped{os.Stdout}, gitsync.Notify
 	} else if !asJSON {

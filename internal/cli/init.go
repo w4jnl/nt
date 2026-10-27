@@ -122,6 +122,7 @@ agent working in this repository.
 - ` + "`daily/YYYY/YYYY-MM-DD.md`" + `: one journal per day. Add to it with ` + "`nt a \"text\"`" + `.
 - ` + "`agents/YYYY/YYYY-MM-DD/`" + `: agent session reports, one file per session, and the day's
   ` + "`README.md`" + `, which is generated from them: do not edit it.
+- ` + "`weekly/GGGG/GGGG-Www.md`" + `: the week's digest, compiled from the notes: read it, do not edit it.
 - ` + "`todo.md`" + `: the todo list; a folder can have its own. A todo is a task line in any note,
   ` + "`- [ ] text due:YYYY-MM-DD`" + `; nt marks one done as ` + "`- [x] text done:YYYY-MM-DD`" + `. Add one with
   ` + "`nt todo add \"text\" --due fri`" + ` (` + "`--in folder`" + ` for a folder's list).

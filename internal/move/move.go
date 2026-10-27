@@ -309,7 +309,7 @@ func existing(parent, name string) (string, bool) {
 // where it goes.
 func (j *job) check(rel, how string) error {
 	c := j.v.Cfg.Folders
-	for _, f := range []struct{ dir, what string }{{c.Daily, "the journals"}, {c.Agents, "the agent reports"}} {
+	for _, f := range []struct{ dir, what string }{{c.Daily, "the journals"}, {c.Agents, "the agent reports"}, {c.Weekly, "the weekly digests"}} {
 		if f.dir == "" || rel != f.dir && !strings.HasPrefix(rel, f.dir+"/") {
 			continue
 		}
