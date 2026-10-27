@@ -6,6 +6,12 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- **Settings from nt.** `nt config` lists every setting of this machine and of the repository,
+  with its value and what it does; `nt config set <key> <value>` changes one, in the right file,
+  keeping its comments and refusing a value that would not load; `nt config get` and
+  `nt config edit [--repo]` too. In the browser `,` shows them in the note's pane, beside the folders:
+  enter flips a setting or asks for its value, `e` opens its file. The browser's own sync (`s`) now also compiles the
+  weekly digest and writes the summaries, as the timer's does.
 - **Weekly summaries.** A machine whose config names a tool (`[summary] tool = "claude"` or
   `"copilot"`) has it write, once a week is over, what was written on that machine in three
   short lists, Done, Decided and Open: its journal lines, todos, notes and agent sessions, read from the commits sync made

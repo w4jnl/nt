@@ -66,6 +66,8 @@ repository
   install --nvim       nt's nvim plugin: paste images, no merge under unsaved notes, sync on exit
   install --hooks      report Claude Code and Copilot CLI sessions; --skill: teach them nt
   doctor               check the repository, git, the sync timer and the tools nt uses
+  config               every setting, its value and what it does; config set <key> <value>,
+                       config get <key>, config edit [--repo] (the whole file in $EDITOR)
 
 other
   theme --glamour [dir]   write nt's preview style for glow (glamour-dark.json, glamour-light.json)
@@ -135,6 +137,8 @@ func Main(args []string) int {
 		return runDigest(args[1:])
 	case "week":
 		return runWeek(args[1:])
+	case "config":
+		return runConfig(args[1:])
 	case "version", "--version", "-V":
 		if stdoutIsTerminal() { // the lockup for people; "nt X.Y.Z" for scripts and the brew test
 			fmt.Println(Lockup(Version))

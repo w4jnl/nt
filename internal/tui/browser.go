@@ -29,6 +29,7 @@ import (
 	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/weekly"
 )
 
 // Layout from tokens.json terminal/*: the list is list-width columns until the person drags the
@@ -175,7 +176,8 @@ type browser struct {
 
 	moving string // the note or folder m or R was pressed on
 
-	cal *calendar // the calendar, in the list pane's place (calendar.go)
+	cal *calendar     // the calendar, in the list pane's place (calendar.go)
+	set *settingsView // the settings, in the note pane's place (settings.go)
 
 	history []visit // the notes links were followed from, for b (follow.go)
 	hinted  string  // the letters typed after f so far
@@ -567,6 +569,9 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return b, tea.Batch(b.loadTodos(keep), b.reindex())
 		}
+		if s, ok := b.settingSelected(); ok { // a config file edited: read it again
+			return b, b.openSettings(s.Key)
+		}
 		if b.cal != nil {
 			b.calRead()
 			return b, tea.Batch(b.loadNow(), b.calTodos(), b.reindex())
@@ -601,6 +606,11 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if b.p.hints != nil {
 			return b, b.hintKey(msg)
+		}
+		if b.set != nil {
+			if cmd, ok := b.settingsKey(msg); ok {
+				return b, cmd
+			}
 		}
 		if b.pick != nil {
 			return b, b.pickKey(msg)
@@ -654,6 +664,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 		d := map[tea.MouseButton]int{tea.MouseWheelDown: 1, tea.MouseWheelUp: -1}[m.Button]
 		switch {
 		case d == 0:
+		case onNote && b.set != nil:
+			b.settingMove(d)
 		case onNote && d > 0:
 			b.p.vp.ScrollDown(3)
 		case onNote:
@@ -673,6 +685,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	case split && m.X >= lw-1 && m.X <= lw+1:
 		b.dragging = true
 		return nil
+	case onNote && b.set != nil:
+		return b.settingsClick(row)
 	case onNote:
 		if b.showing != "" {
 			b.focus = onPreview
@@ -854,6 +868,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.openTodos(false)
 	case "c":
 		return b.openCalendar()
+	case ",":
+		return b.openSettings("")
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		return b.pin(int(s[0] - '1'))
 	case "a":
@@ -1197,6 +1213,11 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			return b.moveNowhere(text)
 		case "rename":
 			return b.rename(text)
+		case "setting":
+			if s, ok := b.settingSelected(); ok {
+				return b.setSetting(s, text)
+			}
+			return nil
 		case "mkdir":
 			return b.mkdir(text)
 		}
@@ -1376,6 +1397,7 @@ func (b *browser) pickKey(k tea.KeyPressMsg) tea.Cmd {
 			return cmd
 		}
 	}
+
 	switch k.String() {
 	case "esc", "q", "left", "h":
 		return b.closePick()
@@ -1519,9 +1541,10 @@ func (b *browser) sync() tea.Cmd {
 		return nil
 	}
 	b.syncing = true
-	v, dir := b.v, b.o.StateDir
+	v, dir, m := b.v, b.o.StateDir, b.o.Machine // copied: the settings list can change them meanwhile
 	run := func() tea.Msg {
-		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify, Digest: b.o.Machine.Digest})
+		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify, Digest: m.Digest, Weekly: m.Weekly, StateDir: dir,
+			Summary: weekly.Tool{Name: m.Summary.Tool, Model: m.Summary.Model}})
 		_ = gitsync.WriteStatus(dir, st)
 		return syncedMsg{st}
 	}

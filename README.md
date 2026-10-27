@@ -66,6 +66,8 @@ uses, the nvim plugin, the hooks and the skill, images, and the links in the not
   echo 'eval "$(nt completion bash)"' >> ~/.bashrc
   echo 'eval "$(nt completion zsh)"'  >> ~/.zshrc     # after compinit
   ```
+- Settings: `nt config` lists them all with what they do, `nt config set <key> <value>` changes
+  one (for example `nt config set weekly true`), and `,` in the browser does the same.
 - One machine writes what nt compiles: set `digest = true` (the agents' daily digest) and
   `weekly = true` (the weekly digest) in that machine's `~/.config/nt/config.toml`.
 - A weekly summary of what each machine wrote: `[summary] tool = "claude"` (or `"copilot"`) in
@@ -136,6 +138,7 @@ Every command that prints data takes `--json`.
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
 | `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
+| `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
 | `nt sync`, `nt doctor` | sync now; check the setup |
 | `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent hooks and skill |
 | `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |
@@ -151,6 +154,7 @@ In the browser:
 | `j` `k`, `enter`, `h` | move, open a folder or note, up a folder |
 | `tab` | to the note and back; `j` `k` then scroll it |
 | `t`, `[` `]`, `c`, `A` | today's journal, the day before or after, the calendar, today's agent reports |
+| `,` | the settings: enter changes one, `e` edits its file |
 | `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
 | `/`, `ctrl-p` | search every note, find a note by its title |
 | `f`, `b` | follow a link by its letters (a click works too), back to the note before |

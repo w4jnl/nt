@@ -343,6 +343,9 @@ agents = "agents"
 weekly = "weekly"
 ```
 
+`nt config` lists both files' settings and changes them one line at a time, keeping comments; the
+browser's `,` does the same.
+
 The machine config `~/.config/nt/config.toml` stays on one machine and is not committed:
 
 ```toml

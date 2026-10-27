@@ -44,4 +44,9 @@ expect "nt s --json finds the text" '"path": "tech/[0-9-]+-plan-a.md"' "$("$BIN"
 rc=0; "$BIN" s no-such-words --json >/dev/null || rc=$?
 expect "nt s exits 1 when nothing matches" '^1$' "$rc"
 expect "nt doctor --json reports its checks" '"check": "repository"' "$("$BIN" doctor --json)"
+expect "nt config set changes one setting, in its file" '^summary.model = haiku' "$("$BIN" config set summary.model haiku)"
+expect "nt config get reads it back" '^haiku$' "$("$BIN" config get summary.model)"
+expect "a value that is not one is refused" 'one of auto, dark, light' "$("$BIN" config set theme.mode blue 2>&1)"
+expect "a repository setting goes to .nt/config.toml" '^pins = \["tech", "work"\]' "$("$BIN" config set pins tech work >/dev/null; grep '^pins' "$T/notes/.nt/config.toml")"
+expect "nt config --json lists every setting" '"key": "day_starts"' "$("$BIN" config --json)"
 finish

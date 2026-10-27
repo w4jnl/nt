@@ -489,3 +489,87 @@ func TestAddMonths(t *testing.T) {
 		}
 	}
 }
+
+func TestSettings(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	machine := filepath.Join(t.TempDir(), "config.toml")
+	t.Setenv("NT_CONFIG", machine)
+	if err := os.WriteFile(machine, []byte("repo = \"~/notes\"\nweekly = false   # one machine only\n\n[theme]\nmode = \"dark\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read := func(p string) string { s, _ := os.ReadFile(p); return string(s) }
+	pick := func(key string) {
+		t.Helper()
+		for i, s := range config.Settings {
+			if s.Key == key {
+				b.set.sel = i
+				return
+			}
+		}
+		t.Fatalf("%s is not a setting", key)
+	}
+
+	press(b, ",")
+	if b.set == nil {
+		t.Fatal(", does not show the settings")
+	}
+	screen := ansi.Strip(b.View().Content)
+	lw := b.listWidth()
+	var left, right []string
+	for _, l := range strings.Split(screen, "\n") {
+		if r := []rune(l); len(r) > lw {
+			left, right = append(left, string(r[:lw])), append(right, string(r[lw:]))
+		}
+	}
+	if l, r := strings.Join(left, "\n"), strings.Join(right, "\n"); !strings.Contains(l, "a.md") || !strings.Contains(r, "this machine") ||
+		!strings.Contains(r, "the repository") || !strings.Contains(r, "summary.model") {
+		t.Errorf("the settings are not in the right pane beside the folder list:\n%s", screen)
+	}
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "enter change") || !strings.Contains(f, "the notes repository this machine works on") {
+		t.Errorf("the footer: %s", f)
+	}
+
+	pick("weekly")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(machine), "weekly = true    # one machine only") || !b.o.Machine.Weekly || b.msg != "weekly = true" {
+		t.Fatalf("enter does not flip weekly (%q):\n%s", b.msg, read(machine))
+	}
+
+	pick("summary.model")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.input == nil || b.inputKind != "setting" {
+		t.Fatal("enter on a value does not ask for it")
+	}
+	press(b, "haiku")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(machine), "[summary]\nmodel = \"haiku\"") || b.set == nil {
+		t.Fatalf("the prompt does not set summary.model, or closes the settings:\n%s", read(machine))
+	}
+
+	pick("pins")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	press(b, "tech")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(b.v.Abs(".nt/config.toml")), `pins = ["tech"]`) || strings.Join(b.v.Cfg.Pins, ",") != "tech" {
+		t.Fatalf("pins is not set in the repository's file, or not at once: %v", b.v.Cfg.Pins)
+	}
+
+	pick("day_starts")
+	before := read(b.v.Abs(".nt/config.toml"))
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	run(b, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	press(b, "5")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !b.alert || !strings.Contains(b.msg, "a time like 04:00") || read(b.v.Abs(".nt/config.toml")) != before {
+		t.Errorf("a bad value: %q; the file changed: %v", b.msg, read(b.v.Abs(".nt/config.toml")) != before)
+	}
+
+	press(b, "j") // j moves in the settings, not in the folder list
+	if config.Settings[b.set.sel].Key != "pins" || b.sel != 0 {
+		t.Errorf("j selected %s, folder row %d", config.Settings[b.set.sel].Key, b.sel)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.set != nil {
+		t.Error("esc does not close the settings")
+	}
+}

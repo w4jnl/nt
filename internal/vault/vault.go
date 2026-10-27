@@ -314,3 +314,35 @@ func (v *Vault) Update(rel string, fn func(old []byte) ([]byte, error)) error {
 
 func isFile(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }
 func isDir(p string) bool  { st, err := os.Stat(p); return err == nil && st.IsDir() }
+
+// SetSetting writes a setting of the repository's .nt/config.toml (config.Settings, File
+// "repo") typed as raw, under the repository lock, keeping the rest of the file; sync shares
+// it. Nothing is written when the result would not load.
+func (v *Vault) SetSetting(key, raw string) error {
+	s, ok := config.FindSetting(key)
+	if !ok || s.File != "repo" {
+		return fmt.Errorf("%q is not a setting of the repository", key)
+	}
+	value, err := s.TOML(raw)
+	if err != nil {
+		return err
+	}
+	err = v.Update(".nt/config.toml", func(old []byte) ([]byte, error) {
+		if old == nil {
+			old = []byte(config.RepoTemplate)
+		}
+		out := config.Edit(old, key, value)
+		if err := config.CheckRepo(out); err != nil {
+			return nil, fmt.Errorf("%s: %w", key, err)
+		}
+		return out, nil
+	})
+	if err != nil {
+		return err
+	}
+	cfg, err := config.LoadRepo(v.Root)
+	if err == nil {
+		v.Cfg = cfg
+	}
+	return err
+}
