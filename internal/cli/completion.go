@@ -44,6 +44,7 @@ var commands = []command{
 	{[]string{"uninstall"}, "remove what install put in", []flag{{"--sync", "the background sync job", ""}, {"--nvim", "nt's nvim plugin", ""}, {"--hooks", "the agent hooks", ""}, {"--skill", "the agent skill", ""}}, nil},
 	{[]string{"agent"}, "agent session reports: hooks and write", []flag{{"--status", "the report's status", "(in-progress done blocked failed abandoned)"}, {"--summary", "one line: the outcome", "summary"}, {"--session", "the session's id", "session"}, {"--agent", "the agent's name", "agent"}, jsonFlag}, []string{"(start turn end write)"}},
 	{[]string{"digest"}, "write and list a day's agent digest", []flag{jsonFlag}, []string{"(today yesterday)"}},
+	{[]string{"week"}, "compile the week's digest now", []flag{jsonFlag}, []string{"(this last)"}},
 	{[]string{"doctor"}, "check the repository, git, the timer and tools", []flag{jsonFlag}, nil},
 	{[]string{"import"}, "bring an Obsidian vault over once", []flag{{"--dry-run", "show the plan, write nothing", ""}, jsonFlag}, []string{"(obsidian)", "dir"}},
 	{[]string{"theme"}, "nt's preview style for glow", []flag{{"--glamour", "write glamour-dark.json and glamour-light.json", ""}}, []string{"dir"}},

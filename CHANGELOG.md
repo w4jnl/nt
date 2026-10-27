@@ -10,6 +10,11 @@ updates this file first. Dates are the tag dates.
   puts letters on the links on screen: type them to follow one. `b` goes back to the note before,
   scrolled as it was. A note opens at the heading the link names; folders, images, other files
   and URLs open as they do elsewhere. The "Linked from" lines under a note follow too.
+- **Weekly digest.** The machine with `weekly = true` compiles `weekly/GGGG/GGGG-Www.md` (the ISO
+  week) on every sync: the notes made and changed that week, the todos done and due, the agent
+  sessions per project, and each day's journal lines. It is written only when it changes and
+  catches up on weeks it missed; `nt week [date|last]` compiles one by hand. Weekly digests,
+  like journals, do not move. Turn it on in one machine's `~/.config/nt/config.toml`.
 - `nt doctor` lists the links in the notes that point at nothing: a note deleted or renamed by
   hand, or a link to a note's old place written on a machine that did not have its move yet.
   The journals' links to days without a journal are left out; `--json` lists every link.

@@ -369,3 +369,20 @@ func TestDelete(t *testing.T) {
 		t.Error("the repository itself counts as an empty folder")
 	}
 }
+
+func TestWeekRel(t *testing.T) {
+	v := newVault(t)
+	for day, want := range map[string]string{
+		"2026-10-27 10:00": "weekly/2026/2026-W44.md",
+		"2026-12-31 10:00": "weekly/2026/2026-W53.md", // a Thursday: its week is 2026's
+		"2027-01-03 10:00": "weekly/2026/2026-W53.md", // a Sunday in 2027, still in that week
+		"2024-12-30 10:00": "weekly/2025/2025-W01.md", // a Monday in 2024, in 2025's first week
+	} {
+		if got := v.WeekRel(at(day)); got != want {
+			t.Errorf("WeekRel(%s) = %s, want %s", day, got, want)
+		}
+	}
+	if got := WeekStart(at("2026-11-01 23:00")).Format("2006-01-02"); got != "2026-10-26" {
+		t.Errorf("WeekStart of a Sunday = %s, want the Monday before", got)
+	}
+}

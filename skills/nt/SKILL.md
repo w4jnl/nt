@@ -13,6 +13,8 @@ repository: `nt sync` is its only git writer.
 
 - `nt s "<words>" --json`: search every note (rg); each match has `path`, `line` and `text`.
 - `nt ls [folder] --json`: the folders and notes in a folder, newest first.
+- `weekly/GGGG/GGGG-Www.md` (ISO week) is the week's digest: its notes, todos, agent sessions
+  and journal lines. Read it to see what a week held; never edit it, nt compiles it.
 - Read a note with your file tools at the path `nt` prints (`nt _editor repo` prints the
   repository's folder). Links between notes are relative markdown links.
 

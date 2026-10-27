@@ -20,14 +20,23 @@ import (
 
 	"github.com/w4jnl/nt/internal/agents"
 	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/weekly"
 )
 
-// digestPath is a day's agent digest, inside the agents folder.
-var digestPath = regexp.MustCompile(`^\d{4}/\d{4}-\d{2}-\d{2}/README\.md$`)
+// digestPath is a day's agent digest, inside the agents folder; weekPath a weekly digest, inside
+// the weekly folder.
+var (
+	digestPath = regexp.MustCompile(`^\d{4}/\d{4}-\d{2}-\d{2}/README\.md$`)
+	weekPath   = regexp.MustCompile(`^\d{4}/\d{4}-W\d{2}\.md$`)
+)
 
+// isDigest reports a file nt compiles: a day's agent digest or a weekly digest.
 func (r *run) isDigest(p string) bool {
-	rest, ok := strings.CutPrefix(p, r.v.Cfg.Folders.Agents+"/")
-	return ok && digestPath.MatchString(rest)
+	if rest, ok := strings.CutPrefix(p, r.v.Cfg.Folders.Agents+"/"); ok && digestPath.MatchString(rest) {
+		return true
+	}
+	rest, ok := strings.CutPrefix(p, r.v.Cfg.Folders.Weekly+"/")
+	return ok && weekPath.MatchString(rest)
 }
 
 // MaxFile is the largest file sync commits; larger ones are reported instead.
@@ -40,6 +49,7 @@ type Options struct {
 	Log    io.Writer        // progress, one line per step; nil: discard
 	Retry  time.Duration    // base pause before retrying a rejected push; 0: 1 s
 	Digest bool             // this machine writes the agent digests (digest = true)
+	Weekly bool             // this machine compiles the weekly digest (weekly = true)
 }
 
 // Status is the outcome of a run, written to status.json for doctor, the TUI and flok.
@@ -137,6 +147,15 @@ func (r *run) cycle() error {
 		}
 		for _, d := range days {
 			r.logf("digest: %s", d)
+		}
+	}
+	if r.o.Weekly { // likewise: a week's digest goes out with the notes it is made from
+		weeks, err := weekly.Refresh(r.v, r.v.Now())
+		if err != nil {
+			return err
+		}
+		for _, w := range weeks {
+			r.logf("weekly: %s", w)
 		}
 	}
 	if err := r.locked(r.commit); err != nil {

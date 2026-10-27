@@ -56,6 +56,8 @@ agents
   agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin)
   agent write             the agent's own Done, Decisions and Open on stdin [--status s] [--summary text]
   digest [date]           write the day's agents/…/README.md from its reports and list them
+  week [date|last]        compile the week's weekly/GGGG/GGGG-Www.md now; the machine with
+                          weekly = true does it on every sync
 
 repository
   init [folder]        make folder a notes repository; --clone <url> on a second machine
@@ -131,6 +133,8 @@ func Main(args []string) int {
 		return runAgent(args[1:])
 	case "digest":
 		return runDigest(args[1:])
+	case "week":
+		return runWeek(args[1:])
 	case "version", "--version", "-V":
 		if stdoutIsTerminal() { // the lockup for people; "nt X.Y.Z" for scripts and the brew test
 			fmt.Println(Lockup(Version))

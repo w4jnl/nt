@@ -26,13 +26,14 @@ type Repo struct {
 	Folders       struct {
 		Daily  string `toml:"daily"`
 		Agents string `toml:"agents"`
+		Weekly string `toml:"weekly"`
 	} `toml:"folders"`
 }
 
 // DefaultRepo is the configuration a repository without .nt/config.toml gets.
 func DefaultRepo() Repo {
 	r := Repo{Format: Format, DefaultFolder: "inbox", DayStarts: "04:00"}
-	r.Folders.Daily, r.Folders.Agents = "daily", "agents"
+	r.Folders.Daily, r.Folders.Agents, r.Folders.Weekly = "daily", "agents", "weekly"
 	return r
 }
 
@@ -46,6 +47,7 @@ pins = []                  # folders on keys 1-9 in the TUI, e.g. ["inbox", "tec
 [folders]
 daily = "daily"
 agents = "agents"
+weekly = "weekly"
 `
 
 // LoadRepo reads <root>/.nt/config.toml over the defaults. A missing file is the defaults.
@@ -61,7 +63,7 @@ func LoadRepo(root string) (Repo, error) {
 	if _, err := r.DayStart(); err != nil {
 		return r, fmt.Errorf("%s: day_starts: %w", p, err)
 	}
-	for _, f := range []*string{&r.Folders.Daily, &r.Folders.Agents, &r.DefaultFolder} {
+	for _, f := range []*string{&r.Folders.Daily, &r.Folders.Agents, &r.Folders.Weekly, &r.DefaultFolder} {
 		*f = strings.Trim(filepath.ToSlash(*f), "/")
 	}
 	return r, nil
@@ -84,6 +86,7 @@ type Machine struct {
 	Repo         string `toml:"repo"`
 	Host         string `toml:"host"`
 	Digest       bool   `toml:"digest"`
+	Weekly       bool   `toml:"weekly"`
 	ImageViewer  string `toml:"image_viewer"`
 	InlineImages string `toml:"inline_images"`
 	Sync         struct {
@@ -110,6 +113,7 @@ const MachineTemplate = `# nt settings for this machine, not committed (docs/for
 repo = %q
 # host = "mbp"             # default: the short host name
 digest = false             # true on the one machine that writes agent digests
+weekly = false             # true on the one machine that compiles the weekly digest
 image_viewer = ""          # default per OS: qlmanage -p / xdg-open / chafa in a tmux popup
 inline_images = "auto"     # auto | on | off: draw images in the preview (Ghostty, kitty)
 

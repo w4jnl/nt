@@ -28,11 +28,12 @@ Rules are marked **must** or **should**. A client that cannot follow a must rule
   daily/YYYY/assets/              attachments pasted into journals
   agents/YYYY/YYYY-MM-DD/         agent reports for that day (§6)
   agents/YYYY/YYYY-MM-DD/README.md   the day's digest (§7)
+  weekly/GGGG/GGGG-Www.md         the week's digest, named by ISO week (§7)
   <folder>/…/YYYY-MM-DD-slug.md   topic notes, in any folder the person creates
   <folder>/…/assets/              attachments for the notes in that folder
 ```
 
-- `daily/` and `agents/` are reserved. Their names can be changed in `.nt/config.toml`.
+- `daily/`, `agents/` and `weekly/` are reserved. Their names can be changed in `.nt/config.toml`.
 - Any other folder is the person's. Folders can nest to any depth.
 - Names that start with `.` are ignored by clients, except `.nt/`, `.gitattributes` and `.gitignore`.
 - A folder that holds no note yet holds an empty `.gitkeep`, so git keeps it. Clients leave it in
@@ -112,7 +113,7 @@ Frontmatter is optional. It is YAML between two `---` lines at the very top of t
 | `title` | string | The note's title |
 | `date` | `YYYY-MM-DD` | The day the note belongs to |
 | `tags` | list of strings | Lowercase. `/` makes a hierarchy: `work/q3` |
-| `type` | string | `note` (the default), `daily`, `agent-report` or `digest` |
+| `type` | string | `note` (the default), `daily`, `agent-report`, `digest` or `weekly` |
 
 - Clients must keep keys they don't know, in their order, when they rewrite frontmatter.
 - **Title** is found in this order: the `title` key, then the first `#` heading, then the file stem.
@@ -218,6 +219,54 @@ type: daily
 
 Glyphs: `◐` in-progress, `✓` done, `●` blocked, `◆` failed, `○` abandoned. The status word is always written next to the glyph.
 
+### Weekly digest
+
+`weekly/GGGG/GGGG-Www.md` is compiled from the week's notes. People don't edit it: it is written again when they change.
+
+- `GGGG-Www` is the ISO week-year and week, Monday to Sunday: 29 December 2025 is in `2026-W01`, and 3 January 2027 in `2026-W53`. The days are the journals' days, shifted by `day_starts`.
+- Only one machine compiles it: the one with `weekly = true` in its machine config (§9). Before each sync commits, it compiles the current week, the week before, and every week since the newest digest there is, so it catches up after being off. A change that a merge brings in reaches the digest on its next sync.
+- A week with nothing in it gets no digest. The file is written only when its bytes change; nothing in it depends on when it was made.
+- It has `type: weekly` frontmatter, the week as its title, links to the weeks before and after, and these sections, each left out when empty:
+  - **Notes:** topic notes made that week, by the date in their names (`new`), then those changed that week, by the repository's commit history (`changed`, at most 20 by name, the rest counted). A commit that changed more than 20 notes was an import or a move: its notes are counted on one line, not listed. Journals, agent reports, digests, `todo.md` files and conflict copies are not listed.
+  - **Todos:** those done that week (`✓` and the day), then the open ones due by its Sunday (`○` and the due date).
+  - **Agents:** the week's sessions per project, with a count per status.
+  - **Days:** for each day with a journal or agent sessions, the journal's `## Log` lines (their links made relative to the digest), then links to the journal and the day's agent digest.
+
+```markdown
+---
+title: Week 44, 2026
+date: 2026-10-26
+type: weekly
+---
+
+# Week 44 · 26 October – 1 November 2026
+
+[← W43](2026-W43.md) · [W45 →](2026-W45.md)
+
+Compiled by nt from the week's notes; it is written again when they change.
+
+## Notes
+
+- [NAS setup](../../tech/2026-10-27-nas-setup.md) · tech · new
+
+## Todos
+
+- ✓ Pay the invoice · Tue
+- ○ Renew passport · due Thu 29 Oct
+
+## Agents
+
+- noteTaking · 9 sessions: 1 blocked, 8 done
+
+## Days
+
+### Monday 26 October
+
+- 09:12 Called the bank
+
+[journal](../../daily/2026/2026-10-26.md) · [3 agent sessions](../../agents/2026/2026-10-26/README.md)
+```
+
 ## 8. Templates
 
 - Templates are in `.nt/templates/` and use Go `text/template`. Missing templates fall back to the built-in defaults.
@@ -238,6 +287,7 @@ pins = ["inbox", "tech", "work", "agents"]   # folders on keys 1-9
 [folders]
 daily = "daily"
 agents = "agents"
+weekly = "weekly"
 ```
 
 The machine config `~/.config/nt/config.toml` stays on one machine and is not committed:
@@ -245,7 +295,8 @@ The machine config `~/.config/nt/config.toml` stays on one machine and is not co
 ```toml
 repo = "~/notes"
 host = "mbp"               # default: the short host name
-digest = true              # this machine writes digests (one machine only)
+digest = true              # this machine writes the agent digests (one machine only)
+weekly = true              # this machine compiles the weekly digest (one machine only)
 image_viewer = ""          # default per OS: qlmanage -p / xdg-open / chafa in a tmux popup
 inline_images = "auto"     # auto | on | off: draw images in the preview (Ghostty, kitty)
 
@@ -270,7 +321,7 @@ These rules apply to every client that writes to the repository.
 - **Conflicts never leave markers.**
   - When both sides changed a file, the remote version stays in place. The local version is saved as a conflict copy (§3).
   - When one side changed a file and the other deleted it, the change wins.
-  - Digests are regenerated.
+  - Digests, the days' and the weeks', are regenerated: the remote version is taken and the machine that writes them writes them again.
   - Journals don't conflict, because of the union rule.
 - **Large files.** Files over 20 MB are not committed. Sync reports them instead.
 - **Interrupted merges.** A client that finds an unfinished merge (`MERGE_HEAD` exists, or files are unmerged) finishes the resolution before it does anything else.
@@ -360,8 +411,8 @@ Renaming a note:
 Rules:
 
 - New folder names are slugs (§3). Folders that exist keep their names, whatever case is typed.
-- Journals, agent reports and digests are not moved or renamed, and neither are the `daily/` and
-  `agents/` folders. Nothing is moved into them.
+- Journals, agent reports and digests are not moved or renamed, and neither are the `daily/`,
+  `agents/` and `weekly/` folders. Nothing is moved into them.
 - `pins` and `default_folder` in `.nt/config.toml` follow a folder that moves.
 - A new name that differs from the old one only in case is refused: git on macOS would not see
   the change.
