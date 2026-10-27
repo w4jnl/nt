@@ -173,8 +173,8 @@ func (b *browser) calKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			return nil, true
 		}
 		return b.closeCalendar(), true
-	case "s", "?", "a", "n", "/", "ctrl+p", "<", ">", "ctrl+c":
-		return nil, false // the browser's own: sync, help, add, new, search, resize, quit
+	case "s", "?", "a", "n", "/", "ctrl+p", "<", ">", "f", "b", "ctrl+c":
+		return nil, false // the browser's own: sync, help, add, new, search, resize, follow, back, quit
 	}
 	return nil, true
 }

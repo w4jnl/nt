@@ -56,6 +56,8 @@ type preview struct {
 	extra   string // shown after the note (the browser's "Linked from"), already styled
 	body    string
 	lines   []string                  // what the viewport shows, one rendered line each
+	links   []linkSpot                // where the links are in lines (follow.go)
+	hints   map[string]linkSpot       // f's labels on the links on screen, nil when off
 	mark    *span                     // text selected with the mouse, nil when none
 	img     *termimg.Terminal         // nil: images keep their alt text
 	images  map[string]*termimg.Image // by file
@@ -110,7 +112,7 @@ func (p *preview) changed() bool {
 }
 
 func (p *preview) render() {
-	p.lines = nil
+	p.lines, p.links, p.hints = nil, nil, nil
 	if p.width <= 1 || p.path == "" {
 		p.vp.SetContent("")
 		return
@@ -137,6 +139,7 @@ func (p *preview) render() {
 		}
 	}
 	p.lines = lines
+	p.links = findLinks(lines)
 	p.vp.SetContentLines(lines)
 }
 
@@ -243,9 +246,23 @@ func (p *preview) showText(text string) bool {
 	return false
 }
 
-// View is the visible part of the note, the selected text on accent-soft.
+// View is the visible part of the note, the selected text on accent-soft and f's labels over
+// the links they follow.
 func (p *preview) View() string {
 	v := p.vp.View()
+	if p.hints != nil {
+		tag := lipgloss.NewStyle().Foreground(p.pal.OnAccent).Background(p.pal.Accent).Bold(true)
+		rows := strings.Split(v, "\n")
+		for label, s := range p.hints {
+			i := s.line - p.vp.YOffset()
+			if i < 0 || i >= len(rows) {
+				continue
+			}
+			w := ansi.StringWidth(rows[i])
+			rows[i] = ansi.Cut(rows[i], 0, s.from) + tag.Render(label) + ansi.Cut(rows[i], min(w, s.from+len(label)), w)
+		}
+		v = strings.Join(rows, "\n")
+	}
 	if p.mark == nil || p.mark.empty() {
 		return v
 	}

@@ -6,6 +6,10 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- **Follow links in the note.** In the browser a click on a link in the note follows it, and `f`
+  puts letters on the links on screen: type them to follow one. `b` goes back to the note before,
+  scrolled as it was. A note opens at the heading the link names; folders, images, other files
+  and URLs open as they do elsewhere. The "Linked from" lines under a note follow too.
 - `nt doctor` lists the links in the notes that point at nothing: a note deleted or renamed by
   hand, or a link to a note's old place written on a machine that did not have its move yet.
   The journals' links to days without a journal are left out; `--json` lists every link.

@@ -142,6 +142,21 @@ expect "and the journal no longer links it" '^0$' "$(grep -c 'Browser note' "$N"
 key q
 expect_soon "q quits" '^gone$' session
 
+# following links in the note: a click, or f and the letters of a label; b back
+start
+key 1
+expect_soon "the project plan shows" 'See the NAS' capture
+p=$(at 'the NAS'); mouse "0;$p" && key -l $'\e[<0;'"$p"'m'
+expect_soon "a click on a link in the note follows it" 'The unicorn mount lives here' capture
+key b
+expect_soon "b goes back to the note before" 'See the NAS' capture
+key f
+expect_soon "f labels the links on screen" 'follow the link they label' footer
+key a
+expect_soon "typing a label follows its link" 'The unicorn mount lives here' capture
+key q
+expect_soon "q quits" '^gone$' session
+
 start 60
 expect_soon "a narrow screen shows the list alone" 'tech/' capture
 key 2

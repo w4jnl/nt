@@ -157,6 +157,8 @@ Decisions taken with the user (2026-10-26):
 | `ctrl-p` | Fuzzy title search |
 | `e` | Open in nvim at the current line via `tea.ExecProcess`; reload on return. fsnotify also reloads live. |
 | `l` | Link picker; then follow the link |
+| `f` | Label the links on screen with letters; typing a label follows its link (a click on a link follows it too) |
+| `b` | Back to the note a link was followed from, scrolled as it was |
 | `o` | Outline picker |
 | `i` | Image picker |
 | `v` | Open in `glow` |
@@ -197,7 +199,9 @@ Decisions taken with the user (2026-10-26):
 
 It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same `_editor` calls and `nt paste`.
 
-**Deferred:** back stack and multiple views.
+**Following links in the note** (`internal/tui/follow.go`). Glamour writes every link as an OSC 8 hyperlink carrying its target as written, so after each render nt reads which cells of which line belong to which link. A click on one follows it (a drag still selects text); `f` puts a label of one or two letters, on `accent`, over the first cells of each link on screen, one per target, and typing it follows; the notes under "Linked from" are hyperlinks too. A note opens at the heading its anchor names, a folder in the list, an image as `i` opens it, any other file or a URL with the OS. `b` goes back through the notes links were followed from (at most 50).
+
+**Deferred:** multiple views.
 
 ## 5. Images and platforms
 **Image opener.** Configurable as `image_viewer`. The default depends on the OS:

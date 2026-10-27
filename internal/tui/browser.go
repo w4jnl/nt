@@ -15,6 +15,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/clip"
 	"github.com/w4jnl/nt/internal/config"
@@ -175,6 +176,9 @@ type browser struct {
 	moving string // the note or folder m or R was pressed on
 
 	cal *calendar // the calendar, in the list pane's place (calendar.go)
+
+	history []visit // the notes links were followed from, for b (follow.go)
+	hinted  string  // the letters typed after f so far
 
 	status    gitsync.Status
 	hasStatus bool
@@ -400,8 +404,9 @@ func (b *browser) linkedFrom(rel string) string {
 	var s strings.Builder
 	s.WriteString("\n\n  " + b.st.Rule.Render(strings.Repeat("─", 24)) + "\n")
 	s.WriteString("  " + b.st.Muted.Render("Linked from") + "\n")
-	for _, from := range b.ix.Back[rel] {
-		s.WriteString("  " + b.st.Text.Render("← "+firstNonEmpty(b.ix.Title(from), from)) + "  " + b.st.Faint.Render(from) + "\n")
+	for _, from := range b.ix.Back[rel] { // hyperlinks, like the note's own links, so they follow
+		s.WriteString("  " + ansi.SetHyperlink(vault.RelLink(rel, from)) + b.st.Text.Render("← "+firstNonEmpty(b.ix.Title(from), from)) + "  " +
+			b.st.Faint.Render(from) + ansi.ResetHyperlink() + "\n")
 	}
 	return s.String()
 }
@@ -592,6 +597,9 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if b.input != nil {
 			return b, b.inputKey(msg)
 		}
+		if b.p.hints != nil {
+			return b, b.hintKey(msg)
+		}
 		if b.pick != nil {
 			return b, b.pickKey(msg)
 		}
@@ -631,8 +639,12 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 			return b.p.sendImages()
 		case b.selecting:
 			b.selecting = false
-			if b.p.mark.empty() {
-				b.p.mark = nil // a click, not a drag
+			if b.p.mark.empty() { // a click, not a drag: on a link, it follows it
+				at := b.p.mark.anchor
+				b.p.mark = nil
+				if s, ok := b.p.linkAt(at); ok {
+					return b.follow(s.dest)
+				}
 			}
 		}
 		return nil
@@ -878,6 +890,10 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.copy(b.showing, b.showing)
 	case "D":
 		return b.askDelete()
+	case "f":
+		return b.startHints()
+	case "b":
+		return b.back()
 	case "m":
 		return b.startMove()
 	case "R":

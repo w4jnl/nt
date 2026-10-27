@@ -288,7 +288,7 @@ func (b *browser) helpText(w, h int) string {
 		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "1–9", "pinned folders", "A", "today's agent reports"},
 		{"find", "/", "search every note", "ctrl-p", "a note by its title"},
 		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
-		{"in a note", "l", "links in and to it", "o", "its outline", "i", "its images, full size", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
+		{"in a note", "f", "follow a link: type its letters, or click it", "b", "back to the note before", "l o i", "its links, outline, images", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
 		{"write", "a", "add a line to today", "n", "a new note here", "N", "a new folder here", "m R", "move, rename it", "s", "sync now", "r", "reload"},
 		{"mouse", "drag text", "select it in the note", "drag │", "resize the list (< > too)", "click", "select; again opens", "wheel", "scroll"},
 		{"", "?", "this help", "q", "quit"},
@@ -344,6 +344,8 @@ func (b *browser) footer() string {
 	}
 	var left string
 	switch {
+	case b.p.hints != nil:
+		left = hints(b.st, "letters", "follow the link they label", "esc", "cancel")
 	case b.p.mark != nil && !b.p.mark.empty():
 		left = hints(b.st, "y", "copy", "esc", "clear", "drag", "select more")
 	case b.pick != nil && b.pick.todos:
