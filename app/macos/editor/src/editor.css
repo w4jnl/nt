@@ -1,0 +1,176 @@
+/* Rules on CodeMirror's classes sit under #editor, so they win over its base theme.
+   The note in the Mac app: nt's tokens (docs/design-system/tokens.json; a test keeps them equal), the system face for the text, JetBrains Mono for code, times and metadata. */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-400.woff2") format("woff2");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-700.woff2") format("woff2");
+  font-weight: 700;
+}
+
+:root {
+  color-scheme: light dark;
+  --ground: #F6F8F8;
+  --surface: #FFFFFF;
+  --surface-sunk: #EEF2F2;
+  --line: #DCE3E4;
+  --line-strong: #7E8D90;
+  --ink: #14181A;
+  --ink-muted: #5A686B;
+  --ink-faint: #98A5A7;
+  --accent: #0B7A7E;
+  --accent-soft: #E8F6F6;
+  --ok: #1F7A3A;
+  --warn: #9A5A0E;
+  --alert: #C0342B;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #14181A;
+    --surface: #1A2023;
+    --surface-sunk: #0F1214;
+    --line: #263034;
+    --line-strong: #6B7A7D;
+    --ink: #F2F5F5;
+    --ink-muted: #8A999C;
+    --ink-faint: #5E6D70;
+    --accent: #3FD0D4;
+    --accent-soft: #173437;
+    --ok: #5FC47A;
+    --warn: #E8963C;
+    --alert: #F0645A;
+  }
+}
+
+html, body { margin: 0; height: 100%; background: var(--ground); color: var(--ink); }
+#editor, .cm-editor { height: 100%; }
+
+#editor .cm-editor {
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/26px var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+#editor .cm-editor.cm-focused { outline: none; }
+#editor .cm-scroller { font-family: inherit; line-height: inherit; }
+#editor .cm-content {
+  box-sizing: border-box;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 22px 40px 160px;
+  caret-color: var(--accent);
+}
+#editor .cm-line { position: relative; padding: 0; }
+#editor .cm-cursor, #editor .cm-dropCursor { border-left: 2px solid var(--accent); }
+#editor .cm-selectionBackground, #editor .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: var(--accent-soft); }
+
+/* Headings: in ink, the size says the level. */
+.cm-h1 { font: 650 28px/36px var(--display); letter-spacing: -0.3px; padding: 4px 0 10px; }
+#editor .cm-h2 { font: 600 21px/28px var(--display); letter-spacing: -0.2px; padding: 20px 0 4px; }
+#editor .cm-h3 { font: 600 17px/24px var(--display); padding: 14px 0 2px; }
+#editor .cm-h4, #editor .cm-h5, #editor .cm-h6 { font-weight: 600; padding-top: 10px; }
+
+/* The markdown of the line being edited: the # marks hang in the margin, the rest is faint. */
+.cm-hang {
+  position: absolute;
+  right: 100%;
+  margin-right: 6px;
+  white-space: pre;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+#editor .cm-syntax { color: var(--ink-faint); }
+
+#editor .cm-em { font-style: italic; }
+#editor .cm-strong { font-weight: 600; }
+#editor .cm-strike { text-decoration: line-through; color: var(--ink-muted); }
+#editor .cm-icode {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--surface-sunk);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+#editor .cm-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  cursor: pointer;
+}
+#editor .cm-link-broken { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+#editor .cm-url { color: var(--ink-muted); font-size: 0.9em; }
+
+#editor .cm-image { display: inline-block; width: 100%; margin: 8px 0 2px; }
+#editor .cm-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+#editor .cm-caption { display: block; margin-top: 6px; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+#editor .cm-image-missing img { display: none; }
+#editor .cm-image-missing .cm-caption::after { content: " (image not found)"; }
+#editor .cm-imgalt { color: var(--ink-muted); font-style: italic; }
+
+#editor .cm-check { display: inline-block; width: 1.3em; color: var(--ink-muted); }
+#editor .cm-check-done { color: var(--ok); }
+#editor .cm-done { color: var(--ink-muted); }
+#editor .cm-bullet { color: var(--ink-muted); }
+#editor .cm-time { font-family: var(--mono); font-size: 13px; color: var(--ink-muted); }
+#editor .cm-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); }
+
+#editor .cm-quote { border-left: 2px solid var(--line); padding-left: 14px !important; color: var(--ink-muted); }
+#editor .cm-hr { display: inline-block; width: 100%; height: 1px; vertical-align: middle; background: var(--line-strong); }
+
+#editor .cm-code {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 21px;
+  background: var(--surface-sunk);
+  padding: 0 16px !important;
+}
+#editor .cm-code-first { padding-top: 10px !important; border-radius: 6px 6px 0 0; }
+#editor .cm-code-last { padding-bottom: 10px !important; border-radius: 0 0 6px 6px; }
+#editor .cm-code-first.cm-code-last { border-radius: 6px; }
+#editor .cm-fence { line-height: 6px; }
+#editor .cm-codeinfo { position: absolute; top: 6px; right: 12px; font-size: 11px; color: var(--ink-muted); }
+#editor .cm-table { font-family: var(--mono); font-size: 13px; }
+#editor .cm-nav { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); }
+#editor .cm-nav .cm-link { text-decoration: none; }
+
+#editor .cm-fm { font-family: var(--mono); font-size: 12px; line-height: 20px; color: var(--ink-muted); }
+#editor .cm-fm-summary {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  padding-bottom: 10px;
+  cursor: pointer;
+}
+#editor .cm-fm-none { height: 0; }
+
+#editor .cm-backlinks { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }
+#editor .cm-backlinks-head { margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+#editor .cm-backlink {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--accent);
+  text-decoration: none;
+}
+#editor .cm-backlink-folder { font-family: var(--mono); font-size: 11px; color: var(--ink-muted); }

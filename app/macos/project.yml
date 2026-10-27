@@ -1,0 +1,87 @@
+# nt for Mac: the Xcode project is generated from this file (brew install xcodegen; make
+# mac-project). Local.xcconfig (gitignored) holds your team id, NT_TEAM_ID; it can stay empty for
+# a build that runs on this Mac only.
+#
+# The app is not sandboxed: it reads the notes repository where it is, runs nt and takes the
+# repository's locks (docs/design.md, phase 6). It bundles the nt it was built with, in
+# Contents/Helpers/nt (make nt-universal), and the editor page from Nt/Resources/editor
+# (make mac-editor), with the design system's fonts beside it.
+name: Nt
+options:
+  bundleIdPrefix: nl.w4j
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: $(NT_TEAM_ID)
+    ENABLE_USER_SCRIPT_SANDBOXING: true
+    ENABLE_HARDENED_RUNTIME: true
+targets:
+  Nt:
+    type: application
+    platform: macOS
+    sources:
+      - path: Nt
+        excludes:
+          - Resources
+      - path: Nt/Resources/editor
+        type: folder
+      - path: ../../docs/design-system/fonts
+        type: folder
+      - path: build/nt
+        attributes: [CodeSignOnCopy]
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Helpers
+    settings:
+      base:
+        PRODUCT_NAME: nt
+        PRODUCT_MODULE_NAME: Nt
+        PRODUCT_BUNDLE_IDENTIFIER: nl.w4j.nt
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_IDENTITY: "-"
+    info:
+      path: Nt/Info.plist
+      properties:
+        CFBundleDisplayName: nt
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: w4j.nl · MIT
+  NtTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: NtTests
+    dependencies:
+      - target: Nt
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.w4j.nt.tests
+        CODE_SIGN_IDENTITY: "-"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/nt.app/Contents/MacOS/nt
+        BUNDLE_LOADER: $(TEST_HOST)
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  Nt:
+    build:
+      targets:
+        Nt: all
+        NtTests: [test]
+    test:
+      targets:
+        - NtTests

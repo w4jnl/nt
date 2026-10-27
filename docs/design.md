@@ -371,7 +371,73 @@ scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/c
 assets/demo/ (scene.sh, *.tape, record.sh, ghostty.sh) → assets/readme/*.gif   the README recordings
 CONTRIBUTING.md · SECURITY.md · .github/ISSUE_TEMPLATE/ · .github/dependabot.yml
 scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarballs, Homebrew tap bump
+app/macos/          the Mac app (§8): project.yml (XcodeGen), Nt/ (SwiftUI), NtTests/, and editor/,
+                    CodeMirror with nt's live preview, built into Nt/Resources/editor
 ```
+
+## 8. Mac app (phase 6)
+A second client of the same repository, never another store: the files stay the truth, git stays
+the sync, and `nt sync` stays the one git writer on the Mac. The app never runs git.
+
+**Reading and writing.**
+- It bundles the `nt` it was built with, universal, in `Contents/Helpers/nt`, so the app and the
+  format cannot drift. `NT_BIN` points it at another one.
+- It reads files itself. `nt _editor index` gives it the folders, every note's title, the notes
+  that link to each, the day as nt counts it, the pins and where `status.json` is. FSEvents on the
+  repository and on the state folder tell it when to read again.
+- Everything that writes goes through nt, with `--json`: `t`, `a`, `n`, `todo`, `paste`, `mv`,
+  `config set`, `sync`. Saving a note (step 2) keeps the rules of docs/format.md §10 as the nvim
+  plugin does: the repository lock, an atomic write, `.git/nt-edit` held while a note has unsaved
+  changes, `nt _editor kick` after.
+- Not sandboxed and not on the Mac App Store: it reaches the repository where it is, runs nt and
+  takes flocks. It ships Developer ID signed and notarized, as a DMG and a Homebrew cask.
+- Nothing leaves the Mac. The editor page's content policy allows only the app's own files and
+  `nt-asset:`, the repository's files, so a remote image in a note shows its alt text.
+
+**The window.** Two columns, quiet, in the manner of Typora.
+- The sidebar: the sync state as glyph and word at the top (a click syncs now), Open (⌘P),
+  Today, then the folders: the pinned ones in their order, a rule, the rest, then the notes at
+  the root. Notes newest first with their day in mono; journals by year; `assets/` hidden. Which
+  folders are open is kept on the Mac (UserDefaults), never in the repository.
+- The note: a centred column, 680 px. The toolbar says where the note is (folders › title) and
+  searches. The word count sits at the bottom right, a message at the bottom left when something
+  did not work.
+- Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
+  lines that match (`nt s`). Return opens the note, at the line for a text match. Search
+  (⇧⌘F) is the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
+
+**The editor.** CodeMirror 6 in a WKWebView, as MarkEdit does it, with nt's live preview
+(`app/macos/editor/src/livepreview.js`). The note is its markdown, byte for byte, and reads as
+rendered text.
+- A line's markdown shows only while the cursor is on it, faint. A heading's `#` marks then hang
+  in the left margin, so the text never moves.
+- The frontmatter folds to one mono line: the long date and the tags. A click opens it. A
+  journal's folds to nothing; its heading is the date.
+- Links are accent and underlined, and a click follows them (Command-click on the line being
+  edited). A link to nothing is struck through in `ink-faint`, its target in the tooltip.
+- An image alone on its line is drawn from the repository, its alt text as the caption;
+  elsewhere it shows its alt text, as in the terminal (§5).
+- Tasks are `○` and `✓`; a done one is muted; `due:` and `done:` in mono. A journal line's `HH:MM`
+  is mono too.
+- Code blocks are mono on `surface-sunk`, the language at the top right. Tables stay their source,
+  in mono; a rendered table can come later.
+- "Linked from" follows the note, as in the terminal browser.
+- esbuild builds the page into one file, `Nt/Resources/editor/editor.js`, committed with its
+  `LICENSES.txt` (MIT, 20 packages), so building the app needs no Node. It is the app's one
+  third-party component: pinned, and reviewed on update.
+
+**Steps**, each usable and each ending at a review gate:
+0. **Design.** An HTML mockup of the views in both themes, iterated with the person. Done.
+1. **The reader.** The project, the bundled nt, the sidebar, Today, the editor read-only in live
+   preview, links, Linked from, Open and Search, the sync state. Done.
+2. **Writing.** Editing with autosave under the rules above, a new note (⌘N), tasks checked in
+   the text, images pasted and dropped (`nt paste --from <file>`), focus mode (⇧⌘L).
+3. **The views.** Todos, Calendar, Weekly, Agents.
+4. **Menu bar and capture.** The menu bar item (the template mark, its alert variant while sync
+   needs you), a global hotkey (⌥⌘Space) that adds one line to today or a todo, and Settings:
+   nt's through `nt config`, the app's own in UserDefaults.
+5. **Shipping.** Developer ID signing, notarization, the DMG on the GitHub release,
+   `brew install --cask w4jnl/tap/nt-app`.
 
 ---
 
@@ -425,9 +491,11 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 - Weekly summaries, one per machine (`[summary] tool`): Claude Code at home, Copilot CLI at the office, each about what was written on its own machine; the digest shows them all. They take the place of a daily `nt digest --summarize`.
 - Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
 
-**6. Apps:**
-- Mac app: SwiftUI over the same folder; it can shell out to `nt` and `git`.
-- iOS: swift-libgit2 or the GitHub API; sync on open, background and push; App Intent "append to today".
+**6. Mac app** (§8). Steps 0 (design) and 1 (the reader) are done; writing, the views, the menu
+bar and capture, and shipping follow, one gate each.
+
+**7. iOS app** (moved after the Mac app, 2026-10-27): swift-libgit2 or the GitHub API; sync on
+open, in the background and on push; an App Intent "append to today".
 
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.
@@ -460,4 +528,11 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
   - `NO_COLOR` and non-TTY output contain no escape codes.
   - Running `gen.py` again leaves `assets/brand` unchanged (no git diff).
   - The glamour style JSON loads in `glow -s`.
+- **Mac app.**
+  - `make mac-test`: Swift Testing on the index, the sidebar's tree, the sync badge, Open's
+    matching, links, and `Brand` against `tokens.json`.
+  - `make mac-editor`: `node --test` on the live preview without a screen (what is hidden,
+    replaced and styled for a state), and `editor.css` against `tokens.json`.
+  - Screenshots of each view in both themes on `assets/demo/scene.sh`'s notes; the app takes
+    `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTPalette open|text` and `-NTQuery <text>`.
 - **Manual.** In Ghostty + tmux, go through `nt` → `t a n e / i`, once with a dark terminal background and once with a light one. Then check on github.com that links, images, the README hero and the agents `README.md` digest render.
