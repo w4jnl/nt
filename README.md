@@ -19,7 +19,7 @@ other editor.
 
 ## Setup
 
-Current version: 0.3.0 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
+Current version: 0.4.0 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
 search and find; details under [Requirements](#requirements).
 
 1. Install the binary. Homebrew, on macOS or Linux:
@@ -29,7 +29,7 @@ search and find; details under [Requirements](#requirements).
    Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
    (Linux and macOS, `amd64` and `arm64`, no Go, no root):
    ```sh
-   ver=0.3.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+   ver=0.4.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
    shasum -a 256 -c --ignore-missing sha256sums.txt
@@ -223,7 +223,7 @@ What that means in practice:
   says how it changes. Read the release notes before `brew upgrade`.
 - Bug reports with a reproduction are welcome; support is best effort.
 
-nt is at 0.3.0 (2026-10-27). [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
+nt is at 0.4.0 (2026-10-27). [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
 newest first; the same text is on each GitHub release.
 
 ## Credits and license
