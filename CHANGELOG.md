@@ -4,20 +4,27 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
-## Unreleased
+## 0.4.0 (2026-10-27)
 
+Weekly summaries, and settings from nt.
+
+- **Weekly summaries.** A machine whose config names a tool (`[summary] tool = "claude"` or
+  `"copilot"`) has it write, once a week is over, what was written on that machine in three
+  short lists, Done, Decided and Open: its journal lines, todos, notes and agent sessions, read
+  from the commits sync made there. Each machine writes its own file,
+  `weekly/GGGG/GGGG-Www-<host>.md`, so a week written at work goes only to the work machine's
+  tool. The weekly digest shows them all; `nt week --summarize` writes one by hand, and
+  `nt doctor` checks the tool.
 - **Settings from nt.** `nt config` lists every setting of this machine and of the repository,
   with its value and what it does; `nt config set <key> <value>` changes one, in the right file,
   keeping its comments and refusing a value that would not load; `nt config get` and
-  `nt config edit [--repo]` too. In the browser `,` shows them in the note's pane, beside the folders:
-  enter flips a setting or asks for its value, `e` opens its file. The browser's own sync (`s`) now also compiles the
-  weekly digest and writes the summaries, as the timer's does.
-- **Weekly summaries.** A machine whose config names a tool (`[summary] tool = "claude"` or
-  `"copilot"`) has it write, once a week is over, what was written on that machine in three
-  short lists, Done, Decided and Open: its journal lines, todos, notes and agent sessions, read from the commits sync made
-  there. Each machine writes its own file, `weekly/GGGG/GGGG-Www-<host>.md`, so a week written at
-  work goes only to the work machine's tool. The weekly digest shows them all;
-  `nt week --summarize` writes one by hand, and `nt doctor` checks the tool.
+  `nt config edit [--repo]` too. In the browser `,` shows them in the note's pane, beside the
+  folders: enter flips a setting or asks for its value, `e` opens its file.
+- The browser's own sync (`s`) now also compiles the weekly digest and writes the summaries, as
+  the timer's does.
+- The README's browser recording comes from a real Ghostty window, with a note's image drawn
+  inline (`assets/demo/ghostty.sh`).
+- goldmark 1.8.6 and `golang.org/x/text` 0.43.0.
 
 ## 0.3.0 (2026-10-27)
 
