@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Records the README's GIFs, assets/readme/browser.gif and cli.gif (or the tapes named on the
-# command line): scene.sh builds a notes repository, vhs (brew install vhs) plays each tape into
-# a frames folder, and ffmpeg assembles the GIF. vhs cannot draw the notes' images; ghostty.sh
-# records the browser from a real Ghostty window, with them. As in flok, vhs runs in a temp folder on the
+# Records the README's command-line GIF, assets/readme/cli.gif, or the tapes named on the command
+# line: scene.sh builds a notes repository, vhs (brew install vhs) plays each tape into a frames
+# folder, and ffmpeg assembles the GIF. The README's browser.gif comes from ghostty.sh, since vhs
+# cannot draw the note's image; `record.sh browser` makes one without it. As in flok, vhs runs in a temp folder on the
 # system volume, where it can write, and ffmpeg makes the GIF, since vhs 0.12's own encoder
 # writes an empty one with ffmpeg 9.
 set -euo pipefail
@@ -16,7 +16,7 @@ W=$(mktemp -d "${TMPDIR:-/tmp}/nt-vhs.XXXX")
 trap 'rm -rf "$D" "$W"' EXIT
 mkdir -p "$W/bin" assets/readme
 cp bin/nt "$W/bin/nt"
-tapes=("$@"); [ ${#tapes[@]} -gt 0 ] || tapes=(browser cli)
+tapes=("$@"); [ ${#tapes[@]} -gt 0 ] || tapes=(cli)
 for tape in "${tapes[@]}"; do
   sed -e "s#@D@#$D#g" -e "s#@BIN@#$W/bin#g" "assets/demo/$tape.tape" > "$W/$tape.tape"
   rm -rf "$W/frames"
