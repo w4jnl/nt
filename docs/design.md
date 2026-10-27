@@ -392,15 +392,24 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 
 **Folders (after todos step 1).** `nt mv`, `nt rename` and `nt mkdir`, and `m`, `R` and `N` in the browser, with every link kept (docs/format.md §13).
 
-**4. Remote hosts.**
-- Each host keeps its own reports. It is their only writer and never deletes them mid-session; it prunes ended ones after 14 days.
-- The Mac pulls copies with `ssh host nt agent export --since <cursor>`, which streams a tar that `nt` unpacks under the repo lock. This follows the `flok serve --stdio` style.
-- Servers need no GitHub credentials. Don't use `rsync --remove-source-files`: it loses updates to reports that are rewritten during a session, and macOS ships openrsync.
+**4. Remote hosts: parked (2026-10-27).** Not built: there are no remote servers for now. The plan, kept for when there are:
+- **On a server:** the `nt` binary and `nt install --hooks --skill`; no notes repository, no timer, no GitHub access, nothing running. With no repository, `nt agent` writes reports to `~/.local/share/nt/reports/agents/YYYY/YYYY-MM-DD/`, in the repository's layout. The server is their only writer; it prunes ended reports after 14 days, on a hook call or an export, never mid-session.
+- **One collecting machine** lists the servers in its machine config. Two machines collecting from one server would commit different versions of the same report and make conflict copies, so, as with `digest = true`, there is one:
+  ```toml
+  [[hosts]]
+  name = "build1"        # an ssh name: user, port, keys and jump hosts come from ~/.ssh/config
+  nt = "/opt/nt/bin/nt"  # optional, when nt is not in ~/.local/bin or Homebrew's Linux prefix
+  ```
+- **Each sync run** collects: `ssh -oBatchMode=yes <host> nt agent export --since <cursor>` streams a tar of the reports changed since the cursor (one per host, in the state folder), which `nt` unpacks under the repository lock; the sync commits and pushes them. A report rewritten during a session is sent again. An unreachable host is skipped and shown in the status. This follows the `flok serve --stdio` style.
+- **Commands:** `nt host add <name>` (checks ssh and the server's `nt` version, then adds it), `nt host rm`, `nt host ls [--json]`; `nt doctor` checks each host.
+- **Not done:** nt does not install itself on servers (no network calls but git and ssh): one `curl … | tar xz -C ~/.local/bin` line or the server's provisioning. Not `rsync --remove-source-files` either: it loses updates to reports rewritten during a session, and macOS ships openrsync.
 
-**5. Later:**
-- `nt mcp` (official go-sdk).
-- `nt digest --summarize` (`claude -p` with `disableAllHooks`).
-- Weekly notes (ISO week-year).
+**5. Next:**
+- A weekly digest: `weekly/GGGG/GGGG-Www.md` (ISO week-year), compiled by the one machine with `weekly = true` from the week's journals, the notes made or changed that week, its todos and its agent sessions, and kept up to date through the week.
+- Later, its AI summary: `weekly_summary = true` adds a `## Summary` written by `claude -p` (with `disableAllHooks`) once the week is over. It takes the place of a daily `nt digest --summarize`.
+- Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
+
+**6. Apps:**
 - Mac app: SwiftUI over the same folder; it can shell out to `nt` and `git`.
 - iOS: swift-libgit2 or the GitHub API; sync on open, background and push; App Intent "append to today".
 
