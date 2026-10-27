@@ -153,6 +153,14 @@ func TestEndStatus(t *testing.T) {
 	if got := end("quiet", "user_exit"); got != "abandoned" {
 		t.Errorf("a session without a turn ended %s, want abandoned", got)
 	}
+	start("worked") // Copilot CLI's turns carry no message text
+	rel, _ := Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd, Reason: "end_turn"}, at("2026-10-26 09:30"))
+	if log := read(t, v, rel).Section("Log"); !strings.Contains(log, "- 09:30 turn ended") {
+		t.Errorf("a turn without text leaves no line in the log:\n%s", log)
+	}
+	if got := end("worked", "complete"); got != "done" {
+		t.Errorf("a session whose turns had no text ended %s, want done", got)
+	}
 	start("broken")
 	_, _ = Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "broken", Cwd: cwd, Message: "trying"}, at("2026-10-26 09:30"))
 	if got := end("broken", "error"); got != "failed" {

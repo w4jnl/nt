@@ -4,6 +4,12 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## Unreleased
+
+- Copilot CLI sessions no longer end as `abandoned`. Its `agentStop` hook carries no message
+  text, so its turns left no line in the report's log, and a session with no turns counts as
+  abandoned. Every turn now adds a line, `turn ended` when there is no text.
+
 ## 0.2.0 (2026-10-27)
 
 Todos, folders and the calendar.

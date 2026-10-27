@@ -41,6 +41,8 @@ person's notes live in their own repository.
 - Do not add views, modals, colours or keys beyond docs/design.md and the design system without
   asking. Simplicity is the main requirement.
 - Never commit an index, a cache or UI state into a notes repository.
+- `main` takes pull requests only (a ruleset): work on a branch, open a PR, and CI (`test` on
+  macOS and Linux) must pass before it merges. Nobody pushes to `main` directly.
 - Never make outbound network calls other than git and ssh to the configured remotes and hosts.
 - Before calling a task done: `gofmt -l ./cmd ./internal ./skills` is empty, `make vet` and `make test` pass.
 
@@ -51,4 +53,5 @@ person's notes live in their own repository.
 - `make brand`: regenerate `assets/brand` (needs fontTools and brotli, headless Chrome, rsvg-convert).
 - `make e2e`: end-to-end suites in `scripts/e2e/` (isolated tmux servers).
 - `scripts/release.sh <version>`: tag a release and bump `Formula/nt.rb` in w4jnl/homebrew-tap.
+  Run it on `main` after the PR with the CHANGELOG section has merged.
   It needs a `## <version> (YYYY-MM-DD)` section in `CHANGELOG.md`, the release notes.

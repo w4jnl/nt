@@ -82,9 +82,11 @@ func Apply(v *vault.Vault, stateDir string, ev Event, now time.Time) (string, er
 			r.Log("- " + clock + " started in " + where)
 		}
 	case "turn":
-		if l := logLine(ev.Message); l != "" {
-			r.Log("- " + clock + " " + l)
+		l := logLine(ev.Message)
+		if l == "" {
+			l = "turn ended" // Copilot CLI's agentStop carries no text; the turn still counts
 		}
+		r.Log("- " + clock + " " + l)
 	case "end":
 		if r.Get("ended") == "" {
 			r.Set("ended", stamp(now))

@@ -195,7 +195,7 @@ type: daily
 ```
 
 - `## Done`, `## Decisions` and `## Open` belong to the agent: `nt agent write` replaces them.
-- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text. Secrets and full transcripts do not belong in a report.
+- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). Secrets and full transcripts do not belong in a report.
 
 ## 7. Digest
 
