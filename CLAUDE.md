@@ -51,8 +51,10 @@ person's notes live in their own repository.
 - `make install`: build and copy to `~/.local/bin` (`PREFIX` overridable).
 - `make test`, `make vet`, `make fmt`.
 - `make brand`: regenerate `assets/brand` (needs fontTools and brotli, headless Chrome, rsvg-convert).
-- `assets/demo/record.sh [tape…]`: record the README's GIFs into `assets/readme/` (needs vhs and
-  ffmpeg); `assets/demo/scene.sh` builds the demo notes, the `.tape` files play them.
+- `assets/demo/record.sh [tape…]`: record the README's GIFs into `assets/readme/` with vhs.
+  `assets/demo/ghostty.sh` records the browser GIF from a real, full-screen Ghostty window
+  instead, so the notes' images show (macOS, at an unlocked screen, hands off for about 40 s).
+  Both need ffmpeg and build the demo notes with `assets/demo/scene.sh`.
 - `make e2e`: end-to-end suites in `scripts/e2e/` (isolated tmux servers).
 - `scripts/release.sh <version>`: tag a release and bump `Formula/nt.rb` in w4jnl/homebrew-tap.
   Run it on `main` after the PR with the CHANGELOG section has merged.
