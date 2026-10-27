@@ -16,6 +16,7 @@ fi
 ver=$(sed -n 's/^## \([0-9][0-9.]*\) (.*/\1/p' CHANGELOG.md | head -1)
 make build VERSION="v$ver" >/dev/null
 D=$(BIN="$R/bin/nt" assets/demo/scene.sh)
+sed -i '' 's/^inline_images = "off"/inline_images = "auto"/' "$D/config.toml" # the scene's is for vhs
 W=$(mktemp -d "${TMPDIR:-/tmp}/nt-ghostty.XXXX")
 T="tmux -L nt-rec -f $W/tmux.conf"
 cleanup() { $T kill-server 2>/dev/null || true; rm -rf "$D" "$W"; }
@@ -30,8 +31,12 @@ set -g default-terminal tmux-256color
 set -g window-size latest
 CONF
 # a shell first: nt starts once Ghostty is attached, so it sees Ghostty and draws images
-$T new-session -d -s rec -x 140 -y 40 "env -i HOME=$HOME TERM=tmux-256color PATH=$W/bin:/opt/homebrew/bin:/usr/bin:/bin NT_CONFIG=$D/config.toml NT_STATE=$D/state PS1= bash --norc --noprofile"
-open -na Ghostty.app --args --config-default-files=false --fullscreen=true --macos-non-native-fullscreen=true \
+# not env -i: nt finds Ghostty through tmux, by the TMUX and TMUX_PANE tmux sets
+$T new-session -d -s rec -x 140 -y 40 "env TERM=tmux-256color PATH=$W/bin:/opt/homebrew/bin:/usr/bin:/bin NT_CONFIG=$D/config.toml NT_STATE=$D/state PS1= bash --norc --noprofile"
+# window-save-state=never: a new Ghostty would otherwise bring back the tabs of the last session,
+# your own shell among them, and show that one
+open -na Ghostty.app --args --config-default-files=false --window-save-state=never \
+  --fullscreen=true --macos-non-native-fullscreen=true \
   --quit-after-last-window-closed=true --confirm-close-surface=false --font-size=22 \
   --background=#14181A --foreground=#F2F5F5 --cursor-style=block --window-padding-x=16 --window-padding-y=12 \
   -e /opt/homebrew/bin/tmux -L nt-rec attach -t rec
@@ -77,13 +82,23 @@ with open(os.path.join(d, "list.txt"), "w") as out:
         out.write(f"file '{f}'\nduration {max(float(nt) - float(t), 0.05):.3f}\n")
     out.write(f"file '{rows[-1][0]}'\n")
 PY
+# the shots must show the recording's window: nt's ground colour at the left edge, not a desktop
 first=$(head -1 "$W/shots/times" | cut -d' ' -f1)
-if [ "$(stat -f %z "$first")" -lt 400000 ]; then
-  echo "ghostty.sh: the shots are empty (screen asleep or no screen-recording permission)" >&2; exit 1
+if ! ffmpeg -v error -i "$first" -vf "crop=1:1:6:ih/4,format=rgb24" -f rawvideo - | python3 -c '
+import sys
+r, g, b = sys.stdin.buffer.read(3)
+sys.exit(0 if abs(r - 0x14) < 10 and abs(g - 0x18) < 10 and abs(b - 0x1a) < 10 else 1)'; then
+  echo "ghostty.sh: the screen did not show the recording window (asleep, locked, or another window in front); nothing kept" >&2
+  exit 1
 fi
-echo "browser: $(wc -l < "$W/shots/times" | tr -d ' ') shots"
+# the rows above the window (the notch's strip, with the recording dot) are cut off
+top=$(ffmpeg -v error -i "$first" -vf "crop=1:ih/4:6:0,format=rgb24" -f rawvideo - | python3 -c '
+import sys
+b = sys.stdin.buffer.read()
+print(next((i // 3 for i in range(0, len(b), 3) if abs(b[i] - 0x14) < 10 and abs(b[i + 1] - 0x18) < 10 and abs(b[i + 2] - 0x1a) < 10), 0))')
+echo "browser: $(wc -l < "$W/shots/times" | tr -d ' ') shots, the top $top rows cut"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$W/shots/list.txt" \
-  -vf "scale=1280:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
+  -vf "crop=iw:ih-$top:0:$top,scale=1280:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
   "$W/browser.gif"
 mkdir -p assets/readme
 cp "$W/browser.gif" assets/readme/browser.gif

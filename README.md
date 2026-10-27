@@ -13,7 +13,7 @@ that draw them. A click on a link follows it; `f` and a letter do the same from 
 Every note is GitHub markdown, so the repository reads the same on github.com, in nvim and in any
 other editor.
 
-<p align="center"><img src="assets/readme/browser.gif" alt="A 25-second recording of the browser: the homelab folder, the NAS setup note rendered with a table, a code block and its tasks; f labels the links and a follows the one to the backups note, b goes back; x lists the open todos with one two days late; c shows October with dots on days with todos due, h selects yesterday and its journal shows beside the month; a search for restic lists the matching lines" width="900"></p>
+<p align="center"><img src="assets/readme/browser.gif" alt="A 30-second recording of the browser in Ghostty: the homelab folder, the NAS setup note rendered with a diagram drawn inline, a table, a code block and its tasks; f labels the links and a follows the one to the backups note, b goes back to the diagram; x lists the open todos with one two days late; c shows October with dots on days with todos due, h selects yesterday and its journal shows beside the month; a search for restic lists the matching lines" width="900"></p>
 
 <p align="center"><img src="assets/readme/cli.gif" alt="An 18-second recording of the command line: nt a adds a timestamped line to today's journal, nt todo add adds a todo due Friday, nt todo lists the open todos overdue first with the note each is in, nt s restic shows the matching lines per note, nt ls homelab lists the folder's notes newest first" width="760"></p>
 
@@ -224,8 +224,8 @@ The browser uses [Bubble Tea](https://github.com/charmbracelet/bubbletea),
 [Bubbles](https://github.com/charmbracelet/bubbles) and
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and renders notes with
 [Glamour](https://github.com/charmbracelet/glamour) and [goldmark](https://github.com/yuin/goldmark);
-configuration is read with [BurntSushi/toml](https://github.com/BurntSushi/toml). The README
-recordings are made with [vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`);
-`assets/demo/ghostty.sh` records the browser from a real [Ghostty](https://ghostty.org) window,
-so the notes' images show.
+configuration is read with [BurntSushi/toml](https://github.com/BurntSushi/toml). The README's
+browser recording comes from a real [Ghostty](https://ghostty.org) window, so the image in the
+note shows (`assets/demo/ghostty.sh`); the command-line one is made with
+[vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`).
 JetBrains Mono, in `docs/design-system/fonts/`, is under the SIL Open Font License.
