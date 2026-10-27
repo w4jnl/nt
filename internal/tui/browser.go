@@ -224,6 +224,7 @@ func newBrowser(o BrowserOptions) *browser {
 	b.listW = loadListWidth(o.StateDir)
 	b.savedW = b.listW
 	b.p = newPreview(img, mode != "light")
+	b.p.expected = func(file string) bool { return b.v.Dated(b.v.RelPath(file)) }
 	b.setTheme(mode != "light")
 	b.dir = strings.Trim(o.Folder, "/")
 	if st, err := os.Stat(b.v.Abs(b.dir)); err != nil || !st.IsDir() {
@@ -405,8 +406,9 @@ func (b *browser) linkedFrom(rel string) string {
 	s.WriteString("\n\n  " + b.st.Rule.Render(strings.Repeat("─", 24)) + "\n")
 	s.WriteString("  " + b.st.Muted.Render("Linked from") + "\n")
 	for _, from := range b.ix.Back[rel] { // hyperlinks, like the note's own links, so they follow
-		s.WriteString("  " + ansi.SetHyperlink(vault.RelLink(rel, from)) + b.st.Text.Render("← "+firstNonEmpty(b.ix.Title(from), from)) + "  " +
-			b.st.Faint.Render(from) + ansi.ResetHyperlink() + "\n")
+		link := vault.RelLink(rel, from)
+		s.WriteString("  " + ansi.SetHyperlink(link) + b.st.Text.Render("← "+firstNonEmpty(b.ix.Title(from), from)) + ansi.ResetHyperlink() + "  " +
+			ansi.SetHyperlink(link) + b.st.Faint.Render(from) + ansi.ResetHyperlink() + "\n")
 	}
 	return s.String()
 }

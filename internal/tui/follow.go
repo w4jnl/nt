@@ -278,6 +278,8 @@ func (p *preview) missing(dest string) bool {
 	if !filepath.IsAbs(f) {
 		f = filepath.Join(filepath.Dir(p.path), filepath.FromSlash(f))
 	}
-	_, err := os.Stat(f)
-	return err != nil
+	if _, err := os.Stat(f); err == nil {
+		return false
+	}
+	return p.expected == nil || !p.expected(f)
 }
