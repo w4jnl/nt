@@ -21,6 +21,13 @@ notes=$(awk -v v="$ver" '/^## /{p = ($2 == v)} p && !/^## /' CHANGELOG.md | sed 
 grep -qE "^## $ver \([0-9]{4}-[0-9]{2}-[0-9]{2}\)" CHANGELOG.md || { echo "release.sh: the CHANGELOG.md heading must be \"## $ver (YYYY-MM-DD)\"" >&2; exit 1; }
 [ -z "$(gofmt -l ./cmd ./internal ./skills)" ] || { echo "release.sh: gofmt -l ./cmd ./internal ./skills is not empty" >&2; exit 1; }
 go vet ./... && go test -timeout 120s ./... >/dev/null && echo "tests ok"
+# the tap is checked before the tag is pushed, so a release never stops half done
+TAP=${NT_TAP_DIR:-$R/../homebrew-tap}
+[ -d "$TAP/.git" ] || git clone -q git@github.com:w4jnl/homebrew-tap.git "$TAP"
+[ -z "$(git -C "$TAP" status --porcelain)" ] || { echo "release.sh: $TAP has uncommitted changes; commit or stash them first" >&2; exit 1; }
+f=$TAP/Formula/nt.rb
+[ -f "$f" ] || { echo "release.sh: no Formula/nt.rb in $TAP" >&2; exit 1; }
+retry git -C "$TAP" pull -q --ff-only
 
 git tag -a "v$ver" -m "nt v$ver"
 retry git push -q origin "v$ver"
@@ -35,11 +42,7 @@ done
 [ -n "$sha" ] || { echo "release.sh: $url not available yet; rerun the tap bump by hand" >&2; exit 1; }
 echo "sha256 $sha"
 
-TAP=${NT_TAP_DIR:-$R/../homebrew-tap}
-[ -d "$TAP/.git" ] || git clone -q git@github.com:w4jnl/homebrew-tap.git "$TAP"
 retry git -C "$TAP" pull -q --ff-only
-f=$TAP/Formula/nt.rb
-[ -f "$f" ] || { echo "release.sh: no Formula/nt.rb in $TAP" >&2; exit 1; }
 sed -i '' -e "s#^  url \".*\"#  url \"$url\"#" -e "s#^  sha256 \".*\"#  sha256 \"$sha\"#" "$f"
 git -C "$TAP" add Formula/nt.rb
 git -C "$TAP" commit -q -m "nt $ver"
