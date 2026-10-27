@@ -305,7 +305,7 @@ The agent report glyphs are the same as flok's, so a report looks the same in fl
 - **Screen:** one brand line `[nt]` at the top left, two panes, one status/footer line.
 - **Selection:** a `▎` accent bar plus a `surface` background. This is the terminal version of the family's 6px accent bar.
 - **Interaction:** no modals. Prompts are a single line at the bottom, and only one picker is open at a time.
-- **Footer hints:** the key in `accent`, the verb in `ink-muted`.
+- **Footer hints:** the key in `accent`, the verb in `ink-muted`. The right end shows the last message, else nt's version (`nt 0.1.0`) in `ink-faint` when the hints leave room.
 - **Colour:** off when `NO_COLOR` is set or output is not a TTY.
 
 **CLI.**

@@ -354,3 +354,20 @@ func TestFolders(t *testing.T) {
 		t.Fatalf("m on a journal: %q", b.msg)
 	}
 }
+
+func TestFooterVersion(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.o.Version = "v0.2.0"
+	if f := ansi.Strip(b.footer()); !strings.HasSuffix(f, "nt 0.2.0 ") || !strings.Contains(f, "? help") {
+		t.Errorf("a wide footer has the hints and the version at the right: %q", f)
+	}
+	b.say("synced", false)
+	if f := ansi.Strip(b.footer()); strings.Contains(f, "0.2.0") || !strings.HasSuffix(f, "synced ") {
+		t.Errorf("a message takes the version's place: %q", f)
+	}
+	b.say("", false)
+	b.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	if f := ansi.Strip(b.footer()); strings.Contains(f, "0.2.0") || !strings.Contains(f, "? help") {
+		t.Errorf("a narrow footer keeps the hints, not the version: %q", f)
+	}
+}

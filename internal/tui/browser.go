@@ -48,6 +48,7 @@ type BrowserOptions struct {
 	Bin      string // the nt binary, for the image viewer over ssh
 	Kick     func() // starts a background sync after the editor closes
 	StateDir string
+	Version  string // nt's version, at the right end of the footer
 }
 
 // RunBrowser shows the browser until the person quits.

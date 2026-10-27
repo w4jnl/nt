@@ -212,7 +212,7 @@ func runBrowser(folder string) int {
 	bin, _ := os.Executable()
 	return report(tui.RunBrowser(tui.BrowserOptions{
 		Vault: v, Machine: m, Folder: strings.Trim(folder, "/"), Bin: bin,
-		Kick: func() { kickSync(m) }, StateDir: config.StateDir(),
+		Kick: func() { kickSync(m) }, StateDir: config.StateDir(), Version: Version,
 	}))
 }
 

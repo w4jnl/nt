@@ -131,7 +131,8 @@ t today  [ ] day  a append  n new  / search  ? help
   the terminal form of the family's accent bar. There is no zebra striping and no boxes around
   rows.
 - The footer: key hints, the key in `accent` and the verb in `ink-muted`, separated by two
-  spaces. With a prompt open, the footer is the prompt.
+  spaces; at the right end the last message, else nt's version in `ink-faint` when the hints
+  leave room. With a prompt open, the footer is the prompt.
 - No modals. A prompt (append, new note title, search) is one line at the bottom on `surface`,
   with its text on `surface-sunk`. Enter accepts, Escape cancels.
 - One picker at a time (links, outline, images, fuzzy title). A picker replaces the list pane;

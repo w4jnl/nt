@@ -23,6 +23,7 @@ updates this file first. Dates are the tag dates.
   `--dry-run` shows what would change. `nt mkdir` makes a folder that git keeps while it is
   empty. In the browser `m` moves the selected note or folder, `R` renames it and `N` makes a
   folder.
+- The browser's footer shows nt's version at its right end when there is room and no message.
 
 ## 0.1.0 (2026-10-27)
 

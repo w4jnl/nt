@@ -323,7 +323,8 @@ func (b *browser) helpText(w, h int) string {
 	return strings.Join(lines, "\n")
 }
 
-// footer is the prompt when one is open, else the key hints with the last message at the right.
+// footer is the prompt when one is open, else the key hints with the last message at the right,
+// or nt's version when there is no message and the hints leave room for it.
 func (b *browser) footer() string {
 	if b.input != nil {
 		return pad(lipgloss.NewStyle().Background(b.pal.Surface).Render(" ")+b.input.View(b.st, b.pal, b.width-1), b.width)
@@ -356,6 +357,11 @@ func (b *browser) footer() string {
 			right = lipgloss.NewStyle().Foreground(b.pal.Alert).Render("◆ "+b.msg) + " "
 		} else {
 			right = b.st.Muted.Render(b.msg) + " "
+		}
+	}
+	if right == "" && b.o.Version != "" {
+		if v := b.st.Faint.Render("nt "+strings.TrimPrefix(b.o.Version, "v")) + " "; lipgloss.Width(left)+2+lipgloss.Width(v) <= b.width {
+			right = v
 		}
 	}
 	if lipgloss.Width(left)+lipgloss.Width(right) > b.width && right != "" {
