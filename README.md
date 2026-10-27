@@ -38,7 +38,7 @@ nt doctor                          # check the setup
 
 | Command | What it does |
 |---|---|
-| `nt` / `nt <folder>` | the browser: folders and notes on the left, the rendered note on the right, images included; `?` lists the keys |
+| `nt` / `nt <folder>` | the browser: folders and notes on the left, the rendered note on the right, images included; click a link to follow it, or press `f` and the letters on it; `b` goes back; `?` lists the keys |
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "title" [folder]` | a new dated note, linked from today's journal |

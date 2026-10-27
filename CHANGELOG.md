@@ -6,6 +6,10 @@ updates this file first. Dates are the tag dates.
 
 ## Unreleased
 
+- **Follow links in the note.** In the browser a click on a link in the note follows it, and `f`
+  puts letters on the links on screen: type them to follow one. `b` goes back to the note before,
+  scrolled as it was. A note opens at the heading the link names; folders, images, other files
+  and URLs open as they do elsewhere. The "Linked from" lines under a note follow too.
 - **Weekly digest.** The machine with `weekly = true` compiles `weekly/GGGG/GGGG-Www.md` (the ISO
   week) on every sync: the notes made and changed that week, the todos done and due, the agent
   sessions per project, and each day's journal lines. It is written only when it changes and

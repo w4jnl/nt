@@ -132,6 +132,8 @@ t today  [ ] day  a append  n new  / search  ? help
 - Selection: a `▎` bar in `accent` at the left edge of the row on a `surface` background. It is
   the terminal form of the family's accent bar. There is no zebra striping and no boxes around
   rows.
+- Link labels (`f`): one or two letters in `on-accent`, bold, on `accent`, over the first cells
+  of each link on screen; the footer says what to type.
 - The footer: key hints, the key in `accent` and the verb in `ink-muted`, separated by two
   spaces; at the right end the last message, else nt's version in `ink-faint` when the hints
   leave room. With a prompt open, the footer is the prompt.
