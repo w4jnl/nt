@@ -23,6 +23,10 @@ updates this file first. Dates are the tag dates.
   `--dry-run` shows what would change. `nt mkdir` makes a folder that git keeps while it is
   empty. In the browser `m` moves the selected note or folder, `R` renames it and `N` makes a
   folder.
+- **Calendar.** `c` in the browser shows the month: the days with a journal, `•` on days with
+  todos due (in `warn` once the day has passed), and under it the selected day's todos and agent
+  sessions, with its journal in the preview. `h` `l` `j` `k` move by day and week, `[` `]` by
+  month, `e` edits the day's journal (starting it), `x` lists that day's todos.
 - The browser's footer shows nt's version at its right end when there is room and no message.
 
 ## 0.1.0 (2026-10-27)

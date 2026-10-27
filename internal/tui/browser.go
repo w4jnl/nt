@@ -129,6 +129,7 @@ type picker struct {
 	folder string // whose todo.md a todo added there goes to; "" is the root's
 
 	folders []string // the move picker's folders, before what is typed filters them
+	day     string   // the todo list from the calendar: only the todos due or done that day
 }
 
 type browser struct {
@@ -172,6 +173,8 @@ type browser struct {
 	todoAt  *todo.Item // the todo the due prompt is for
 
 	moving string // the note or folder m or R was pressed on
+
+	cal *calendar // the calendar, in the list pane's place (calendar.go)
 
 	status    gitsync.Status
 	hasStatus bool
@@ -337,6 +340,9 @@ func (b *browser) move(d int) tea.Cmd {
 
 // loadNow shows the selected note in the preview.
 func (b *browser) loadNow() tea.Cmd {
+	if b.cal != nil {
+		return b.calShow()
+	}
 	e, ok := b.selected()
 	if !ok || e.dir {
 		b.showing = ""
@@ -376,9 +382,13 @@ func (b *browser) followPick() tea.Cmd {
 	return nil
 }
 
-// closePick closes the picker and gives the preview back to the list's selection.
+// closePick closes the picker and gives the preview back to the list's selection, or to the
+// calendar's day.
 func (b *browser) closePick() tea.Cmd {
 	b.pick = nil
+	if b.cal != nil {
+		return tea.Batch(b.loadNow(), b.calTodos())
+	}
 	return b.loadNow()
 }
 
@@ -520,6 +530,14 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, b.setTodos(msg)
 	case movedMsg:
 		return b, b.moved(msg)
+	case calTodosMsg:
+		b.setCalTodos(msg)
+		return b, nil
+	case calPreviewMsg:
+		if msg.seq != b.loadSeq || b.cal == nil {
+			return b, nil
+		}
+		return b, b.calShow()
 	case syncedMsg:
 		return b, b.synced(msg.st)
 	case editedMsg:
@@ -541,6 +559,10 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				keep = todoRef(it)
 			}
 			return b, tea.Batch(b.loadTodos(keep), b.reindex())
+		}
+		if b.cal != nil {
+			b.calRead()
+			return b, tea.Batch(b.loadNow(), b.calTodos(), b.reindex())
 		}
 		return b, tea.Batch(b.loadNow(), b.reindex())
 	case notedMsg:
@@ -572,6 +594,11 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if b.pick != nil {
 			return b, b.pickKey(msg)
+		}
+		if b.cal != nil && b.focus == onList {
+			if cmd, ok := b.calKey(msg); ok {
+				return b, cmd
+			}
 		}
 		return b, b.key(msg)
 	case tea.MouseMsg:
@@ -639,6 +666,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 			b.p.mark, b.selecting = &span{anchor: at, head: at}, true
 		}
 		return nil
+	case b.pick == nil && b.cal != nil:
+		return b.calClick(row, m.X)
 	case b.pick != nil:
 		i := b.pick.top + row - 1 // under the picker's title
 		if row == 0 || i >= len(b.pick.items) {
@@ -718,6 +747,9 @@ func (b *browser) poll() tea.Cmd {
 	}
 	if m := modTime(b.v.Abs(b.dir)); !m.Equal(b.dirMod) {
 		b.list()
+	}
+	if b.cal != nil {
+		b.calRead()
 	}
 	if m := modTime(gitsync.StatusPath(b.o.StateDir)); !m.Equal(b.statusMod) {
 		b.statusMod = m
@@ -806,6 +838,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.agents()
 	case "x":
 		return b.openTodos(false)
+	case "c":
+		return b.openCalendar()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		return b.pin(int(s[0] - '1'))
 	case "a":
@@ -1373,6 +1407,7 @@ func (b *browser) choose() tea.Cmd {
 			b.say(it.target+": no such note", true)
 			return nil
 		}
+		b.cal = nil // a todo picked from a day of the calendar: its note, in the list
 		cmd := b.reveal(it.target)
 		b.scrollTo(it)
 		return cmd

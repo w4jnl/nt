@@ -55,6 +55,9 @@ func (b *browser) View() tea.View {
 // brandLine is the top row: [nt], the folder, and the sync state at the right edge.
 func (b *browser) brandLine() string {
 	where := firstNonEmpty(b.dir, "notes")
+	if b.cal != nil {
+		where = "calendar"
+	}
 	if b.full && b.showing != "" {
 		where = b.showing
 	}
@@ -152,6 +155,9 @@ func (b *browser) previewPane(w, h int) string {
 		return b.helpText(w, h)
 	}
 	if b.showing == "" {
+		if b.cal != nil {
+			return "\n  " + b.st.Muted.Render("no journal on "+b.cal.day.Format("Monday 2 January 2006")) + "\n  " + b.st.Faint.Render("e starts one")
+		}
 		if e, ok := b.selected(); ok && e.dir {
 			return "\n  " + b.st.Muted.Render(e.rel+"/") + "\n  " + b.st.Faint.Render("enter opens the folder")
 		}
@@ -167,6 +173,9 @@ func (b *browser) previewPane(w, h int) string {
 func (b *browser) listPane(w, h int) string {
 	if b.pick != nil {
 		return b.pickerPane(w, h)
+	}
+	if b.cal != nil {
+		return b.calendarPane(w, h)
 	}
 	var rows []string
 	for i := b.top; i < len(b.entries) && len(rows) < h; i++ {
@@ -276,7 +285,7 @@ func (b *browser) pickerPane(w, h int) string {
 func (b *browser) helpText(w, h int) string {
 	groups := [][]string{
 		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
-		{"go", "t", "today's journal", "[ ]", "the day before, after", "1–9", "pinned folders", "A", "today's agent reports"},
+		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "1–9", "pinned folders", "A", "today's agent reports"},
 		{"find", "/", "search every note", "ctrl-p", "a note by its title"},
 		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
 		{"in a note", "l", "links in and to it", "o", "its outline", "i", "its images, full size", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
@@ -345,6 +354,8 @@ func (b *browser) footer() string {
 		left = hints(b.st, "x", check, "d", "due", "a", "add", "X", other, "e", "edit", "D", "delete", "esc", "back")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
+	case b.cal != nil && b.focus == onList:
+		left = hints(b.st, "h l", "day", "j k", "week", "[ ]", "month", "t", "today", "enter", "open", "e", "edit", "x", "todos", "esc", "back")
 	case b.focus == onPreview:
 		left = hints(b.st, "j k", "scroll", "e", "edit", "l", "links", "o", "outline", "D", "delete", "esc", "back")
 	default:

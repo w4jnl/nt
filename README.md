@@ -58,8 +58,9 @@ is on the [releases page](https://github.com/w4jnl/nt/releases).
 A todo is a task line in any note, `- [ ] Renew passport due:2026-11-03`; new ones go to
 `todo.md`, and a folder can have its own `todo.md`. In the browser, `x` lists them all, overdue
 first, with the note each is in beside it: `x` checks one, `d` sets its due date, `a` adds one to
-the `todo.md` of the folder you are in, `X` shows the done ones. In nvim, `<leader>tx` checks the
-todo under the cursor.
+the `todo.md` of the folder you are in, `X` shows the done ones. `c` shows the month: the days
+with a journal, `•` on days with todos due, and under it the selected day's todos and agent
+sessions, its journal beside it. In nvim, `<leader>tx` checks the todo under the cursor.
 
 | Command | What it does |
 |---|---|

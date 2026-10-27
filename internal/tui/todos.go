@@ -3,6 +3,7 @@ package tui
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -56,7 +57,7 @@ func (b *browser) setTodos(msg todosMsg) tea.Cmd {
 	var items []pickItem
 	late := 0
 	for _, it := range msg.items {
-		if it.Done != p.done {
+		if it.Done != p.done || p.day != "" && it.Due != p.day && it.DoneOn != p.day {
 			continue
 		}
 		if _, l := it.Word(today); l {
@@ -78,6 +79,11 @@ func (b *browser) setTodos(msg todosMsg) tea.Cmd {
 		p.title = "todo · " + strconv.Itoa(len(items)) + " open · " + strconv.Itoa(late) + " late"
 	default:
 		p.title = "todo · " + strconv.Itoa(len(items)) + " open"
+	}
+	if p.day != "" {
+		if d, err := time.ParseInLocation("2006-01-02", p.day, time.Local); err == nil {
+			p.title = d.Format("Mon 2 Jan") + " · " + p.title
+		}
 	}
 	return b.pickMove(0)
 }
@@ -186,11 +192,11 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 		if text == "" {
 			return nil
 		}
-		folder := ""
+		folder, due := "", ""
 		if b.pick != nil {
-			folder = b.pick.folder
+			folder, due = b.pick.folder, b.pick.day
 		}
-		it, err := todo.Add(b.v, folder, text, "", b.v.Now())
+		it, err := todo.Add(b.v, folder, text, due, b.v.Now())
 		if err != nil {
 			b.say(err.Error(), true)
 			return nil

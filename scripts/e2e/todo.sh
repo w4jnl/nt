@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Todos: nt todo add, list, done, undo, due and rm with --json; two clones adding to todo.md at
 # the same time merge line by line, with no conflict copy; the browser's todo list (x) in an
-# isolated tmux server: the list, checking a todo, a due date, the done ones.
+# isolated tmux server: the list, checking a todo, a due date, the done ones; the calendar.
 source "$(dirname "$0")/lib.sh"
 
 git init --quiet --bare -b main "$T/remote.git"
@@ -79,4 +79,18 @@ expect_soon "and adds it to the open ones" '○ From the browser' capture
 expect "at the end of the root's list" '^- \[ \] From the browser$' "$(tail -1 "$T/a/todo.md")"
 key Escape
 expect_soon "esc goes back to the folders" 't today.*x todos' footer
+
+# --- the calendar
+A todo add "Dentist" --due +2d >/dev/null
+key c
+expect_soon "c shows this month" "$(LC_ALL=C date '+%B %Y')" capture
+expect_soon "with its keys in the footer" 'h l day +j k week +\[ \] month' footer
+key l; key l
+expect_soon "the day two days on has the dentist" '○ Dentist' capture
+key x
+expect_soon "x lists that day's todos" '· todo · 1 open' capture
+key Escape
+expect_soon "esc goes back to the calendar" 'h l day' footer
+key Escape
+expect_soon "and esc again to the folders" 't today.*x todos' footer
 finish

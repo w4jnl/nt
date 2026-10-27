@@ -149,6 +149,7 @@ Decisions taken with the user (2026-10-26):
 | `[` `]` | Previous / next day |
 | `A` | Agents day folder, which opens on its digest |
 | `x` | The todo list (Todos, below) |
+| `c` | The calendar (Todos, below) |
 | `1`–`9` | Pinned folders, so preselected subfolders are one key away |
 | `a` | One-line append (text input) |
 | `n` | Title prompt, then a note in the current folder, opened in nvim |
@@ -183,7 +184,7 @@ Decisions taken with the user (2026-10-26):
 - **Dates in words:** `2d late` (in `warn`, so it reads without colour too), `today`, `tomorrow`, a weekday within the week, else `3 nov`. Input takes `YYYY-MM-DD`, `today`, `tomorrow`, `mon`…`sun` (the next one), `+3d`, `+2w`, `+1m`, and `none` to clear.
 - **The browser's todo list** (`x`) is a picker whose rows are todos: `○` open, `✓` done in `done`, the date at the right edge; the preview shows the todo's note at its line. Its keys: `x`/space check or uncheck, `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), `e` edit the note at the todo, `X` the done ones and back, `D` delete the line after asking, `r` read again; enter opens the note and esc goes back, as in every picker.
 - **nvim:** `<leader>tx` checks or unchecks the todo on the cursor line in the buffer, with the day from `nt _editor day`.
-- **Calendar** (step 2, after review): `c` shows a month in the list pane, with the days that have a journal, todos due and agent sessions marked; the preview shows the day's journal.
+- **The calendar** (`c`) shows a month in the list pane, Monday first, 7 days of 4 columns (`list-min`). A day with a journal is in `ink`, one without in `ink-faint`, today in `accent`; `•` after a day with open todos due, in `warn` when that day has passed. Under the month, the selected day: its date, whether it has a journal, its todos (due or done that day) and its agent sessions. The preview shows the day's journal, or says it has none. Keys: `h` `l` day, `j` `k` week, `[` `]` month, `t` today, enter goes to the journal in the list, `e` edits it (starting it when missing), `x` the todo list of that day (a todo added there is due that day), `tab` to the journal, esc back; a click selects a day, a second click opens it. Journals and agent sessions are read with a few stat calls on every move and poll, the todos with `todo.Collect` in the background. It writes nothing but a journal `e` starts.
 
 **Folders** (`internal/move`, docs/format.md §13). A move or a rename is one pass under the repository lock: it works out every file that moves (the note and the images only it uses, or all a folder holds) and every note whose links change, then moves the files and writes those notes. Links are read with `mdparse`, so code is left alone, and rewritten with `vault.RelLink`; legacy wikilinks to what moved become markdown links. `--dry-run` prints the same plan without writing. nt refuses while a note has unsaved changes in an editor (`.git/nt-edit`), since saving it afterwards would bring back the old path.
 
@@ -387,7 +388,7 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 
 **Todos and calendar (after 3).**
 - Step 1: todos as above: the format (docs/format.md §12), `nt todo`, the browser's `x` list, `<leader>tx` in nvim, the skill.
-- Step 2, after step 1 is reviewed: the calendar.
+- Step 2: the calendar (`c`), as above.
 
 **Folders (after todos step 1).** `nt mv`, `nt rename` and `nt mkdir`, and `m`, `R` and `N` in the browser, with every link kept (docs/format.md §13).
 

@@ -88,6 +88,8 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 | todo | open | `○` | `ink-muted` | grey; its due date in words at the right |
 | todo | late | `○` and "2d late" | `warn` on the words | orange; the word says it, the colour repeats it |
 | todo | done | `✓` | `done` → `ok` | green; when it was done in words |
+| calendar day | todos due | `•` after the number | `ink-muted`; `warn` once the day has passed | grey, orange when overdue; the dot says it, the colour repeats it |
+| calendar day | today | the number, bold | `accent` | cyan; "today" beside the date under the month says it |
 
 - `◐` is only ever a spinner frame, so a still `◐` means in-progress and never offline.
 - All text pairs named in the token notes are 4.5:1 or better in both themes; `ink-faint` is

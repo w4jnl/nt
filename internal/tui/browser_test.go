@@ -183,14 +183,24 @@ func TestDeleteAsks(t *testing.T) {
 	}
 }
 
-// run sends msg to the browser, then the todo list's reading of the notes or the move when msg
-// started one.
+// run sends msg to the browser, then what it started that the tests wait for: the todo list's
+// or the calendar's reading of the notes, a move, the calendar's preview.
 func run(b *browser, msg tea.Msg) {
-	if _, cmd := b.Update(msg); cmd != nil {
-		switch m := cmd().(type) {
-		case todosMsg, movedMsg:
-			b.Update(m)
+	_, cmd := b.Update(msg)
+	feed(b, cmd)
+}
+
+func feed(b *browser, cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	switch m := cmd().(type) {
+	case tea.BatchMsg:
+		for _, c := range m {
+			feed(b, c)
 		}
+	case todosMsg, movedMsg, calTodosMsg, calPreviewMsg:
+		b.Update(m)
 	}
 }
 
@@ -369,5 +379,113 @@ func TestFooterVersion(t *testing.T) {
 	b.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 	if f := ansi.Strip(b.footer()); strings.Contains(f, "0.2.0") || !strings.Contains(f, "? help") {
 		t.Errorf("a narrow footer keeps the hints, not the version: %q", f)
+	}
+}
+
+func TestCalendar(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.v.Now = func() time.Time { return time.Date(2026, 10, 27, 10, 0, 0, 0, time.Local) }
+	for f, body := range map[string]string{
+		"daily/2026/2026-10-26.md": "# Monday\n\n## Log\n\n- 09:00 yesterday\n",
+		"todo.md":                  "# Todo\n\n## Inbox\n\n- [ ] Call the plumber due:2026-10-20\n- [ ] Renew passport due:2026-11-03\n- [x] Pay due:2026-10-21 done:2026-10-21\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	screen := func() string { return ansi.Strip(b.View().Content) }
+	day := func() string { return b.cal.day.Format("2006-01-02") }
+
+	press(b, "c")
+	if b.cal == nil || day() != "2026-10-27" {
+		t.Fatal("c does not open the calendar on today")
+	}
+	for _, want := range []string{"October 2026", "  mo  tu  we  th  fr  sa  su", "              1   2   3   4", " 19  20• 21  22", "▎27 ", "Tuesday 27 October · today", "no journal · e starts one", "no journal on Tuesday 27 October 2026"} {
+		if !strings.Contains(screen(), want) {
+			t.Errorf("the calendar does not show %q:\n%s", want, screen())
+		}
+	}
+	if strings.Contains(screen(), "21•") {
+		t.Error("a day whose todos are all done is marked")
+	}
+
+	press(b, "h")
+	if day() != "2026-10-26" || b.showing != "daily/2026/2026-10-26.md" || !strings.Contains(screen(), "journal · enter opens it") {
+		t.Fatalf("h: %s, showing %q", day(), b.showing)
+	}
+	for _, c := range []struct{ keys, want string }{
+		{"]", "2026-11-26"}, {"j", "2026-12-03"}, {"[[", "2026-10-03"}, {"k", "2026-09-26"}, {"l", "2026-09-27"}, {"t", "2026-10-27"},
+	} {
+		press(b, c.keys)
+		if day() != c.want {
+			t.Errorf("%s: %s, want %s", c.keys, day(), c.want)
+		}
+	}
+
+	press(b, "k") // Tuesday 20th: the overdue plumber
+	press(b, "x")
+	if b.pick == nil || b.pick.title != "Tue 20 Oct · todo · 1 open · 1 late" || len(b.pick.items) != 1 {
+		t.Fatalf("x does not list the day's todos: %+v", b.pick)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.pick != nil || b.cal == nil {
+		t.Fatal("esc from the day's todos does not go back to the calendar")
+	}
+	press(b, "?")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.help || b.cal == nil {
+		t.Fatal("esc closes the calendar under the help, not the help")
+	}
+
+	_, cmd := b.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
+	if _, err := os.Stat(b.v.Abs("daily/2026/2026-10-20.md")); err != nil || cmd == nil {
+		t.Fatalf("e does not start the day's journal and edit it: %v", err)
+	}
+	b.editing()
+	b.editing = nil
+
+	// a click on the 13th selects it; a second one opens its journal, which it has none of
+	b.Update(tea.MouseClickMsg{X: 5, Y: 6, Button: tea.MouseLeft})
+	if day() != "2026-10-13" {
+		t.Fatalf("a click selected %s, want 2026-10-13", day())
+	}
+	b.Update(tea.MouseClickMsg{X: 5, Y: 6, Button: tea.MouseLeft})
+	if b.msg != "no journal on Tue 13 Oct: e starts one" {
+		t.Errorf("a second click: %q", b.msg)
+	}
+
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.cal == nil {
+		t.Fatal("enter on a day without a journal left the calendar")
+	}
+	press(b, "t")
+	press(b, "h")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.cal != nil || b.dir != "daily/2026" || b.entries[b.sel].rel != "daily/2026/2026-10-26.md" {
+		t.Fatalf("enter does not go to the day's journal: dir %q", b.dir)
+	}
+
+	press(b, "c")
+	press(b, "k")
+	press(b, "x")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.cal != nil || b.pick != nil || b.showing != "todo.md" {
+		t.Fatalf("enter on a day's todo does not go to its note: showing %q", b.showing)
+	}
+}
+
+func TestAddMonths(t *testing.T) {
+	for _, c := range []struct {
+		from string
+		n    int
+		want string
+	}{{"2026-01-31", 1, "2026-02-28"}, {"2026-03-31", -1, "2026-02-28"}, {"2026-12-15", 1, "2027-01-15"}, {"2028-01-31", 1, "2028-02-29"}} {
+		d, _ := time.ParseInLocation("2006-01-02", c.from, time.Local)
+		if got := addMonths(d, c.n).Format("2006-01-02"); got != c.want {
+			t.Errorf("addMonths(%s, %d) = %s, want %s", c.from, c.n, got, c.want)
+		}
 	}
 }
