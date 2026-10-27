@@ -6,8 +6,8 @@ digest. Your editor edits, git syncs, `rg` searches; nt keeps them together and 
 way.
 
 Current version: 0.2.0 · [release notes](CHANGELOG.md). The everyday commands, git sync, the
-browser, agent reports, todos, folders and the calendar work; an MCP server, digest summaries
-and weekly notes come next
+browser, agent reports, todos, folders and the calendar work; weekly notes and digest
+summaries come next
 ([phases](docs/design.md#phases-each-ends-in-something-usable)).
 
 ## Why

@@ -405,9 +405,9 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 - **Not done:** nt does not install itself on servers (no network calls but git and ssh): one `curl … | tar xz -C ~/.local/bin` line or the server's provisioning. Not `rsync --remove-source-files` either: it loses updates to reports rewritten during a session, and macOS ships openrsync.
 
 **5. Next:**
-- `nt mcp` (official go-sdk).
-- `nt digest --summarize` (`claude -p` with `disableAllHooks`).
 - Weekly notes (ISO week-year).
+- `nt digest --summarize` (`claude -p` with `disableAllHooks`).
+- Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
 
 **6. Apps:**
 - Mac app: SwiftUI over the same folder; it can shell out to `nt` and `git`.
