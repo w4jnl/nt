@@ -68,6 +68,20 @@ todo under the cursor.
 | `nt todo done\|undo\|rm <todo>` | check, uncheck or delete one, named by `path:line` or words from its text |
 | `nt todo due <todo> <when>` | set its due date; `none` clears it |
 
+### Folders
+
+Move and rename with nt rather than `mv`: it fixes every link to what moves and in it, takes the
+images only that note uses along, and keeps the journal's line pointing at the note. In the
+browser, `m` moves the selected note or folder (type to filter the folders, or name a new one),
+`R` renames it, `N` makes a folder in the one you are in (`/name` from the root).
+
+| Command | What it does |
+|---|---|
+| `nt mv <note\|folder> <to>` | move it: into `to` when that ends in `/` or is a folder, else to that path; `--dry-run` shows what changes |
+| `nt rename <note> "New title"` | the title in its frontmatter and heading, and the file name, its date kept; links that showed the old title show the new one |
+| `nt rename <folder> <name>` | the folder's new name; `pins` and `default_folder` follow it |
+| `nt mkdir <folder>` | a new folder, with a `.gitkeep` so git keeps it while it is empty |
+
 ### Agents
 
 `nt install --hooks` gives every Claude Code and Copilot CLI session a report in

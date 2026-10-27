@@ -116,6 +116,9 @@ Decisions taken with the user (2026-10-26):
 | `nt f` | `rg --files \| fzf --preview 'nt _preview {}'` (nt's own style), then open the pick in `$EDITOR` |
 | `nt s <query>` | Search with `rg` |
 | `nt ls <folder>` | List notes in a folder |
+| `nt mv <note\|folder> <to> [--dry-run]` | Move a note or a folder; every link to it and in it is fixed, and the images only it uses go along (Folders, below) |
+| `nt rename <note\|folder> <new>` | A note's new title and the file name that goes with it, its date kept; a folder's new name |
+| `nt mkdir <folder>` | A new folder, with a `.gitkeep` so git keeps it while it is empty |
 | `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
 | `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
@@ -158,6 +161,9 @@ Decisions taken with the user (2026-10-26):
 | `v` | Open in `glow` |
 | `y` | Copy the text selected in the note, else the note's path: `pbcopy`, `wl-copy` or `xclip`, else OSC 52 |
 | `D` | Delete the note (with the images no other note uses, and its line in the journal of its day) or an empty folder, after a y/n question on the footer line |
+| `m` | Move the selected note or folder: a picker of the folders it can go to, filtered as you type; a name that is no folder yet makes one |
+| `R` | Rename it: the prompt starts from the note's title or the folder's name |
+| `N` | A new folder in the current one; a name starting with `/` goes from the root |
 | `s` | Sync now |
 | `<` `>` | Narrower / wider list; dragging the divider with the mouse does the same |
 
@@ -178,6 +184,8 @@ Decisions taken with the user (2026-10-26):
 - **The browser's todo list** (`x`) is a picker whose rows are todos: `○` open, `✓` done in `done`, the date at the right edge; the preview shows the todo's note at its line. Its keys: `x`/space check or uncheck, `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), `e` edit the note at the todo, `X` the done ones and back, `D` delete the line after asking, `r` read again; enter opens the note and esc goes back, as in every picker.
 - **nvim:** `<leader>tx` checks or unchecks the todo on the cursor line in the buffer, with the day from `nt _editor day`.
 - **Calendar** (step 2, after review): `c` shows a month in the list pane, with the days that have a journal, todos due and agent sessions marked; the preview shows the day's journal.
+
+**Folders** (`internal/move`, docs/format.md §13). A move or a rename is one pass under the repository lock: it works out every file that moves (the note and the images only it uses, or all a folder holds) and every note whose links change, then moves the files and writes those notes. Links are read with `mdparse`, so code is left alone, and rewritten with `vault.RelLink`; legacy wikilinks to what moved become markdown links. `--dry-run` prints the same plan without writing. nt refuses while a note has unsaved changes in an editor (`.git/nt-edit`), since saving it afterwards would bring back the old path.
 
 **nvim** (`internal/nvim`). A small Lua plugin carried inside the binary, so it always matches the `nt` that runs it. `nt install --nvim` writes it to `$XDG_DATA_HOME/nt/nvim` (`~/.local/share/nt/nvim`); a lazy.nvim config loads it with `{ dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }`, and `require("nt").setup(opts)` changes `cmd`, `keys.paste` or `reload`. `nt doctor` warns when it is missing or older than `nt`. In a markdown note inside the repository it:
 - maps `<leader>ip` to `nt paste` with a name prompt, the line going below the cursor;
@@ -333,6 +341,7 @@ internal/search     rg --json wrapper, fuzzy titles
 internal/gitsync    cycle above, conflict resolver, status.json, launchd/systemd unit install, notify
 internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest, hook installers
 internal/todo       todos: parse task lines, collect, sort, dates in words, add/check/due/remove one line
+internal/move       mv, rename, mkdir: move files and rewrite the links to and in them, under the lock
 skills/             skills/nt/SKILL.md, embedded; nt install --skill
 internal/theme      tokens → lipgloss v2 styles, state glyphs; termtheme (OSC 11) ported from flok
 internal/render     glamour: style from tokens, strip frontmatter, rewrite [[x]] → links, width
@@ -379,6 +388,8 @@ scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarba
 **Todos and calendar (after 3).**
 - Step 1: todos as above: the format (docs/format.md §12), `nt todo`, the browser's `x` list, `<leader>tx` in nvim, the skill.
 - Step 2, after step 1 is reviewed: the calendar.
+
+**Folders (after todos step 1).** `nt mv`, `nt rename` and `nt mkdir`, and `m`, `R` and `N` in the browser, with every link kept (docs/format.md §13).
 
 **4. Remote hosts.**
 - Each host keeps its own reports. It is their only writer and never deletes them mid-session; it prunes ended ones after 14 days.

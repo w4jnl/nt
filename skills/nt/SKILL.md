@@ -24,6 +24,9 @@ repository: `nt sync` is its only git writer.
   path. Then write the body into that file. Default folder: `inbox`.
 - `nt paste <note> --name "what it shows"`: save the image on the clipboard beside the note and
   print the `![…](assets/…)` line to put in it.
+- `nt mv <note|folder> <to> [--dry-run]`, `nt rename <note> "New title"`, `nt mkdir <folder>`:
+  move, rename and make folders. nt fixes every link to and in what moves; never move notes
+  with `mv` or `git mv`.
 - Notes are GitHub markdown: `[Title](relative/path.md)` links, `![alt](assets/x.png)` images,
   flat YAML frontmatter (`title`, `date`, `tags`). No wikilinks, embeds or callouts.
 

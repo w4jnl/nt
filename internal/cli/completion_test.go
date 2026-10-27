@@ -54,6 +54,9 @@ c nt agent write --status b
 c nt todo ""
 c nt todo add --due f
 c nt todo add --in t
+c nt mv t
+c nt mv tech/2026-10-20-nas.md w
+c nt rename --
 `
 	out, err := exec.Command("bash", "-c", probe).CombinedOutput()
 	if err != nil {
@@ -76,7 +79,10 @@ c nt todo add --in t
 		"blocked",
 		"add done undo due rm",
 		"fri",
-		"tech", // --in takes a folder
+		"tech",                        // --in takes a folder
+		"tech tech/2026-10-20-nas.md", // mv moves a note or a folder
+		"work",                        // into a folder
+		"--dry-run --json",
 	}
 	got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(got) != len(want) {

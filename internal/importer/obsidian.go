@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/w4jnl/nt/internal/mdparse"
 	"github.com/w4jnl/nt/internal/render"
 	"github.com/w4jnl/nt/internal/vault"
 )
@@ -342,7 +343,7 @@ func (im *importer) convert(f *file, note []byte) (out []byte, converted int, un
 func (im *importer) wikilink(f *file, m []string) (string, bool) {
 	embed, target, heading, label := m[1] == "!", strings.TrimSpace(m[2]), strings.TrimPrefix(m[3], "#"), strings.TrimPrefix(m[4], "|")
 	if target == "" && heading != "" { // [[#heading]]: a heading in this note
-		return "[" + firstNonEmpty(label, heading) + "](#" + anchor(heading) + ")", true
+		return "[" + firstNonEmpty(label, heading) + "](#" + mdparse.Anchor(heading) + ")", true
 	}
 	to := im.resolve(f, target)
 	if to == nil {
@@ -357,7 +358,7 @@ func (im *importer) wikilink(f *file, m []string) (string, bool) {
 		return "![" + alt + "](" + link + ")", true
 	}
 	if heading != "" {
-		link += "#" + anchor(heading)
+		link += "#" + mdparse.Anchor(heading)
 	}
 	text := label
 	if text == "" {
@@ -461,20 +462,6 @@ func outsideCode(line string, fn func(string) string) string {
 		parts[i] = fn(parts[i])
 	}
 	return strings.Join(parts, "`")
-}
-
-// anchor is GitHub's anchor for a heading: lowercase, spaces to "-", other punctuation dropped.
-func anchor(h string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(strings.TrimSpace(h)) {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_':
-			b.WriteRune(r)
-		case r == ' ':
-			b.WriteByte('-')
-		}
-	}
-	return b.String()
 }
 
 // splitCamel puts spaces into CamelCase so slugs keep the words: CleanupStorscanDB → Cleanup Storscan DB.

@@ -133,6 +133,8 @@ agent working in this repository.
 - Do not run git here. ` + "`nt sync`" + ` is the only git writer; it runs on a timer.
 - Write with nt where it can: ` + "`nt a`, `nt n \"Title\" folder`, `nt paste`, `nt agent write`" + `. It takes
   the repository lock and writes atomically.
+- Move and rename with ` + "`nt mv <note|folder> <to>` and `nt rename <note> \"New title\"`" + `, never ` + "`mv`" + `:
+  nt fixes the links to and in what moves.
 - GitHub-flavoured markdown only: ` + "`[Title](relative/path.md)`" + ` links, ` + "`![alt](assets/x.png)`" + `
   images, flat YAML frontmatter (` + "`title`, `date`, `tags`" + `). No wikilinks, embeds or callouts.
 - Your session's report: ` + "`nt agent write --status done --summary \"one line\"`" + ` with ` + "`## Done`" + `,

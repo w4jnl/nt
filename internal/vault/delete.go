@@ -108,7 +108,7 @@ func (v *Vault) Unshared(rel string, images []string) []string {
 }
 
 // DeleteFolder removes the folder at rel when it holds no notes: nothing but perhaps an empty
-// assets folder.
+// assets folder and the .gitkeep that keeps an empty folder in git.
 func (v *Vault) DeleteFolder(rel string) error {
 	if !v.FolderEmpty(rel) {
 		return fmt.Errorf("%s/ is not empty: delete what is in it first", rel)
@@ -119,10 +119,12 @@ func (v *Vault) DeleteFolder(rel string) error {
 	}
 	defer unlock()
 	_ = os.Remove(v.Abs(path.Join(rel, "assets")))
+	_ = os.Remove(v.Abs(path.Join(rel, ".gitkeep")))
 	return os.Remove(v.Abs(rel))
 }
 
-// FolderEmpty reports whether the folder at rel holds nothing but perhaps an empty assets folder.
+// FolderEmpty reports whether the folder at rel holds nothing but perhaps an empty assets folder
+// and a .gitkeep.
 func (v *Vault) FolderEmpty(rel string) bool {
 	if strings.Trim(rel, "/") == "" {
 		return false
@@ -132,6 +134,9 @@ func (v *Vault) FolderEmpty(rel string) bool {
 		return false
 	}
 	for _, d := range des {
+		if d.Name() == ".gitkeep" && !d.IsDir() {
+			continue
+		}
 		if d.Name() != "assets" || !d.IsDir() {
 			return false
 		}

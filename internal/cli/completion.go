@@ -34,6 +34,9 @@ var commands = []command{
 	{[]string{"ls"}, "the folders and notes in a folder", []flag{jsonFlag}, []string{"folder"}},
 	{[]string{"view"}, "show one note rendered", []flag{{"--theme", "light or dark", "(auto dark light)"}, {"--images", "draw images", "(auto on off)"}}, []string{"note"}},
 	{[]string{"paste"}, "save the clipboard's image beside a note", []flag{{"--name", "what the image shows", "name"}, jsonFlag}, []string{"note"}},
+	{[]string{"mv", "move"}, "move a note or folder, its links fixed", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", "folder"}},
+	{[]string{"rename"}, "a note's new title and file name, or a folder's new name", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", ""}},
+	{[]string{"mkdir"}, "a new folder, kept by git while it is empty", []flag{jsonFlag}, []string{"folder"}},
 	{[]string{"todo"}, "the todo list: add, check, due dates", []flag{{"--done", "the done ones", ""}, {"--all", "open and done", ""}, {"--due", "when it is due", "(today tomorrow mon tue wed thu fri sat sun none)"}, {"--in", "add to this folder's todo.md", "folder"}, jsonFlag}, []string{"(add done undo due rm)"}},
 	{[]string{"init"}, "make a folder a notes repository", []flag{{"--clone", "clone this repository", "url"}, jsonFlag}, []string{"dir"}},
 	{[]string{"sync"}, "commit, merge and push now", []flag{jsonFlag}, nil},
@@ -179,6 +182,8 @@ func bashArg(a string) string {
 		return `COMPREPLY=( $(compgen -W "$(nt _complete folders 2>/dev/null)" -- "$cur") )`
 	case "note":
 		return `COMPREPLY=( $(compgen -W "$(nt _complete notes 2>/dev/null)" -- "$cur") )` // else files (-o default)
+	case "path":
+		return `COMPREPLY=( $(compgen -W "$(nt _complete folders 2>/dev/null) $(nt _complete notes 2>/dev/null)" -- "$cur") )`
 	case "dir":
 		return `COMPREPLY=( $(compgen -d -- "$cur") )`
 	}
@@ -200,6 +205,10 @@ _nt_notes() {
     local -a notes
     notes=(${(f)"$(nt _complete notes 2>/dev/null)"})
     _alternative 'notes:note:compadd -a notes' 'files:file:_files -g "*.md"'
+}
+_nt_paths() {
+    _nt_folders
+    _nt_notes
 }
 _nt() {
     local -a cmds
@@ -247,6 +256,8 @@ _nt() {
 				spec += "folder:_nt_folders"
 			case "note":
 				spec += "note:_nt_notes"
+			case "path":
+				spec += "note or folder:_nt_paths"
 			case "dir":
 				spec += "folder:_files -/"
 			default:

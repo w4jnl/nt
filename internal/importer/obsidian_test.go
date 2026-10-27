@@ -207,15 +207,10 @@ func TestJournalClashBecomesANote(t *testing.T) {
 	}
 }
 
-func TestSplitCamelAndAnchor(t *testing.T) {
+func TestSplitCamel(t *testing.T) {
 	for in, want := range map[string]string{"CleanupStorscanDB": "Cleanup Storscan DB", "DockerServiceOverride": "Docker Service Override", "LDAP": "LDAP", "already spaced": "already spaced"} {
 		if got := splitCamel(in); got != want {
 			t.Errorf("splitCamel(%q) = %q, want %q", in, got, want)
-		}
-	}
-	for in, want := range map[string]string{"build_report.ksh": "build_reportksh", "Setup & Use!": "setup--use", "Ünïcode Heading": "ünïcode-heading"} {
-		if got := anchor(in); got != want {
-			t.Errorf("anchor(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

@@ -183,10 +183,12 @@ func TestDeleteAsks(t *testing.T) {
 	}
 }
 
-// run sends msg to the browser, then the todo list's reading of the notes when msg started one.
+// run sends msg to the browser, then the todo list's reading of the notes or the move when msg
+// started one.
 func run(b *browser, msg tea.Msg) {
 	if _, cmd := b.Update(msg); cmd != nil {
-		if m, ok := cmd().(todosMsg); ok {
+		switch m := cmd().(type) {
+		case todosMsg, movedMsg:
 			b.Update(m)
 		}
 	}
@@ -264,5 +266,91 @@ func TestTodoList(t *testing.T) {
 	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if b.pick != nil {
 		t.Fatal("esc does not close the todo list")
+	}
+}
+
+func TestFolders(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	for f, body := range map[string]string{
+		"tech/2026-10-22-c.md":     "---\ntitle: Cables\n---\n\n# Cables\n",
+		"daily/2026/2026-10-22.md": "# Day\n\n- [Cables](../../tech/2026-10-22-c.md)\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	journal := func() string { s, _ := os.ReadFile(b.v.Abs("daily/2026/2026-10-22.md")); return string(s) }
+	enter := func() { run(b, tea.KeyPressMsg{Code: tea.KeyEnter}) }
+	clear := func() { run(b, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}) }
+	pick := func(rel string) {
+		for i, e := range b.entries {
+			if e.rel == rel {
+				b.sel = i
+				return
+			}
+		}
+		t.Fatalf("%s is not in the list", rel)
+	}
+
+	press(b, "N")
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "new folder in tech:") {
+		t.Errorf("N does not say where: %s", f)
+	}
+	press(b, "Work Stuff")
+	enter()
+	if _, err := os.Stat(b.v.Abs("tech/work-stuff/.gitkeep")); err != nil || b.msg != "made tech/work-stuff/" {
+		t.Fatalf("N does not make the folder, with .gitkeep: %v, %q", err, b.msg)
+	}
+
+	pick("tech/2026-10-22-c.md")
+	press(b, "m")
+	if b.pick == nil || b.pick.title != "move tech/2026-10-22-c.md to" {
+		t.Fatalf("m does not ask where to: %+v", b.pick)
+	}
+	var rows []string
+	for _, it := range b.pick.items {
+		rows = append(rows, it.label)
+	}
+	if got := strings.Join(rows, " "); got != "/ tech/work-stuff/" {
+		t.Errorf("the folders it can go to: %s; not its own", got)
+	}
+	press(b, "stuff")
+	enter()
+	if _, err := os.Stat(b.v.Abs("tech/work-stuff/2026-10-22-c.md")); err != nil || b.showing != "tech/work-stuff/2026-10-22-c.md" {
+		t.Fatalf("m does not move the note there and show it: %v, showing %q", err, b.showing)
+	}
+	if !strings.Contains(journal(), "(../../tech/work-stuff/2026-10-22-c.md)") || !strings.Contains(b.msg, "links fixed in 1 note") {
+		t.Fatalf("the journal's link (%s):\n%s", b.msg, journal())
+	}
+
+	press(b, "R")
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "new title: Cables") {
+		t.Errorf("R does not start from the title: %s", f)
+	}
+	clear()
+	press(b, "Cat6 cables")
+	enter()
+	if _, err := os.Stat(b.v.Abs("tech/work-stuff/2026-10-22-cat6-cables.md")); err != nil || !strings.Contains(journal(), "- [Cat6 cables](../../tech/work-stuff/2026-10-22-cat6-cables.md)") {
+		t.Fatalf("R does not rename the note and its link (%v):\n%s", err, journal())
+	}
+
+	press(b, "h")
+	pick("tech/work-stuff")
+	press(b, "R")
+	clear()
+	press(b, "Projects")
+	enter()
+	if !strings.Contains(journal(), "(../../tech/projects/2026-10-22-cat6-cables.md)") || b.entries[b.sel].rel != "tech/projects" {
+		t.Fatalf("R on a folder (%s):\n%s", b.msg, journal())
+	}
+
+	b.dir = "daily/2026"
+	b.list()
+	press(b, "m")
+	if b.pick != nil || !strings.Contains(b.msg, "stay where their date puts them") {
+		t.Fatalf("m on a journal: %q", b.msg)
 	}
 }

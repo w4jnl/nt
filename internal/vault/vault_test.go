@@ -355,8 +355,9 @@ func TestDelete(t *testing.T) {
 		t.Error("a folder with a note was deleted")
 	}
 	_ = os.MkdirAll(v.Abs("old/assets"), 0o755)
+	_ = os.WriteFile(v.Abs("old/.gitkeep"), nil, 0o644)
 	if !v.FolderEmpty("old") {
-		t.Error("a folder with only an empty assets folder is not empty")
+		t.Error("a folder with only an empty assets folder and .gitkeep is not empty")
 	}
 	if err := v.DeleteFolder("old"); err != nil {
 		t.Fatal(err)

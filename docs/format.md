@@ -35,6 +35,8 @@ Rules are marked **must** or **should**. A client that cannot follow a must rule
 - `daily/` and `agents/` are reserved. Their names can be changed in `.nt/config.toml`.
 - Any other folder is the person's. Folders can nest to any depth.
 - Names that start with `.` are ignored by clients, except `.nt/`, `.gitattributes` and `.gitignore`.
+- A folder that holds no note yet holds an empty `.gitkeep`, so git keeps it. Clients leave it in
+  place and do not show it.
 
 ## 3. Names
 
@@ -333,6 +335,48 @@ A todo is a task list item in any note. A `todo.md` is where clients add new one
   on two devices without a conflict, as it does for journals. In the rare case that one device changes the last todo while the other adds
   one right after it, both versions of the changed todo are kept, and the person deletes one.
 
-## 13. Changes to this format
+## 13. Moving and renaming
+
+A client that moves or renames a note or a folder keeps every link working. Under the
+repository lock, in the same pass as the move, it:
+
+- rewrites every relative link and image to a file that moved, in every note, to point at the
+  file's new place;
+- rewrites the relative links in a note that moved, to point at the same files from its new place;
+- keeps a link's `#anchor`, its trailing `/` and its title;
+- turns a legacy `[[wikilink]]` to a note that moved into a markdown link;
+- moves the attachments in the note's own `assets/` folder that no other note names into the
+  `assets/` folder at its new place. Attachments other notes use stay, and the links to them are
+  rewritten.
+
+Renaming a note:
+
+- sets `title` in its frontmatter, adding the key when it is missing, and its first `#` heading
+  when the title came from that heading or it showed the old title;
+- renames the file after the new title, `YYYY-MM-DD-<slug>.md`, keeping its date;
+- gives every link to the note whose text was the old title, such as its line in the journal,
+  the new title.
+
+Rules:
+
+- New folder names are slugs (§3). Folders that exist keep their names, whatever case is typed.
+- Journals, agent reports and digests are not moved or renamed, and neither are the `daily/` and
+  `agents/` folders. Nothing is moved into them.
+- `pins` and `default_folder` in `.nt/config.toml` follow a folder that moves.
+- A new name that differs from the old one only in case is refused: git on macOS would not see
+  the change.
+- Links in code, URLs, paths outside the repository and links to files that do not exist are
+  left as they are.
+
+Sync commits a move as files deleted and added, and git's merge finds the rename:
+
+- An edit another device made to the note at its old path is merged into the note at its new
+  place.
+- A note another device deleted stays, at its new place: a change wins over a deletion (§10).
+- A note two devices moved to different places at once is kept in both. Nothing is lost; delete
+  the one you do not want.
+- A link to the old path that another device wrote before it had the move points at nothing.
+
+## 14. Changes to this format
 
 A change that older clients would misread raises `format` in `.nt/config.toml`. A client must not write to a repository with a higher `format` than it knows. Adding an optional frontmatter key is not such a change.

@@ -40,6 +40,12 @@ notes
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
 
+folders
+  mv <from> <to>       move a note or a folder; to ending in / is a folder to move it into. The
+                       links to it and in it are fixed, its images go along [--dry-run]
+  rename <from> <new>  a note's new title and file name, or a folder's new name [--dry-run]
+  mkdir <folder>       a new folder, kept by git while it is empty
+
 todos
   todo [folder]        the open todos in every note, or under folder, overdue first [--done] [--all]
   todo add <text>      a new todo at the end of Inbox in todo.md [--due fri|+3d|YYYY-MM-DD]
@@ -113,6 +119,12 @@ func Main(args []string) int {
 		return runPaste(args[1:])
 	case "todo":
 		return runTodo(args[1:])
+	case "mv", "move":
+		return runMv(args[1:])
+	case "rename":
+		return runRename(args[1:])
+	case "mkdir":
+		return runMkdir(args[1:])
 	case "theme":
 		return runTheme(args[1:])
 	case "agent":

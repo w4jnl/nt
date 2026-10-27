@@ -19,13 +19,13 @@ import (
 // openTodos shows the todo list: the open todos, or with done the done ones. A todo added there
 // goes to the todo.md of the folder the browser is in.
 func (b *browser) openTodos(done bool) tea.Cmd {
-	b.pick = &picker{title: "todo · reading the notes", todos: true, done: done, folder: b.todoFolder()}
+	b.pick = &picker{title: "todo · reading the notes", todos: true, done: done, folder: b.plainFolder()}
 	return b.loadTodos("")
 }
 
-// todoFolder is the folder the browser is in, or the root from the journals and agent reports,
-// which keep no todo list of their own.
-func (b *browser) todoFolder() string {
+// plainFolder is the folder the browser is in, or the root from the journals and agent reports,
+// which keep no todo list and no folders of their own.
+func (b *browser) plainFolder() string {
 	c := b.v.Cfg.Folders
 	for _, f := range []string{c.Daily, c.Agents} {
 		if b.dir == f || strings.HasPrefix(b.dir, f+"/") {

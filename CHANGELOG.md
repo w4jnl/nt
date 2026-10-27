@@ -16,6 +16,14 @@ updates this file first. Dates are the tag dates.
   line like the journals: run `nt init <repo>` once in an existing repository to add the
   `.gitattributes` line, which `nt doctor` checks.
 
+- **Folders.** `nt mv` moves a note or a folder and `nt rename` gives a note a new title (the
+  file name follows, its date kept) or a folder a new name. Every link to what moves and in it
+  is fixed in the same pass, the images only that note uses go along, `[[wikilinks]]` to it
+  become markdown links, and `pins` and `default_folder` follow a folder (docs/format.md §13).
+  `--dry-run` shows what would change. `nt mkdir` makes a folder that git keeps while it is
+  empty. In the browser `m` moves the selected note or folder, `R` renames it and `N` makes a
+  folder.
+
 ## 0.1.0 (2026-10-27)
 
 The first release: phases 0 to 3 of [the design](docs/design.md#phases-each-ends-in-something-usable).

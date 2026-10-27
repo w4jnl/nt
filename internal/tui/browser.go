@@ -126,6 +126,8 @@ type picker struct {
 	done   bool   // its done todos, not the open ones
 	ready  bool   // its todos are read
 	folder string // whose todo.md a todo added there goes to; "" is the root's
+
+	folders []string // the move picker's folders, before what is typed filters them
 }
 
 type browser struct {
@@ -158,7 +160,7 @@ type browser struct {
 
 	pick       *picker
 	input      *lineInput
-	inputKind  string // add, new, search, find
+	inputKind  string // add, new, search, find, due, todo, move, rename, mkdir
 	searchSeq  int
 	searchStop context.CancelFunc
 
@@ -167,6 +169,8 @@ type browser struct {
 
 	todoSeq int
 	todoAt  *todo.Item // the todo the due prompt is for
+
+	moving string // the note or folder m or R was pressed on
 
 	status    gitsync.Status
 	hasStatus bool
@@ -513,6 +517,8 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, b.searched(msg)
 	case todosMsg:
 		return b, b.setTodos(msg)
+	case movedMsg:
+		return b, b.moved(msg)
 	case syncedMsg:
 		return b, b.synced(msg.st)
 	case editedMsg:
@@ -837,6 +843,12 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.copy(b.showing, b.showing)
 	case "D":
 		return b.askDelete()
+	case "m":
+		return b.startMove()
+	case "R":
+		return b.startRename()
+	case "N":
+		return b.startMkdir()
 	case "s":
 		return b.sync()
 	case "r":
@@ -957,6 +969,7 @@ func (b *browser) afterDelete() tea.Cmd {
 }
 
 func isFile(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }
+func isDir(p string) bool  { st, err := os.Stat(p); return err == nil && st.IsDir() }
 
 // noteFolder is where n puts a note: the current folder, or the default folder when the browser
 // is at the root or in the journals or agent reports.
@@ -1078,7 +1091,8 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 	case "esc", "ctrl+c":
 		kind := b.inputKind
 		b.closeInput()
-		if kind == "search" || kind == "find" {
+		b.moving = ""
+		if kind == "search" || kind == "find" || kind == "move" {
 			return b.closePick()
 		}
 		return nil
@@ -1123,6 +1137,15 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			return b.choose()
 		case "due", "todo":
 			return b.todoInput(kind, text)
+		case "move":
+			if p := b.pick; p != nil && p.sel < len(p.items) {
+				return b.moveInto(p.items[p.sel])
+			}
+			return b.moveNowhere(text)
+		case "rename":
+			return b.rename(text)
+		case "mkdir":
+			return b.mkdir(text)
 		}
 		return nil
 	}
@@ -1138,6 +1161,8 @@ func (b *browser) inputChanged() tea.Cmd {
 		return b.runSearch(b.input.Value())
 	case "find":
 		return b.findTitles()
+	case "move":
+		return b.moveTargets()
 	}
 	return nil
 }
@@ -1363,6 +1388,8 @@ func (b *browser) choose() tea.Cmd {
 		return b.openImage(it.target)
 	case "missing":
 		b.say(it.hint+": the link points to nothing", true)
+	case "folder":
+		return b.moveInto(it)
 	}
 	return nil
 }
