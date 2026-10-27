@@ -29,6 +29,7 @@ import (
 	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/weekly"
 )
 
 // Layout from tokens.json terminal/*: the list is list-width columns until the person drags the
@@ -131,6 +132,8 @@ type picker struct {
 
 	folders []string // the move picker's folders, before what is typed filters them
 	day     string   // the todo list from the calendar: only the todos due or done that day
+
+	settings bool // the settings list (settings.go)
 }
 
 type browser struct {
@@ -375,6 +378,10 @@ func (b *browser) followPick() tea.Cmd {
 	}
 	it := b.pick.items[b.pick.sel]
 	switch it.kind {
+	case "setting":
+		if s, ok := config.FindSetting(it.target); ok {
+			b.say(s.Help, false)
+		}
 	case "heading":
 		if !b.p.showText(it.text) {
 			b.p.showLine(it.line)
@@ -566,6 +573,9 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				keep = todoRef(it)
 			}
 			return b, tea.Batch(b.loadTodos(keep), b.reindex())
+		}
+		if s, ok := b.settingSelected(); ok { // a config file edited: read it again
+			return b, b.openSettings(s.Key)
 		}
 		if b.cal != nil {
 			b.calRead()
@@ -854,6 +864,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.openTodos(false)
 	case "c":
 		return b.openCalendar()
+	case ",":
+		return b.openSettings("")
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		return b.pin(int(s[0] - '1'))
 	case "a":
@@ -1197,6 +1209,11 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			return b.moveNowhere(text)
 		case "rename":
 			return b.rename(text)
+		case "setting":
+			if s, ok := b.settingSelected(); ok {
+				return b.setSetting(s, text)
+			}
+			return nil
 		case "mkdir":
 			return b.mkdir(text)
 		}
@@ -1376,6 +1393,11 @@ func (b *browser) pickKey(k tea.KeyPressMsg) tea.Cmd {
 			return cmd
 		}
 	}
+	if b.pick.settings {
+		if cmd, ok := b.settingKeys(k); ok {
+			return cmd
+		}
+	}
 	switch k.String() {
 	case "esc", "q", "left", "h":
 		return b.closePick()
@@ -1519,9 +1541,10 @@ func (b *browser) sync() tea.Cmd {
 		return nil
 	}
 	b.syncing = true
-	v, dir := b.v, b.o.StateDir
+	v, dir, m := b.v, b.o.StateDir, b.o.Machine // copied: the settings list can change them meanwhile
 	run := func() tea.Msg {
-		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify, Digest: b.o.Machine.Digest})
+		st := gitsync.Run(v, gitsync.Options{Notify: gitsync.Notify, Digest: m.Digest, Weekly: m.Weekly, StateDir: dir,
+			Summary: weekly.Tool{Name: m.Summary.Tool, Model: m.Summary.Model}})
 		_ = gitsync.WriteStatus(dir, st)
 		return syncedMsg{st}
 	}

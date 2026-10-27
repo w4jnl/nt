@@ -57,6 +57,8 @@ c nt todo add --in t
 c nt mv t
 c nt mv tech/2026-10-20-nas.md w
 c nt rename --
+c nt config ""
+c nt config set s
 `
 	out, err := exec.Command("bash", "-c", probe).CombinedOutput()
 	if err != nil {
@@ -83,6 +85,8 @@ c nt rename --
 		"tech tech/2026-10-20-nas.md", // mv moves a note or a folder
 		"work",                        // into a folder
 		"--dry-run --json",
+		"get set edit", // config's first word
+		"summary.tool summary.model sync.auto sync.interval", // then a setting
 	}
 	got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(got) != len(want) {

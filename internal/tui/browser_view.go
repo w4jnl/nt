@@ -285,8 +285,8 @@ func (b *browser) pickerPane(w, h int) string {
 func (b *browser) helpText(w, h int) string {
 	groups := [][]string{
 		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
-		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "1–9", "pinned folders", "A", "today's agent reports"},
-		{"find", "/", "search every note", "ctrl-p", "a note by its title"},
+		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "1–9", "pinned folders", "A", "today's agent reports", ",", "the settings"},
+		{"find", "/ ctrl-p", "search every note, find a title"},
 		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
 		{"in a note", "f", "follow a link: type its letters, or click it", "b", "back to the note before", "l o i", "its links, outline, images", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
 		{"write", "a", "add a line to today", "n", "a new note here", "N", "a new folder here", "m R", "move, rename it", "s", "sync now", "r", "reload"},
@@ -354,6 +354,8 @@ func (b *browser) footer() string {
 			check, other = "open again", "open ones"
 		}
 		left = hints(b.st, "x", check, "d", "due", "a", "add", "X", other, "e", "edit", "D", "delete", "esc", "back")
+	case b.pick != nil && b.pick.settings:
+		left = hints(b.st, "enter", "change", "e", "edit the file", "esc", "back")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
 	case b.cal != nil && b.focus == onList:

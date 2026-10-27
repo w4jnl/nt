@@ -489,3 +489,70 @@ func TestAddMonths(t *testing.T) {
 		}
 	}
 }
+
+func TestSettings(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	machine := filepath.Join(t.TempDir(), "config.toml")
+	t.Setenv("NT_CONFIG", machine)
+	if err := os.WriteFile(machine, []byte("repo = \"~/notes\"\nweekly = false   # one machine only\n\n[theme]\nmode = \"dark\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read := func(p string) string { s, _ := os.ReadFile(p); return string(s) }
+	pick := func(key string) {
+		t.Helper()
+		for i, it := range b.pick.items {
+			if it.target == key {
+				b.pick.sel = i
+				return
+			}
+		}
+		t.Fatalf("%s is not in the settings", key)
+	}
+
+	press(b, ",")
+	if b.pick == nil || !b.pick.settings || len(b.pick.items) < 15 {
+		t.Fatalf(", does not list the settings: %+v", b.pick)
+	}
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "enter change") || !strings.Contains(f, "the notes repository this machine works on") {
+		t.Errorf("the footer: %s", f)
+	}
+
+	pick("weekly")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(machine), "weekly = true    # one machine only") || !b.o.Machine.Weekly || b.msg != "weekly = true" {
+		t.Fatalf("enter does not flip weekly (%q):\n%s", b.msg, read(machine))
+	}
+
+	pick("summary.model")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.input == nil || b.inputKind != "setting" {
+		t.Fatal("enter on a value does not ask for it")
+	}
+	press(b, "haiku")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(machine), "[summary]\nmodel = \"haiku\"") || b.pick == nil || !b.pick.settings {
+		t.Fatalf("the prompt does not set summary.model, or leaves the list:\n%s", read(machine))
+	}
+
+	pick("pins")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	press(b, "tech")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !strings.Contains(read(b.v.Abs(".nt/config.toml")), `pins = ["tech"]`) || strings.Join(b.v.Cfg.Pins, ",") != "tech" {
+		t.Fatalf("pins is not set in the repository's file, or not at once: %v", b.v.Cfg.Pins)
+	}
+
+	pick("day_starts")
+	before := read(b.v.Abs(".nt/config.toml"))
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	run(b, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	press(b, "5")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !b.alert || !strings.Contains(b.msg, "a time like 04:00") || read(b.v.Abs(".nt/config.toml")) != before {
+		t.Errorf("a bad value: %q; the file changed: %v", b.msg, read(b.v.Abs(".nt/config.toml")) != before)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.pick != nil {
+		t.Error("esc does not close the settings")
+	}
+}
