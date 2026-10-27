@@ -386,3 +386,38 @@ func TestWeekRel(t *testing.T) {
 		t.Errorf("WeekStart of a Sunday = %s, want the Monday before", got)
 	}
 }
+
+func TestSortLog(t *testing.T) {
+	const h4 = 4 * time.Hour
+	for _, c := range []struct{ name, in, want string }{
+		{"in order", "# D\n\n## Log\n\n- 09:00 a\n- 10:00 b\n\n## Notes\n", "# D\n\n## Log\n\n- 09:00 a\n- 10:00 b\n\n## Notes\n"},
+		{"merged out of order", "# D\n\n## Log\n\n- 10:05 c\n- 10:01 a\n  more of a\n- 10:03 b\n\n## Notes\n\n- [x](x.md)\n",
+			"# D\n\n## Log\n\n- 10:01 a\n  more of a\n- 10:03 b\n- 10:05 c\n\n## Notes\n\n- [x](x.md)\n"},
+		{"the night belongs to the day before it", "## Log\n- 01:30 late\n- 23:00 evening\n- 09:00 morning\n", "## Log\n- 09:00 morning\n- 23:00 evening\n- 01:30 late\n"},
+		{"a line the merge left twice", "## Log\n- 10:01 a\n- 10:03 b\n- 10:01 a\n", "## Log\n- 10:01 a\n- 10:03 b\n"},
+		{"a line without a time stays with the one before", "## Log\nintro\n- 10:05 c\n- no time\n- 10:01 a\n", "## Log\nintro\n- 10:01 a\n- 10:05 c\n- no time\n"},
+		{"no Log", "# D\n\n- 10:05 c\n- 10:01 a\n", "# D\n\n- 10:05 c\n- 10:01 a\n"},
+	} {
+		if got := string(SortLog([]byte(c.in), h4)); got != c.want {
+			t.Errorf("%s:\n%q\nwant\n%q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSortPastLogs(t *testing.T) {
+	v := newVault(t)
+	v.Now = func() time.Time { return at("2026-10-27 10:00") }
+	jumbled := "# D\n\n## Log\n\n- 10:05 c\n- 10:01 a\n"
+	for _, day := range []string{"2026-10-27", "2026-10-26", "2026-10-19"} {
+		if err := WriteFile(v.Abs("daily/2026/"+day+".md"), []byte(jumbled)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := v.SortPastLogs(v.Now())
+	if err != nil || strings.Join(got, " ") != "daily/2026/2026-10-26.md" {
+		t.Fatalf("SortPastLogs = %v, %v; want yesterday's only: not today's, not older than a week", got, err)
+	}
+	if read(t, v, "daily/2026/2026-10-26.md") != "# D\n\n## Log\n\n- 10:01 a\n- 10:05 c\n" || read(t, v, "daily/2026/2026-10-27.md") != jumbled {
+		t.Error("yesterday's journal is not in time order, or today's was touched")
+	}
+}

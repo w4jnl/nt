@@ -88,6 +88,7 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 | todo | open | `○` | `ink-muted` | grey; its due date in words at the right |
 | todo | late | `○` and "2d late" | `warn` on the words | orange; the word says it, the colour repeats it |
 | todo | done | `✓` | `done` → `ok` | green; when it was done in words |
+| link | points at nothing | its text struck through | `ink-faint` | grey; the strike says it, a click says where it pointed |
 | calendar day | todos due | `•` after the number | `ink-muted`; `warn` once the day has passed | grey, orange when overdue; the dot says it, the colour repeats it |
 | calendar day | today | the number, bold | `accent` | cyan; "today" beside the date under the month says it |
 

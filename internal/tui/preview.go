@@ -138,8 +138,9 @@ func (p *preview) render() {
 			lines[i] = ansi.Truncate(l, p.width, "")
 		}
 	}
-	p.lines = lines
 	p.links = findLinks(lines)
+	p.markMissing(lines)
+	p.lines = lines
 	p.vp.SetContentLines(lines)
 }
 

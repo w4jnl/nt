@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -23,16 +24,21 @@ func TestFindLinks(t *testing.T) {
 	}
 	got := findLinks(lines)
 	want := []linkSpot{
-		{0, 6, 13, "tech/nas.md"}, {0, 14, 25, "tech/nas.md"},
-		{1, 7, 10, "https://x.org"}, // the wide characters take two cells each
-		{2, 10, 15, "a.md"}, {3, 0, 3, "a.md"},
+		{line: 0, from: 6, to: 13, dest: "tech/nas.md"}, {line: 0, from: 14, to: 25, dest: "tech/nas.md"},
+		{line: 1, from: 7, to: 10, dest: "https://x.org"}, // the wide characters take two cells each
+		{line: 2, from: 10, to: 15, dest: "a.md"}, {line: 3, from: 0, to: 3, dest: "a.md"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("findLinks = %+v, want %+v", got, want)
 	}
 	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("%d: %+v, want %+v", i, got[i], want[i])
+		g := got[i]
+		if text := ansi.Strip(lines[g.line][g.text[0]:g.text[1]]); text != ansi.Strip(ansi.Cut(lines[g.line], g.from, g.to)) {
+			t.Errorf("%d: the bytes %v hold %q, not the link's text", i, g.text, text)
+		}
+		g.text = [2]int{}
+		if g != want[i] {
+			t.Errorf("%d: %+v, want %+v", i, g, want[i])
 		}
 	}
 }
@@ -129,5 +135,34 @@ func TestFollowLinks(t *testing.T) {
 	b.Update(tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})
 	if b.showing != "tech/2026-10-22-c.md" {
 		t.Errorf("a click on a link shows %q", b.showing)
+	}
+}
+
+func TestMissingLinksLookBroken(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	note := "# A\n\n[there](2026-10-21-b.md) and [gone](nope.md) and [web](https://example.org)\n"
+	if err := os.WriteFile(b.v.Abs("tech/2026-10-20-a.md"), []byte(note), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.reveal("tech/2026-10-20-a.md")
+	struck := regexp.MustCompile(`\x1b\[(?:[0-9:]+;)*9(?:;[0-9:]+)*m`)
+	var line string
+	for _, l := range b.p.lines {
+		if strings.Contains(ansi.Strip(l), "gone") {
+			line = l
+		}
+	}
+	if line == "" || !struck.MatchString(line) || strings.Count(line, "\x1b]8;") != 12 {
+		t.Errorf("the link to nothing is not struck through, or the hyperlinks changed:\n%q", line)
+	}
+	if got := strings.TrimSpace(ansi.Strip(line)); got != "there tech/2026-10-21-b.md and gone tech/nope.md and web https://example.org" {
+		t.Errorf("the text changed: %q", got)
+	}
+	found := false
+	for _, s := range b.p.links {
+		found = found || s.dest == "nope.md"
+	}
+	if !found {
+		t.Error("the struck-through link is no longer a link: a click would not say where it pointed")
 	}
 }
