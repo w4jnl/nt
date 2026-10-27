@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/w4jnl/nt/internal/termimg"
 	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/weekly"
 	"github.com/w4jnl/nt/skills"
 )
 
@@ -57,6 +59,7 @@ func runDoctor(args []string) int {
 		checks = append(checks, linkCheck(v))
 	}
 	syncChecks(m, add)
+	summaryCheck(m, add)
 	toolChecks(add)
 	switch t, why := termimg.Detect(m.InlineImages); {
 	case t != nil:
@@ -193,6 +196,23 @@ func syncChecks(m config.Machine, add func(name, state, format string, a ...any)
 		add("last sync", "warn", "%s", detail)
 	default:
 		add("last sync", "fail", "%s", detail)
+	}
+}
+
+// summaryCheck reports the tool that writes this machine's weekly summaries, when one is set.
+func summaryCheck(m config.Machine, add func(name, state, format string, a ...any)) {
+	t := m.Summary.Tool
+	switch {
+	case t == "":
+		return
+	case !slices.Contains(weekly.Tools, t):
+		add("summary", "fail", "[summary] tool = %q: use claude or copilot", t)
+	default:
+		if p, err := weekly.LookTool(t); err != nil {
+			add("summary", "warn", "%v: install it, or set [summary] tool = \"\"", err)
+		} else {
+			add("summary", "ok", "%s writes this machine's weekly summaries (%s)", t, tilde(p))
+		}
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/gitsync"
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/internal/weekly"
 )
 
 // nt sync: commit, merge and push once. --background is the timer's form: no waiting for a run
@@ -29,7 +30,8 @@ func runSync(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	o := gitsync.Options{Wait: !background, Digest: m.Digest, Weekly: m.Weekly}
+	o := gitsync.Options{Wait: !background, Digest: m.Digest, Weekly: m.Weekly, StateDir: config.StateDir(),
+		Summary: weekly.Tool{Name: m.Summary.Tool, Model: m.Summary.Model}}
 	if background {
 		o.Log, o.Notify = stamped{os.Stdout}, gitsync.Notify
 	} else if !asJSON {

@@ -273,6 +273,39 @@ Compiled by nt from the week's notes; it is written again when they change.
 [journal](../../daily/2026/2026-10-26.md) · [3 agent sessions](../../agents/2026/2026-10-26/README.md)
 ```
 
+### Weekly summaries
+
+`weekly/GGGG/GGGG-Www-<host>.md` is one machine's summary of a week: a paragraph written by an AI
+tool on that machine, about what was written on that machine.
+
+- A machine writes summaries only when its machine config names a tool (`[summary] tool`, §9),
+  and writes only its own file, once the week is over, so every summary has one writer.
+- "Written on that machine" is read from the repository: the commits sync made there (their
+  message starts `nt: <host> ·`, merges left out) and the agent reports with that `host`. The
+  journal lines, todos and notes another machine wrote never go to this machine's tool, so a work
+  machine's week stays with the work machine's tool, whatever folder it is in.
+- What the tool reads: the week's journal lines, the todos added or done, the notes made (their
+  text) or changed (the lines added), a commit of more than 20 notes only counted, and each agent
+  session's summary, Done, Decisions and Open, at most about 40,000 characters. It is asked for one
+  paragraph of plain text, without secrets or personal data.
+- The file has `type: weekly-summary` frontmatter with `host`, `tool` and, when one is set,
+  `model`, then the paragraph. It is not rewritten when the week's notes change later.
+- The weekly digest shows each machine's summary under `## Summary`, after its title.
+
+```markdown
+---
+title: "Week 44, 2026 · mbp"
+date: 2026-10-26
+type: weekly-summary
+host: mbp
+tool: claude
+---
+
+The NAS got four disks in RAID-Z1 and its nightly restic backup; a decision was recorded to drop
+the Synology job. The infra project's Terraform for the new cron host was finished; the website
+waits on a DNS change.
+```
+
 ## 8. Templates
 
 - Templates are in `.nt/templates/` and use Go `text/template`. Missing templates fall back to the built-in defaults.
@@ -312,6 +345,10 @@ interval = "2m"
 
 [theme]
 mode = "auto"              # auto | dark | light
+
+[summary]
+tool = "claude"            # claude | copilot: write this machine's weekly summaries with it; "" none
+model = ""                 # optional: the model the tool uses, e.g. "haiku"
 ```
 
 ## 10. Writing and syncing

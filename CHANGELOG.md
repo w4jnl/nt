@@ -4,6 +4,15 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## Unreleased
+
+- **Weekly summaries.** A machine whose config names a tool (`[summary] tool = "claude"` or
+  `"copilot"`) has it write, once a week is over, a paragraph on what was written on that
+  machine: its journal lines, todos, notes and agent sessions, read from the commits sync made
+  there. Each machine writes its own file, `weekly/GGGG/GGGG-Www-<host>.md`, so a week written at
+  work goes only to the work machine's tool. The weekly digest shows them all;
+  `nt week --summarize` writes one by hand, and `nt doctor` checks the tool.
+
 ## 0.3.0 (2026-10-27)
 
 Follow links in the note, the weekly digest, journals in time order.

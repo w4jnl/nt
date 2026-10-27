@@ -5,6 +5,7 @@
 package gitsync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -44,12 +45,14 @@ const MaxFile = 20 << 20
 
 // Options are one sync run's settings.
 type Options struct {
-	Wait   bool             // wait for a sync already running instead of leaving it to finish
-	Notify func(msg string) // tells the person about new conflict copies; nil: nobody
-	Log    io.Writer        // progress, one line per step; nil: discard
-	Retry  time.Duration    // base pause before retrying a rejected push; 0: 1 s
-	Digest bool             // this machine writes the agent digests (digest = true)
-	Weekly bool             // this machine compiles the weekly digest (weekly = true)
+	Wait     bool             // wait for a sync already running instead of leaving it to finish
+	Notify   func(msg string) // tells the person about new conflict copies; nil: nobody
+	Log      io.Writer        // progress, one line per step; nil: discard
+	Retry    time.Duration    // base pause before retrying a rejected push; 0: 1 s
+	Digest   bool             // this machine writes the agent digests (digest = true)
+	Weekly   bool             // this machine compiles the weekly digest (weekly = true)
+	Summary  weekly.Tool      // the tool that writes this machine's weekly summaries; Name "" none
+	StateDir string           // the state folder: when a summary was last tried
 }
 
 // Status is the outcome of a run, written to status.json for doctor, the TUI and flok.
@@ -147,6 +150,15 @@ func (r *run) cycle() error {
 		}
 		for _, d := range days {
 			r.logf("digest: %s", d)
+		}
+	}
+	if r.o.Summary.Name != "" { // before the digest, which shows it; a failure does not stop the sync
+		wrote, err := weekly.RefreshSummaries(context.Background(), r.v, r.o.Summary, r.o.StateDir, r.v.Now())
+		for _, w := range wrote {
+			r.logf("summary: %s", w)
+		}
+		if err != nil {
+			r.logf("%v; tried again in an hour", err)
 		}
 	}
 	if r.o.Weekly { // likewise: a week's digest goes out with the notes it is made from
