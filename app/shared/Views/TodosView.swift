@@ -23,6 +23,18 @@ struct TodosView: View {
     @State private var writes: Task<Void, Never>?
     @FocusState private var focus: Field?
     @Namespace private var rows
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var size
+    #endif
+
+    /// compact: an iPhone's width, where a todo's note goes under its text.
+    private var compact: Bool {
+        #if os(iOS)
+        size == .compact
+        #else
+        false
+        #endif
+    }
 
     enum Field: Hashable { case add, list, due }
 
@@ -37,11 +49,7 @@ struct TodosView: View {
         let done = shown.filter(\.done)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Todos")
-                    .font(.system(size: 28, weight: .semibold))
-                    .kerning(-0.3)
-                    .foregroundStyle(Brand.ink)
-                    .padding(.bottom, 4)
+                ViewTitle(text: "Todos", below: 4)
                 summary(open)
                     .padding(.bottom, 22)
                 addField
@@ -79,7 +87,7 @@ struct TodosView: View {
                 }
             }
             .frame(maxWidth: 640, alignment: .leading)
-            .padding(EdgeInsets(top: 22, leading: 40, bottom: 96, trailing: 40))
+            .viewInsets(bottom: 96)
             .frame(maxWidth: .infinity)
         }
         .background(Brand.ground)
@@ -89,7 +97,7 @@ struct TodosView: View {
         .onKeyPress(.downArrow) { move(1, open + (showDone ? done : [])); return .handled }
         .onKeyPress(.upArrow) { move(-1, open + (showDone ? done : [])); return .handled }
         .onKeyPress(.space) { act { tick($0) } }
-        .onKeyPress(.return) { act { t in ws.show(t.rel, line: t.line) } }
+        .onKeyPress(.return) { act { t in ws.go(t.rel, line: t.line) } }
         .onKeyPress("d") { act { t in startDue(t) } }
         .viewToolbar("Todos")
     }
@@ -155,17 +163,26 @@ struct TodosView: View {
             .buttonStyle(.plain)
             .help(done ? "Open it again" : "Mark it done")
             .accessibilityLabel(done ? "Done; open it again" : "Open; mark it done")
-            Text(t.text)
+            let text = Text(t.text)
                 .font(.system(size: 15))
                 .foregroundStyle(done ? Brand.muted : Brand.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)
-            Button(source(t)) { ws.show(t.rel, line: t.line) }
+            let from = Button(source(t)) { ws.go(t.rel, line: t.line) }
                 .buttonStyle(.plain)
-                .font(.system(size: 12))
+                .font(.system(size: compact ? 13 : 12))
                 .foregroundStyle(Brand.muted)
                 .lineLimit(1)
                 .help("Open \(t.rel) at the todo")
+            if compact {
+                VStack(alignment: .leading, spacing: 2) {
+                    text
+                    from
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                text.frame(maxWidth: .infinity, alignment: .leading)
+                from
+            }
             if editingDue == t.id {
                 TextField("fri, +3d, none", text: $dueText)
                     .textFieldStyle(.plain)
@@ -178,11 +195,12 @@ struct TodosView: View {
                 Text(t.when)
                     .font(Brand.mono(12))
                     .foregroundStyle(t.late ? Brand.warn : Brand.muted)
-                    .frame(width: 64, alignment: .trailing)
+                    .fixedSize()
+                    .frame(minWidth: 64, alignment: .trailing)
             }
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: 40)
+        .frame(minHeight: compact ? 52 : 40)
         .background(isSelected ? Brand.accentSoft : .clear, in: RoundedRectangle(cornerRadius: 8))
         .overlay(alignment: .leading) {
             if isSelected {
@@ -196,11 +214,11 @@ struct TodosView: View {
             selected = t.id
             focus = .list
         }
-        .onTapGesture(count: 2) { ws.show(t.rel, line: t.line) }
+        .onTapGesture(count: 2) { ws.go(t.rel, line: t.line) }
         .contextMenu {
             Button(done ? "Open Again" : "Done") { tick(t) }
             if !done { Button("Set Due Date…") { startDue(t) } }
-            Button("Open Note") { ws.show(t.rel, line: t.line) }
+            Button("Open Note") { ws.go(t.rel, line: t.line) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel([t.text, t.when, source(t)].filter { !$0.isEmpty }.joined(separator: ", "))
@@ -298,8 +316,9 @@ struct TodosView: View {
 }
 
 extension View {
+    #if os(macOS)
     /// viewToolbar is the toolbar of a view in the note's place: its name, and Search.
-    func viewToolbar(_ title: String) -> some View {
+    func viewToolbar(_ title: String, large: Bool = true) -> some View {
         // no bar behind the toolbar: the views sit on ground under it, as the note does
         scrollEdgeEffectHidden(true, for: .top)
             .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -317,8 +336,53 @@ extension View {
                 }
             }
     }
+    #else
+    /// viewToolbar names a view in the navigation bar: large, or small for a view that heads
+    /// itself (the calendar's month). Search is on the home list.
+    func viewToolbar(_ title: String, large: Bool = true) -> some View {
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(large ? .large : .inline)
+    }
+    #endif
+
+    /// viewInsets are a view's margins: narrower on an iPhone.
+    func viewInsets(bottom: CGFloat) -> some View { modifier(ViewInsets(bottom: bottom)) }
 }
 
+struct ViewInsets: ViewModifier {
+    let bottom: CGFloat
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var size
+    #endif
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if size == .compact {
+            return content.padding(EdgeInsets(top: 4, leading: 20, bottom: bottom, trailing: 20))
+        }
+        #endif
+        return content.padding(EdgeInsets(top: 22, leading: 40, bottom: bottom, trailing: 40))
+    }
+}
+
+/// ViewTitle is a view's name above it on the Mac; on iPhone and iPad the navigation bar's large
+/// title says it.
+struct ViewTitle: View {
+    let text: String
+    var below: CGFloat = 0
+
+    var body: some View {
+        #if os(macOS)
+        Text(text)
+            .font(.system(size: 28, weight: .semibold))
+            .kerning(-0.3)
+            .foregroundStyle(Brand.ink)
+            .padding(.bottom, below)
+        #endif
+    }
+}
+
+#if os(macOS)
 /// SearchButton opens Search (⇧⌘F).
 struct SearchButton: View {
     @Environment(Workspace.self) private var ws
@@ -333,3 +397,4 @@ struct SearchButton: View {
         .accessibilityLabel("Search notes")
     }
 }
+#endif

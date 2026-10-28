@@ -1,9 +1,13 @@
 // nt's design system in code (docs/design-system): every colour the app shows, in its light and
 // dark value, and the brand face. Views never name a colour or a font; they ask Brand. A test
 // keeps the table equal to tokens.json, as internal/theme's does for the terminal.
-import AppKit
 import CoreText
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 enum Brand {
     /// The tokens the app uses: name → (light, dark), as in tokens.json.
@@ -38,9 +42,14 @@ enum Brand {
     static let alert = color("alert")
 
     static func color(_ name: String) -> Color {
+        #if os(macOS)
         Color(nsColor: nsColor(name))
+        #else
+        Color(uiColor: uiColor(name))
+        #endif
     }
 
+    #if os(macOS)
     /// A colour that follows the window's appearance.
     static func nsColor(_ name: String) -> NSColor {
         let t = tokens[name] ?? (0xFF00FF, 0xFF00FF)
@@ -49,13 +58,25 @@ enum Brand {
             return NSColor(hex: dark ? t.dark : t.light)
         }
     }
+    #else
+    /// A colour that follows the screen's light or dark appearance.
+    static func uiColor(_ name: String) -> UIColor {
+        let t = tokens[name] ?? (0xFF00FF, 0xFF00FF)
+        return UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? t.dark : t.light) }
+    }
+    #endif
 
     /// JetBrains Mono at a fixed size, for dates, times, paths and keys; the system's monospaced
     /// face when the bundled one is missing.
     static func mono(_ size: CGFloat, bold: Bool = false) -> Font {
         _ = fontsRegistered
         let name = bold ? "JetBrainsMono-Bold" : "JetBrainsMono-Regular"
-        if NSFont(name: name, size: size) != nil {
+        #if os(macOS)
+        let have = NSFont(name: name, size: size) != nil
+        #else
+        let have = UIFont(name: name, size: size) != nil
+        #endif
+        if have {
             return .custom(name, fixedSize: size)
         }
         return .system(size: size, weight: bold ? .bold : .regular, design: .monospaced)
@@ -71,8 +92,16 @@ enum Brand {
     }()
 }
 
+#if os(macOS)
 extension NSColor {
     convenience init(hex: UInt32) {
         self.init(srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
     }
 }
+#else
+extension UIColor {
+    convenience init(hex: UInt32) {
+        self.init(red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+    }
+}
+#endif

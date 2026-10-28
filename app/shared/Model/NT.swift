@@ -1,10 +1,16 @@
 // NT runs the nt command line tool. nt is the one that knows the repository format and writes
 // to the repository (docs/format.md §10); the app asks it, with --json, and reads files itself.
+// On the Mac nt is a process; on iPhone and iPad it is nt's Go code in the app (Core), asked the
+// same command lines and answering the same way.
 import Foundation
 
 struct NT: Sendable {
+    #if os(macOS)
     let executable: URL
     let environment: [String: String]
+    #else
+    let core: Core
+    #endif
 
     /// What a run printed and how it ended.
     struct Output: Sendable {
@@ -13,6 +19,7 @@ struct NT: Sendable {
         let stderr: String
     }
 
+    #if os(macOS)
     /// The nt this app bundles, else $NT_BIN, else one installed by hand or by Homebrew.
     static func locate() -> NT? {
         let env = ProcessInfo.processInfo.environment
@@ -77,6 +84,15 @@ struct NT: Sendable {
         }
     }
 
+    #else
+    /// run asks the core, off the main thread; what it says when it fails reads as nt's stderr.
+    func run(_ args: [String], input: Data? = nil) async throws -> Output {
+        let out = await core.run(args, input: input)
+        return Output(status: Int32(out.status), stdout: out.stdout, stderr: out.stderr.isEmpty ? "" : "nt: " + out.stderr)
+    }
+
+    #endif
+
     /// json runs nt and decodes what it printed; a failed run throws what nt said.
     func json<T: Decodable>(_ type: T.Type, _ args: [String], input: Data? = nil) async throws -> T {
         let out = try await run(args, input: input)
@@ -89,6 +105,7 @@ struct NT: Sendable {
     }
 }
 
+#if os(macOS)
 /// Hold is `nt _editor hold` running: .git/nt-edit held (shared) while a note has unsaved
 /// changes, so sync commits but does not merge under them. Closing its input lets it go; so does
 /// the app ending.
@@ -112,6 +129,24 @@ final class Hold: @unchecked Sendable {
 
     deinit { release() }
 }
+#else
+/// Hold is the core holding .git/nt-edit (shared) while a note has unsaved changes, so sync
+/// commits but does not merge under them, as `nt _editor hold` does on the Mac.
+final class Hold: @unchecked Sendable {
+    private let core: Core
+
+    init?(_ nt: NT) {
+        core = nt.core
+        guard core.hold() else { return nil }
+    }
+
+    func release() {
+        core.unhold()
+    }
+
+    deinit { release() }
+}
+#endif
 
 enum NTError: LocalizedError, Equatable {
     case cannotRun(String, String)

@@ -2,6 +2,9 @@
 # mac-project). Local.xcconfig (gitignored) holds your team id, NT_TEAM_ID; it can stay empty for
 # a build that runs on this Mac only.
 #
+# ../shared is compiled into this app and the iOS app (app/ios): the model, the editor's web view
+# and the views both show, with #if os() where the platforms differ.
+#
 # The app is not sandboxed: it reads the notes repository where it is, runs nt and takes the
 # repository's locks (docs/design.md, phase 6). It bundles the nt it was built with, in
 # Contents/Helpers/nt (make nt-universal), and the editor page from Nt/Resources/editor
@@ -36,6 +39,7 @@ targets:
       - path: Nt
         excludes:
           - Resources
+      - path: ../shared
       - path: Nt/Resources/editor
         type: folder
       - path: ../../docs/design-system/fonts

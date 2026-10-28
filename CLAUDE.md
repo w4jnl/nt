@@ -31,10 +31,12 @@ person's notes live in their own repository.
 - Voice in docs, help text and messages: technical, direct, short sentences; no emoji, no
   exclamation marks; `nt` always lowercase. States are lowercase words with their glyph, never
   colour alone. Errors say what is wrong and how to fix it.
-- Mac app (`app/macos`, docs/design.md §8): Swift 6 with complete strict concurrency, SwiftUI,
+- Mac app (`app/macos`, docs/design.md §8) and iOS app (`app/ios`, §9), sharing `app/shared`
+  (`#if os` where the platforms differ): Swift 6 with complete strict concurrency, SwiftUI,
   `@MainActor @Observable` state, Apple frameworks only; the editor page's CodeMirror is the one
-  third-party component. Colours come only from `Brand.swift` and `editor.css`, which mirror the
-  tokens; it writes only through nt and never runs git.
+  third-party component, and on iOS libgit2 with libssh2 and mbedTLS. Colours come only from
+  `Brand.swift` and `editor.css`, which mirror the tokens. The apps write only through nt; the Mac
+  app never runs git, and the iOS app's git (libgit2) runs only when nt's sync asks for it.
 - Tests: table-driven, temp directories and temp git repositories; no mocks of git. `NT_CONFIG`,
   `NT_STATE` and `NT_REPO` point nt at a test's own machine config, state and repository. End-to-end
   suites in `scripts/e2e/` drive a bare repository and isolated tmux servers (`tmux -L <name>
@@ -49,8 +51,8 @@ person's notes live in their own repository.
   macOS and Linux) must pass before it merges. Nobody pushes to `main` directly.
 - Never make outbound network calls other than git and ssh to the configured remotes and hosts.
 - Before calling a task done: `gofmt -l ./cmd ./internal ./skills ./mobile` is empty, `make vet` and `make test` pass;
-  after a change under `app/macos`, `make mac-test` and `make mac-editor` pass too; after a change
-  under `app/ios` or `mobile`, `make ios-core` and `make ios-test`.
+  after a change under `app/macos` or `app/shared`, `make mac-test` and `make mac-editor` pass too;
+  after a change under `app/ios`, `app/shared` or `mobile`, `make ios-core` and `make ios-test`.
 
 ## Commands
 - `make build`: `bin/nt` with the version stamped from git.

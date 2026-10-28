@@ -21,7 +21,7 @@ struct CalendarView: View {
                     dayPane(day)
                 }
             }
-            .padding(EdgeInsets(top: 22, leading: 40, bottom: 64, trailing: 40))
+            .viewInsets(bottom: 64)
             .frame(maxWidth: .infinity)
         }
         .background(Brand.ground)
@@ -37,7 +37,7 @@ struct CalendarView: View {
             openJournal(day)
             return .handled
         }
-        .viewToolbar("Calendar")
+        .viewToolbar("Calendar", large: false)
     }
 
     private func go(_ day: String, days: Int = 0, months: Int = 0) -> KeyPress.Result {
@@ -184,7 +184,7 @@ struct CalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(todos) { t in
                         Button {
-                            ws.show(t.rel, line: t.line)
+                            ws.go(t.rel, line: t.line)
                         } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 Text(t.done ? "✓" : "○")
@@ -235,7 +235,7 @@ struct CalendarView: View {
                 }
             }
         } else if isToday {
-            Button("Start today's journal") { Task { await ws.openToday() } }
+            Button("Start today's journal") { Task { await ws.goToday() } }
                 .buttonStyle(.plain)
                 .font(.system(size: 15))
                 .foregroundStyle(Brand.accent)
@@ -253,7 +253,7 @@ struct CalendarView: View {
             Text(isToday ? "None today." : "None.")
             if let next {
                 Text(" Next: ")
-                Button(next.text) { ws.show(next.rel, line: next.line) }
+                Button(next.text) { ws.go(next.rel, line: next.line) }
                     .buttonStyle(.plain)
                     .foregroundStyle(Brand.accent)
                 Text(", \(next.when).")
@@ -266,9 +266,9 @@ struct CalendarView: View {
 
     private func openJournal(_ day: String) {
         if day == ws.today {
-            Task { await ws.openToday() }
+            Task { await ws.goToday() }
         } else if ws.journalDays.contains(day) {
-            ws.show(ws.journalPath(day))
+            ws.go(ws.journalPath(day))
         }
     }
 }
@@ -282,7 +282,7 @@ struct ReportRow: View {
     var body: some View {
         let st = report.state
         Button {
-            ws.show(report.path)
+            ws.go(report.path)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(st.glyph)
