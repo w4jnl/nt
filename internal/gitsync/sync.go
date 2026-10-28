@@ -53,6 +53,7 @@ type Options struct {
 	Weekly   bool             // this machine compiles the weekly digest (weekly = true)
 	Summary  weekly.Tool      // the tool that writes this machine's weekly summaries; Name "" none
 	StateDir string           // the state folder: when a summary was last tried
+	Git      Git              // the repository's plumbing; nil: git itself
 }
 
 // Status is the outcome of a run, written to status.json for doctor, the TUI and flok.
@@ -78,7 +79,7 @@ func (e errStop) Error() string { return e.msg }
 
 type run struct {
 	v      *vault.Vault
-	g      git
+	g      Git
 	o      Options
 	st     *Status
 	branch string
@@ -103,7 +104,11 @@ func Run(v *vault.Vault, o Options) Status {
 		return st
 	}
 	defer release()
-	r := &run{v: v, g: newGit(v.Root), o: o, st: &st}
+	g := o.Git
+	if g == nil {
+		g = newGit(v.Root)
+	}
+	r := &run{v: v, g: g, o: o, st: &st}
 	if err := r.cycle(); err != nil {
 		return fail(st, err)
 	}
@@ -185,13 +190,13 @@ func (r *run) cycle() error {
 		return r.finish()
 	}
 	for attempt := 1; ; attempt++ {
-		if err := r.g.runQuiet("fetch", "--quiet", "--prune", "origin"); err != nil {
-			if offline(err) {
+		if err := r.g.Fetch(); err != nil {
+			if errors.Is(err, ErrOffline) {
 				return r.offline(err)
 			}
 			return err
 		}
-		upstream := r.g.ok("rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+r.branch)
+		upstream := r.g.Upstream(r.branch)
 		if upstream {
 			if r.v.Editing() && r.behind() > 0 {
 				r.st.Message = "waiting for the editor to close before merging"
@@ -204,19 +209,15 @@ func (r *run) cycle() error {
 				break
 			}
 		}
-		args := []string{"push", "--quiet", "origin", "HEAD:refs/heads/" + r.branch}
-		if !upstream {
-			args = []string{"push", "--quiet", "-u", "origin", r.branch}
-		}
-		err := r.g.runQuiet(args...)
+		err := r.g.Push(r.branch, !upstream)
 		if err == nil {
 			r.logf("pushed %s", r.branch)
 			break
 		}
-		if offline(err) {
+		if errors.Is(err, ErrOffline) {
 			return r.offline(err)
 		}
-		if !rejected(err) || attempt >= 5 {
+		if !errors.Is(err, ErrRejected) || attempt >= 5 {
 			return err
 		}
 		pause := r.o.Retry + time.Duration(rand.Int64N(int64(r.o.Retry)))
@@ -234,16 +235,14 @@ func (r *run) preflight() error {
 			return errStop{"a rebase is in progress: finish it, or run git rebase --abort, then sync again"}
 		}
 	}
-	b, err := r.g.run("symbolic-ref", "--quiet", "--short", "HEAD")
+	b, err := r.g.Branch()
 	if err != nil {
 		return errStop{"HEAD is detached: check out the notes branch (git switch main), then sync again"}
 	}
 	r.branch, r.st.Branch = b, b
-	r.remote = r.g.ok("remote", "get-url", "origin")
-	if want, err := r.g.run("symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); err == nil {
-		if want = strings.TrimPrefix(want, "origin/"); want != b {
-			return errStop{fmt.Sprintf("on branch %s, but the remote's branch is %s: git switch %s, then sync again", b, want, want)}
-		}
+	r.remote = r.g.HasRemote()
+	if want := r.g.RemoteBranch(); want != "" && want != b {
+		return errStop{fmt.Sprintf("on branch %s, but the remote's branch is %s: git switch %s, then sync again", b, want, want)}
 	}
 	return nil
 }
@@ -276,7 +275,7 @@ func (r *run) recover() error {
 		if err := r.stageAll(); err != nil {
 			return err
 		}
-		if _, err := r.g.run("commit", "--quiet", "--no-edit"); err != nil {
+		if err := r.g.Commit(""); err != nil {
 			return err
 		}
 		r.st.Merged = true
@@ -289,16 +288,15 @@ func (r *run) commit() error {
 	if err := r.stageAll(); err != nil {
 		return err
 	}
-	names, err := r.g.bytes("diff", "--cached", "--name-only", "-z")
+	files, err := r.g.Staged()
 	if err != nil {
 		return err
 	}
-	files := splitZ(names)
 	if len(files) == 0 {
 		return nil
 	}
 	msg := commitMessage(r.v.Host, files)
-	if _, err := r.g.run("commit", "--quiet", "-m", msg); err != nil {
+	if err := r.g.Commit(msg); err != nil {
 		return err
 	}
 	r.st.Committed += len(files)
@@ -308,30 +306,18 @@ func (r *run) commit() error {
 
 // stageAll is git add -A without temp files and without files over MaxFile.
 func (r *run) stageAll() error {
-	out, err := r.g.bytes("status", "--porcelain=v1", "-z", "--untracked-files=all")
+	paths, err := r.g.Status()
 	if err != nil {
 		return err
 	}
-	args := []string{"add", "-A", "--", ".", ":(exclude,glob)**/.nt-tmp-*"}
-	fields := splitZ(out)
 	var skipped []string
-	for i := 0; i < len(fields); i++ {
-		e := fields[i]
-		if len(e) < 4 {
-			continue
-		}
-		xy, p := e[:2], e[3:]
-		if xy[0] == 'R' || xy[0] == 'C' {
-			i++ // the source path follows
-		}
+	for _, p := range paths {
 		if st, err := os.Stat(filepath.Join(r.v.Root, p)); err == nil && st.Mode().IsRegular() && st.Size() > MaxFile {
 			skipped = append(skipped, p)
-			args = append(args, ":(exclude,literal)"+p)
 		}
 	}
 	r.st.Skipped = skipped
-	_, err = r.g.run(args...)
-	return err
+	return r.g.Stage(skipped)
 }
 
 // commitMessage is "nt: <host> · 3 files (daily, agents)": the count and the top-level folders.
@@ -365,7 +351,7 @@ func (r *run) merge() error {
 	if r.behind() == 0 {
 		return nil
 	}
-	_, err := r.g.run("merge", "--quiet", "--no-edit", "--ff", "origin/"+r.branch)
+	err := r.g.Merge(r.branch)
 	r.st.Merged = true
 	if err == nil {
 		r.logf("merged origin/%s", r.branch)
@@ -381,7 +367,7 @@ func (r *run) merge() error {
 	if err := r.stageAll(); err != nil {
 		return err
 	}
-	if _, err := r.g.run("commit", "--quiet", "--no-edit"); err != nil {
+	if err := r.g.Commit(""); err != nil {
 		return err
 	}
 	r.logf("merged origin/%s with %d conflicting file(s)", r.branch, len(unmerged))
@@ -390,29 +376,7 @@ func (r *run) merge() error {
 
 // unmerged lists the conflicted paths and the index stages each one has: 1 base, 2 ours
 // (local), 3 theirs (remote).
-func (r *run) unmerged() (map[string]map[int]string, error) {
-	out, err := r.g.bytes("ls-files", "-u", "-z")
-	if err != nil {
-		return nil, err
-	}
-	m := map[string]map[int]string{}
-	for _, e := range splitZ(out) {
-		meta, p, ok := strings.Cut(e, "\t")
-		if !ok {
-			continue
-		}
-		f := strings.Fields(meta) // mode sha stage
-		if len(f) != 3 {
-			continue
-		}
-		stage, _ := strconv.Atoi(f[2])
-		if m[p] == nil {
-			m[p] = map[int]string{}
-		}
-		m[p][stage] = f[1]
-	}
-	return m, nil
-}
+func (r *run) unmerged() (map[string]map[int]string, error) { return r.g.Unmerged() }
 
 // resolve settles every conflicted path without conflict markers (docs/format.md §10):
 // changed on both sides, the remote version stays and the local one becomes a conflict copy;
@@ -429,14 +393,14 @@ func (r *run) resolve(unmerged map[string]map[int]string) error {
 		switch {
 		case ours != "" && theirs != "" && r.isDigest(p):
 			// a digest is made from its reports: take either, the digest machine writes it anew
-			if _, err := r.g.run("checkout", "--theirs", "--", p); err != nil {
+			if err := r.g.Take(p, true); err != nil {
 				return err
 			}
-			if _, err := r.g.run("add", "--", p); err != nil {
+			if err := r.g.Add(p); err != nil {
 				return err
 			}
 		case ours != "" && theirs != "":
-			local, err := r.g.bytes("cat-file", "blob", ours)
+			local, err := r.g.Blob(ours)
 			if err != nil {
 				return err
 			}
@@ -444,33 +408,33 @@ func (r *run) resolve(unmerged map[string]map[int]string) error {
 			if err := vault.WriteFile(r.v.Abs(copyRel), local); err != nil {
 				return err
 			}
-			if _, err := r.g.run("checkout", "--theirs", "--", p); err != nil {
+			if err := r.g.Take(p, true); err != nil {
 				return err
 			}
-			if _, err := r.g.run("add", "--", p, copyRel); err != nil {
+			if err := r.g.Add(p, copyRel); err != nil {
 				return err
 			}
 			r.st.NewConflicts = append(r.st.NewConflicts, copyRel)
 			r.logf("conflict: %s changed here and on the remote; kept the remote version, yours is %s", p, copyRel)
 		case theirs != "":
-			if _, err := r.g.run("checkout", "--theirs", "--", p); err != nil {
+			if err := r.g.Take(p, true); err != nil {
 				return err
 			}
-			if _, err := r.g.run("add", "--", p); err != nil {
+			if err := r.g.Add(p); err != nil {
 				return err
 			}
 			r.logf("kept %s: changed on the remote, deleted here", p)
 		case ours != "":
-			if _, err := r.g.run("checkout", "--ours", "--", p); err != nil {
+			if err := r.g.Take(p, false); err != nil {
 				return err
 			}
-			if _, err := r.g.run("add", "--", p); err != nil {
+			if err := r.g.Add(p); err != nil {
 				return err
 			}
 			r.logf("kept %s: changed here, deleted on the remote", p)
 		default:
 			_ = os.Remove(r.v.Abs(p))
-			if _, err := r.g.run("rm", "--quiet", "--cached", "--ignore-unmatch", "--", p); err != nil {
+			if err := r.g.Forget(p); err != nil {
 				return err
 			}
 		}
@@ -495,14 +459,7 @@ func ConflictName(rel, host string, t time.Time) string {
 func (r *run) behind() int { return r.count("HEAD..origin/" + r.branch) }
 func (r *run) ahead() int  { return r.count("origin/" + r.branch + "..HEAD") }
 
-func (r *run) count(rng string) int {
-	out, err := r.g.run("rev-list", "--count", rng)
-	if err != nil {
-		return 0
-	}
-	n, _ := strconv.Atoi(out)
-	return n
-}
+func (r *run) count(rng string) int { return r.g.Count(rng) }
 
 func (r *run) offline(err error) error {
 	r.st.State, r.st.Message = "offline", "offline: "+firstLines(strings.TrimSpace(stderrOf(err)), 1)
@@ -514,7 +471,7 @@ func (r *run) offline(err error) error {
 // finish sets the state from where the repository stands now.
 func (r *run) finish() error {
 	r.st.Conflicts = r.conflictCopies()
-	if r.remote && r.g.ok("rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+r.branch) {
+	if r.remote && r.g.Upstream(r.branch) {
 		r.st.Ahead = r.ahead()
 	} else if r.remote {
 		r.st.Ahead = r.count("HEAD")
@@ -539,29 +496,15 @@ func (r *run) finish() error {
 
 // conflictCopies lists the conflict copies committed in the repository.
 func (r *run) conflictCopies() []string {
-	out, err := r.g.bytes("ls-files", "-z")
+	files, err := r.g.Files()
 	if err != nil {
 		return nil
 	}
 	var c []string
-	for _, f := range splitZ(out) {
+	for _, f := range files {
 		if strings.Contains(path.Base(f), ".conflict-") {
 			c = append(c, f)
 		}
 	}
 	return c
-}
-
-// runQuiet runs a command whose stdout nobody needs.
-func (g git) runQuiet(args ...string) error {
-	_, err := g.bytes(args...)
-	return err
-}
-
-func splitZ(b []byte) []string {
-	s := strings.TrimRight(string(b), "\x00")
-	if s == "" {
-		return nil
-	}
-	return strings.Split(s, "\x00")
 }

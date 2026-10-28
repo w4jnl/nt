@@ -1,5 +1,6 @@
 // Package search runs ripgrep over a notes repository: smart case, markdown files only, temp
-// files left out. nt s and the browser's live search share it.
+// files left out. nt s, the browser's live search and the apps share it. Where rg is missing,
+// as on a phone, a search in Go finds the same lines.
 package search
 
 import (
@@ -9,8 +10,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Match is one line rg found.
@@ -24,7 +30,72 @@ type Match struct {
 // ErrNoRg says ripgrep is missing, with the fix.
 var ErrNoRg = errors.New("ripgrep (rg) is not installed: brew install ripgrep")
 
-// Rg searches the repository at root for query. No match is no error.
+// Search searches the repository at root for query: with rg when it is there, else in Go.
+func Search(ctx context.Context, root, query string) ([]Match, error) {
+	if _, err := exec.LookPath("rg"); err != nil {
+		return Go(ctx, root, query)
+	}
+	return Rg(ctx, root, query)
+}
+
+// Go searches the repository at root for query as rg does: the query a regular expression,
+// case-insensitive unless it has a capital letter, in markdown files outside hidden folders,
+// temp files left out. No match is no error.
+func Go(ctx context.Context, root, query string) ([]Match, error) {
+	expr := query
+	if !strings.ContainsFunc(query, unicode.IsUpper) {
+		expr = "(?i)" + expr
+	}
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		return nil, fmt.Errorf("%q is not a regular expression nt can search for: %w", query, err)
+	}
+	var res []Match
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err != nil {
+			return nil
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if p != root && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, ".md") || strings.HasPrefix(name, ".") {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, p)
+		for i, line := range strings.Split(strings.TrimSuffix(string(b), "\n"), "\n") {
+			line = strings.TrimRight(line, "\r")
+			locs := re.FindAllStringIndex(line, -1)
+			if locs == nil {
+				continue
+			}
+			m := Match{Path: filepath.ToSlash(rel), Line: i + 1, Text: line}
+			for _, l := range locs {
+				if l[0] < l[1] {
+					m.Spans = append(m.Spans, [2]int{l[0], l[1]})
+				}
+			}
+			res = append(res, m)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Rg searches the repository at root for query with ripgrep. No match is no error.
 func Rg(ctx context.Context, root, query string) ([]Match, error) {
 	if _, err := exec.LookPath("rg"); err != nil {
 		return nil, ErrNoRg

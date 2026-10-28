@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,9 +12,9 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/w4jnl/nt/internal/config"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/todo"
-	"github.com/w4jnl/nt/internal/vault"
 )
 
 // nt todo [folder] [--done|--all] [--json]; nt todo add|done|undo|due|rm.
@@ -31,14 +28,6 @@ func runTodo(args []string) int {
 		}
 	}
 	return runTodoList(args)
-}
-
-// todoJSON is a todo as the commands print it with --json: when is its date in words as the
-// browser shows it (2d late, fri, 3 nov; yesterday for a done one), late whether it is overdue.
-func todoJSON(v *vault.Vault, it todo.Item) map[string]any {
-	when, late := it.Word(v.Day(v.Now()))
-	return map[string]any{"path": v.Abs(it.Path), "rel": it.Path, "line": it.Line, "done": it.Done,
-		"text": it.Text, "due": it.Due, "done_on": it.DoneOn, "section": it.Section, "when": when, "late": late}
 }
 
 // nt todo [folder] [--done|--all]: the open todos in every note, or in the notes under folder,
@@ -60,25 +49,18 @@ func runTodoList(args []string) int {
 	}
 	folder := ""
 	if len(pos) == 1 {
-		folder = strings.Trim(path.Clean("/"+filepath.ToSlash(pos[0])), "/")
-		if !isDir(v.Abs(folder)) {
-			return fail(fmt.Errorf("todo: %q is no folder in %s, nor add, done, undo, due or rm", pos[0], tilde(v.Root)))
-		}
+		folder = pos[0]
 	}
-	items := todo.Collect(v)
-	todo.Sort(items)
-	var show []todo.Item
-	for _, it := range items {
-		if (all || it.Done == done) && (folder == "" || strings.HasPrefix(it.Path, folder+"/")) {
-			show = append(show, it)
-		}
+	show, err := ops.Todos(v, folder, done, all)
+	if err != nil {
+		return fail(err)
 	}
 	if asJSON {
-		out := []map[string]any{}
+		list := ops.TodoList{Todos: []ops.Todo{}}
 		for _, it := range show {
-			out = append(out, todoJSON(v, it))
+			list.Todos = append(list.Todos, ops.TodoOf(v, it))
 		}
-		return printJSON(map[string]any{"todos": out})
+		return printJSON(list)
 	}
 	st := cliStyles(m)
 	if len(show) == 0 {
@@ -156,12 +138,12 @@ func runTodoAdd(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	it, err := todo.Add(v, folder, text, due, v.Now())
+	it, err := ops.AddTodo(v, folder, text, due)
 	if err != nil {
-		return fail(fmt.Errorf("todo add: %w", err))
+		return fail(err)
 	}
 	if asJSON {
-		return printJSON(todoJSON(v, it))
+		return printJSON(ops.TodoOf(v, it))
 	}
 	st := cliStyles(m)
 	lipgloss.Println(st.Muted.Render("added ") + oneRow(m, it, v.Day(v.Now())))
@@ -187,44 +169,19 @@ func runTodoChange(kind string, args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	today := v.Day(v.Now())
-	date := ""
-	if kind == "due" {
-		if date, err = todo.ParseWhen(when, today); err != nil {
-			return fail(fmt.Errorf("todo due: %w", err))
-		}
-	}
-	want := map[string]func(todo.Item) bool{
-		"done": func(it todo.Item) bool { return !it.Done },
-		"due":  func(it todo.Item) bool { return !it.Done },
-		"undo": func(it todo.Item) bool { return it.Done },
-		"rm":   func(todo.Item) bool { return true },
-	}[kind]
-	it, err := matchTodo(todo.Collect(v), strings.Join(words, " "), want)
+	it, err := ops.ChangeTodo(v, kind, strings.Join(words, " "), when)
 	if err != nil {
-		return fail(fmt.Errorf("todo %s: %w", kind, err))
-	}
-	verb := map[string]string{"done": "done", "undo": "open again", "due": "due", "rm": "deleted"}[kind]
-	switch kind {
-	case "done":
-		it, err = todo.Check(v, it, today)
-	case "undo":
-		it, err = todo.Uncheck(v, it)
-	case "due":
-		it, err = todo.SetDue(v, it, date)
-	case "rm":
-		err = todo.Remove(v, it)
-	}
-	if err != nil {
-		return fail(fmt.Errorf("todo %s: %w", kind, err))
+		return fail(err)
 	}
 	if asJSON {
-		out := todoJSON(v, it)
-		out["deleted"] = kind == "rm"
+		out := ops.TodoOf(v, it)
+		deleted := kind == "rm"
+		out.Deleted = &deleted
 		return printJSON(out)
 	}
+	verb := map[string]string{"done": "done", "undo": "open again", "due": "due", "rm": "deleted"}[kind]
 	st := cliStyles(m)
-	lipgloss.Println(st.Muted.Render(verb+" ") + oneRow(m, it, today))
+	lipgloss.Println(st.Muted.Render(verb+" ") + oneRow(m, it, v.Day(v.Now())))
 	return 0
 }
 
@@ -232,48 +189,4 @@ func runTodoChange(kind string, args []string) int {
 func oneRow(m config.Machine, it todo.Item, today time.Time) string {
 	word, _ := it.Word(today)
 	return todoRow(m, it, today, lipgloss.Width(it.Text), lipgloss.Width(word))
-}
-
-var lineRef = regexp.MustCompile(`^(.+\.md):(\d+)$`)
-
-// matchTodo picks the todo match names among those want accepts: path:line, else the one whose
-// text holds match (case does not matter), else the one whose text is match.
-func matchTodo(items []todo.Item, match string, want func(todo.Item) bool) (todo.Item, error) {
-	if m := lineRef.FindStringSubmatch(match); m != nil {
-		n, _ := strconv.Atoi(m[2])
-		for _, it := range items {
-			if it.Path == m[1] && it.Line == n {
-				return it, nil
-			}
-		}
-		return todo.Item{}, fmt.Errorf("no todo at %s: nt todo --all lists them", match)
-	}
-	q := strings.ToLower(strings.TrimSpace(match))
-	if q == "" {
-		return todo.Item{}, errors.New("name the todo: words from its text, or path:line as nt todo prints it")
-	}
-	var found, exact []todo.Item
-	for _, it := range items {
-		if !want(it) || !strings.Contains(strings.ToLower(it.Text), q) {
-			continue
-		}
-		found = append(found, it)
-		if strings.ToLower(it.Text) == q {
-			exact = append(exact, it)
-		}
-	}
-	switch {
-	case len(found) == 1:
-		return found[0], nil
-	case len(exact) == 1:
-		return exact[0], nil
-	case len(found) == 0:
-		return todo.Item{}, fmt.Errorf("no todo matches %q: nt todo --all lists them", match)
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "%d todos match %q; name one by path:line:", len(found), match)
-	for _, it := range found {
-		fmt.Fprintf(&b, "\n  %s:%d  %s", it.Path, it.Line, it.Text)
-	}
-	return todo.Item{}, errors.New(b.String())
 }

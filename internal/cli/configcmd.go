@@ -4,13 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 
 	"github.com/w4jnl/nt/internal/config"
-	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/ops"
 )
 
 // nt config [--json]: every setting, its value, its file and what it does; nt config get <key>,
@@ -32,21 +31,16 @@ func runConfig(args []string) int {
 	} else if len(pos) > 0 {
 		return fail(fmt.Errorf("config: %q is not get, set or edit", pos[0]))
 	}
-	m, r, repoPath, err := loadBoth()
+	m, r, repoPath, err := ops.LoadBoth()
 	if err != nil {
 		return fail(err)
 	}
 	if asJSON {
-		var out []map[string]any
-		for _, s := range config.Settings {
-			p := config.MachinePath()
-			if s.File == "repo" {
-				p = repoPath
-			}
-			out = append(out, map[string]any{"key": s.Key, "value": s.Value(m, r), "file": s.File, "path": p,
-				"kind": s.Kind, "choices": s.Choices(), "help": s.Help})
+		settings, err := ops.Settings()
+		if err != nil {
+			return fail(err)
 		}
-		return printJSON(map[string]any{"settings": out})
+		return printJSON(ops.SettingList{Settings: settings})
 	}
 	st := cliStyles(m)
 	w := 0
@@ -78,17 +72,6 @@ func runConfig(args []string) int {
 	return 0
 }
 
-// loadBoth reads this machine's config and the repository's, and where the repository's is.
-func loadBoth() (config.Machine, config.Repo, string, error) {
-	m, err := config.LoadMachine()
-	if err != nil {
-		return m, config.Repo{}, "", err
-	}
-	root := vault.Find(m)
-	r, err := config.LoadRepo(root)
-	return m, r, filepath.Join(root, ".nt", "config.toml"), err
-}
-
 func runConfigGet(args []string) int {
 	pos, err := positional("config get", args)
 	if err != nil {
@@ -101,7 +84,7 @@ func runConfigGet(args []string) int {
 	if !ok {
 		return fail(fmt.Errorf("config get: %q is not a setting; nt config lists them", pos[0]))
 	}
-	m, r, _, err := loadBoth()
+	m, r, _, err := ops.LoadBoth()
 	if err != nil {
 		return fail(err)
 	}
@@ -124,11 +107,11 @@ func runConfigSet(args []string) int {
 		return fail(fmt.Errorf("config set: %q is not a setting; nt config lists them", pos[0]))
 	}
 	raw := strings.Join(pos[1:], " ")
-	where, err := SetSetting(s, raw)
+	where, err := ops.SetSetting(s, raw)
 	if err != nil {
 		return fail(fmt.Errorf("config set: %w", err))
 	}
-	m, r, _, _ := loadBoth()
+	m, r, _, _ := ops.LoadBoth()
 	st := cliStyles(m)
 	v := s.Value(m, r)
 	if v == "" {
@@ -139,25 +122,6 @@ func runConfigSet(args []string) int {
 		lipgloss.Println(st.Muted.Render(hint))
 	}
 	return 0
-}
-
-// SetSetting writes one setting typed as raw: this machine's in its config file, the
-// repository's in .nt/config.toml under the repository lock, for sync to share. It says where.
-func SetSetting(s config.Setting, raw string) (string, error) {
-	if s.File == "machine" {
-		if _, err := config.SetMachine(s.Key, raw); err != nil {
-			return "", err
-		}
-		return "this machine: " + tilde(config.MachinePath()), nil
-	}
-	v, _, err := openVault()
-	if err != nil {
-		return "", err
-	}
-	if err := v.SetSetting(s.Key, raw); err != nil {
-		return "", err
-	}
-	return "the repository: " + tilde(v.Abs(".nt/config.toml")) + ", shared by sync", nil
 }
 
 // SettingHint is what a change needs to take effect, when it is more than the next command.

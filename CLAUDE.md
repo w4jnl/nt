@@ -48,8 +48,9 @@ person's notes live in their own repository.
 - `main` takes pull requests only (a ruleset): work on a branch, open a PR, and CI (`test` on
   macOS and Linux) must pass before it merges. Nobody pushes to `main` directly.
 - Never make outbound network calls other than git and ssh to the configured remotes and hosts.
-- Before calling a task done: `gofmt -l ./cmd ./internal ./skills` is empty, `make vet` and `make test` pass;
-  after a change under `app/macos`, `make mac-test` and `make mac-editor` pass too.
+- Before calling a task done: `gofmt -l ./cmd ./internal ./skills ./mobile` is empty, `make vet` and `make test` pass;
+  after a change under `app/macos`, `make mac-test` and `make mac-editor` pass too; after a change
+  under `app/ios` or `mobile`, `make ios-core` and `make ios-test`.
 
 ## Commands
 - `make build`: `bin/nt` with the version stamped from git.
@@ -62,6 +63,9 @@ person's notes live in their own repository.
   demo notes with `assets/demo/scene.sh`.
 - `make mac-run`, `make mac-test`: build and open, or test, the Mac app (Xcode 26+, XcodeGen);
   `make mac-editor`: test and rebuild its editor page after a change under `app/macos/editor/src` (Node).
+- `make ios-build`, `make ios-test`, `make ios-device`: the iOS app (app/ios) in the simulator, its
+  tests, or on a connected iPhone; `make ios-core` rebuilds nt for the phone (gomobile) after a Go
+  change, `make ios-libgit2` its libgit2 (cmake), `make ios-ssh-test` its ssh against a test sshd.
 - `make e2e`: end-to-end suites in `scripts/e2e/` (isolated tmux servers).
 - `scripts/release.sh <version>`: tag a release and bump `Formula/nt.rb` in w4jnl/homebrew-tap.
   Run it on `main` after the PR with the CHANGELOG section has merged.

@@ -1514,7 +1514,7 @@ func (b *browser) runSearch(query string) tea.Cmd {
 		if strings.TrimSpace(query) == "" || ctx.Err() != nil {
 			return searchMsg{seq: seq}
 		}
-		m, err := search.Rg(ctx, root, query)
+		m, err := search.Search(ctx, root, query)
 		return searchMsg{seq: seq, matches: m, err: err}
 	})
 }

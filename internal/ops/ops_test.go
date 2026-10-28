@@ -1,4 +1,4 @@
-package cli
+package ops
 
 import (
 	"os"
@@ -37,13 +37,13 @@ func TestMatchTodo(t *testing.T) {
 		{"", open, "name the todo"},
 		{"x.md:9", open, "no todo at x.md:9"},
 	} {
-		it, err := matchTodo(items, tc.match, tc.want)
+		it, err := MatchTodo(items, tc.match, tc.want)
 		got := it.Path + ":" + strconv.Itoa(it.Line)
 		if err != nil {
 			got = err.Error()
 		}
 		if !strings.HasPrefix(got, tc.at) {
-			t.Errorf("matchTodo(%q) = %q, want %q", tc.match, got, tc.at)
+			t.Errorf("MatchTodo(%q) = %q, want %q", tc.match, got, tc.at)
 		}
 	}
 }
@@ -68,9 +68,9 @@ func TestTodoJSONSaysWhen(t *testing.T) {
 		{todo.Item{Text: "Cables"}, "", false},
 		{todo.Item{Text: "Router", Done: true, DoneOn: "2026-10-27"}, "yesterday", false},
 	} {
-		got := todoJSON(v, tc.it)
-		if got["when"] != tc.when || got["late"] != tc.late {
-			t.Errorf("%s: when %q late %v, want %q %v", tc.it.Text, got["when"], got["late"], tc.when, tc.late)
+		got := TodoOf(v, tc.it)
+		if got.When != tc.when || got.Late != tc.late {
+			t.Errorf("%s: when %q late %v, want %q %v", tc.it.Text, got.When, got.Late, tc.when, tc.late)
 		}
 	}
 }

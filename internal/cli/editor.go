@@ -1,22 +1,14 @@
 package cli
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/w4jnl/nt/internal/config"
-	"github.com/w4jnl/nt/internal/gitsync"
 	"github.com/w4jnl/nt/internal/nvim"
-	"github.com/w4jnl/nt/internal/scan"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
@@ -60,7 +52,7 @@ func runEditorHelper(args []string) int {
 	case "day":
 		fmt.Println(v.Day(v.Now()).Format("2006-01-02"))
 	case "index":
-		return printJSON(editorIndex(v))
+		return printJSON(ops.IndexOf(v, config.StateDir()))
 	case "save":
 		return fail(errors.New("_editor save: name the note: nt _editor save <note> [--base <sha256>] [--keep]"))
 	default:
@@ -69,36 +61,9 @@ func runEditorHelper(args []string) int {
 	return 0
 }
 
-// editorIndex is the repository as an editor's sidebar and "Linked from" need it.
-func editorIndex(v *vault.Vault) map[string]any {
-	ix := scan.Build(v.Root)
-	notes := ix.Notes
-	if notes == nil {
-		notes = []scan.Note{}
-	}
-	pins := v.Cfg.Pins
-	if pins == nil {
-		pins = []string{}
-	}
-	return map[string]any{
-		"root":    v.Root,
-		"state":   config.StateDir(),
-		"day":     v.Day(v.Now()).Format("2006-01-02"),
-		"pins":    pins,
-		"folders": map[string]string{"daily": v.Cfg.Folders.Daily, "agents": v.Cfg.Folders.Agents, "weekly": v.Cfg.Folders.Weekly},
-		"dirs":    dirsOf(v.Root),
-		"notes":   notes,
-		"back":    ix.Back,
-	}
-}
-
-// editorSave writes a note an editor changed: its text, read from in, under the repository
-// lock through a temp file (docs/format.md §10). With --base it writes only when the file on
-// disk is still the one the editor read, whose SHA-256 is base. When another writer changed it
-// since, nothing is written and the reply carries the file as it is now, for the editor to merge
-// its changes into; --keep writes all the same, after saving that file beside the note as a
-// conflict copy (§3). A note that is gone is written again. It prints
-// {"saved", "sha", "text" when not saved, "copy" when one was made}.
+// editorSave writes a note an editor changed: its text, read from in, through ops.Save, which
+// says what is done when another writer changed it since. It prints {"saved", "sha", "text" when
+// not saved, "copy" when one was made}.
 func editorSave(v *vault.Vault, args []string, in io.Reader) int {
 	args, keep := takeBool(args, "--keep")
 	args, base, _, err := takeValue(args, "--base")
@@ -112,68 +77,19 @@ func editorSave(v *vault.Vault, args []string, in io.Reader) int {
 	if len(pos) != 1 {
 		return fail(errors.New("_editor save: name one note"))
 	}
-	rel, err := inRepo(v, pos[0])
+	rel, err := ops.InRepo(v, pos[0])
 	if err != nil {
 		return fail(fmt.Errorf("_editor save: %w", err))
-	}
-	if !strings.HasSuffix(rel, ".md") || strings.HasPrefix(rel, ".") || strings.Contains(rel, "/.") {
-		return fail(fmt.Errorf("_editor save: %s is not a note: notes are .md files outside folders starting with .", rel))
 	}
 	text, err := io.ReadAll(in)
 	if err != nil {
 		return fail(fmt.Errorf("_editor save: %w", err))
 	}
-	unlock, err := v.Lock()
+	saved, err := ops.Save(v, rel, text, base, keep)
 	if err != nil {
 		return fail(err)
 	}
-	defer unlock()
-	path := v.Abs(rel)
-	cur, err := os.ReadFile(path)
-	gone := errors.Is(err, os.ErrNotExist)
-	if err != nil && !gone {
-		return fail(fmt.Errorf("_editor save: %w", err))
-	}
-	reply := map[string]any{"saved": true, "sha": sha256hex(text)}
-	if !gone && base != "" && sha256hex(cur) != base && !bytes.Equal(cur, text) {
-		if !keep {
-			return printJSON(map[string]any{"saved": false, "sha": sha256hex(cur), "text": string(cur)})
-		}
-		cp := v.Unique(gitsync.ConflictName(rel, v.Host, v.Now()))
-		if err := vault.WriteFile(v.Abs(cp), cur); err != nil {
-			return fail(fmt.Errorf("_editor save: %w", err))
-		}
-		reply["copy"] = cp
-	}
-	if gone || !bytes.Equal(cur, text) {
-		if err := vault.WriteFile(path, text); err != nil {
-			return fail(fmt.Errorf("_editor save: %w", err))
-		}
-	}
-	return printJSON(reply)
-}
-
-func sha256hex(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
-}
-
-// dirsOf lists every folder under root as a repository path, sorted, without hidden ones.
-func dirsOf(root string) []string {
-	dirs := []string{}
-	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || !d.IsDir() || p == root {
-			return nil
-		}
-		if strings.HasPrefix(d.Name(), ".") {
-			return filepath.SkipDir
-		}
-		rel, _ := filepath.Rel(root, p)
-		dirs = append(dirs, filepath.ToSlash(rel))
-		return nil
-	})
-	sort.Strings(dirs)
-	return dirs
+	return printJSON(saved)
 }
 
 // installNvim writes nt's nvim plugin, or removes it.

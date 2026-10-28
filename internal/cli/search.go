@@ -32,7 +32,7 @@ func runSearch(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	matches, err := search.Rg(context.Background(), v.Root, strings.Join(words, " "))
+	matches, err := search.Search(context.Background(), v.Root, strings.Join(words, " "))
 	if err != nil {
 		return fail(fmt.Errorf("s: %w", err))
 	}
