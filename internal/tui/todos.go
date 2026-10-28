@@ -148,23 +148,63 @@ func (b *browser) todoKeys(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// toggleTodo checks an open todo or opens a done one again.
+// todoHold is how long a ticked row stays in the todo list after the last tick.
+const todoHold = 700 * time.Millisecond
+
+type todoSettleMsg struct{ seq int }
+
+// toggleTodo checks an open todo or opens a done one again. The row stays in the list with its
+// glyph turned until the ticks settle, todoHold after the last, so the person sees what they did
+// and another x takes it back; then the list is read again (settleTodos).
 func (b *browser) toggleTodo(it todo.Item) tea.Cmd {
+	var n todo.Item
 	var err error
 	if it.Done {
-		_, err = todo.Uncheck(b.v, it)
+		n, err = todo.Uncheck(b.v, it)
 	} else {
-		_, err = todo.Check(b.v, it, b.v.Day(b.v.Now()))
+		n, err = todo.Check(b.v, it, b.v.Day(b.v.Now()))
 	}
-	switch {
-	case err != nil:
+	if err != nil {
 		b.say(err.Error(), true)
-	case it.Done:
+		return b.loadTodos("")
+	}
+	if it.Done {
 		b.say("open again: "+it.Text, false)
-	default:
+	} else {
 		b.say("done: "+it.Text, false)
 	}
-	return b.loadTodos("")
+	if p := b.pick; p != nil && p.todos && p.sel < len(p.items) {
+		p.items[p.sel].todo = &n // the line as it is now, for the glyph and for another x
+		if p.ticked == nil {
+			p.ticked = map[string]bool{}
+		}
+		p.ticked[todoRef(&n)] = true
+	}
+	var cmds []tea.Cmd
+	if b.showing == n.Path && b.p.changed() { // the note beside the list shows the tick too
+		b.p.load()
+		b.p.render()
+		cmds = append(cmds, b.p.sendImages())
+	}
+	b.todoSettleSeq++
+	seq := b.todoSettleSeq
+	return tea.Batch(append(cmds, tea.Tick(todoHold, func(time.Time) tea.Msg { return todoSettleMsg{seq} }))...)
+}
+
+// settleTodos reads the todo list again once the ticks settle: the ticked rows go to the other
+// list. The selection stays on its row, or, on one that went, moves to the one that took its
+// place.
+func (b *browser) settleTodos(msg todoSettleMsg) tea.Cmd {
+	p := b.pick
+	if msg.seq != b.todoSettleSeq || p == nil || !p.todos {
+		return nil
+	}
+	keep := ""
+	if it := b.todoSelected(); it != nil && !p.ticked[todoRef(it)] {
+		keep = todoRef(it)
+	}
+	p.ticked = nil
+	return b.loadTodos(keep)
 }
 
 // todoInput acts on what was typed at the due and todo prompts.

@@ -241,10 +241,23 @@ func TestTodoList(t *testing.T) {
 		t.Errorf("footer: %s", f)
 	}
 
-	press(b, "x") // checks the selected one
-	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") || len(b.pick.items) != 2 {
-		t.Fatalf("x does not check the todo:\n%s", read())
+	press(b, "x") // checks the selected one, which stays a moment with its tick
+	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") || len(b.pick.items) != 3 {
+		t.Fatalf("x does not check the todo, or takes it away at once:\n%s", read())
 	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "✓ Call the plumber") {
+		t.Fatalf("the ticked row does not show its tick:\n%s", screen)
+	}
+	press(b, "x") // another x takes it back
+	press(b, "x")
+	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") {
+		t.Fatalf("x twice more does not check it again:\n%s", read())
+	}
+	run(b, todoSettleMsg{b.todoSettleSeq}) // the ticks settle: it goes, the next is selected
+	if len(b.pick.items) != 2 || b.todoSelected() == nil || b.todoSelected().Text != "Renew passport" {
+		t.Fatalf("after the ticks settle: %v, selected %+v", rows(), b.todoSelected())
+	}
+	run(b, todoSettleMsg{b.todoSettleSeq - 1}) // an older tick's settling does nothing
 
 	press(b, "d") // the selected one, Renew passport, is due friday
 	press(b, "fri")

@@ -149,8 +149,9 @@ type picker struct {
 	ready  bool   // its todos are read
 	folder string // whose todo.md a todo added there goes to; "" is the root's
 
-	folders []string // the move picker's folders, before what is typed filters them
-	day     string   // the todo list from the calendar: only the todos due or done that day
+	folders []string        // the move picker's folders, before what is typed filters them
+	day     string          // the todo list from the calendar: only the todos due or done that day
+	ticked  map[string]bool // the todos ticked since the list was read, by path:line
 }
 
 type browser struct {
@@ -190,8 +191,9 @@ type browser struct {
 	help bool
 	ask  *question // a yes-or-no question on the footer line
 
-	todoSeq int
-	todoAt  *todo.Item // the todo the due prompt is for
+	todoSeq       int
+	todoAt        *todo.Item // the todo the due prompt is for
+	todoSettleSeq int        // the last tick in the todo list, which reads it again (todos.go)
 
 	todoOpen, todoLate int         // the open todos and the late ones, for the home list
 	todoKnown          bool        // they have been counted
@@ -702,6 +704,8 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, b.searched(msg)
 	case todosMsg:
 		return b, b.setTodos(msg)
+	case todoSettleMsg:
+		return b, b.settleTodos(msg)
 	case movedMsg:
 		return b, b.moved(msg)
 	case calTodosMsg:

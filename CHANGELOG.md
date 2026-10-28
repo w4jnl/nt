@@ -20,6 +20,9 @@ A home in the browser, and nt as a viewer for any file.
   A to Z, before them. `nt ls` lists folders the same way.
 - **A day's agent digest comes first** in its folder, then its reports by when the session
   began, the latest first, where they were in the order of their file names.
+- **A tick shows before the todo leaves.** `x` in the todo list turns the row's glyph and keeps
+  it in place until the ticks settle, 0.7 s after the last, so another `x` takes a slip back;
+  then the row goes and the next one is selected.
 - **`~`** goes to the root from any folder, on the top-level folder you were in; at the root,
   to Today.
 - **`nt <file>`** shows a note, or any text file, on the whole screen, from anywhere: `nt
