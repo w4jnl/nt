@@ -19,7 +19,13 @@ struct ContentView: View {
                     SidebarView()
                         .navigationSplitViewColumnWidth(min: 200, ideal: 248, max: 380)
                 } detail: {
-                    NoteView()
+                    switch ws.selection {
+                    case .todos: TodosView()
+                    case .calendar: CalendarView()
+                    case .agents: AgentsView()
+                    case .weekly where ws.weeklyPath == nil: WeeklyEmptyView()
+                    default: NoteView()
+                    }
                 }
             }
         }

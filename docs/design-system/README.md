@@ -203,6 +203,10 @@ t today  [ ] day  a append  n new  / search  ? help
   the selected row is `accent-soft` with the family's accent bar at its left edge.
 - **No modals.** Open, Search and New note are one floating field over the window; Escape closes
   it.
+- **Views.** Todos, Calendar and Agents are pages like a note: a 28 px title, a muted line of
+  counts under it, rows 40 px high with the state's glyph at the left and dates in mono at the
+  right, `warn` for what is late. No cards, no zebra; the selected row is `accent-soft` with the
+  accent bar, as in Open.
 - **Focus mode.** The sidebar goes and every paragraph but the one being written is at 30%
   opacity; nothing else changes, no colour, no size.
 - **Read-only.** A digest says so in the bottom line, in mono `ink-muted` beside the word count,

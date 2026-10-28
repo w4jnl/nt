@@ -414,8 +414,9 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   `nt-asset:`, the repository's files, so a remote image in a note shows its alt text.
 
 **The window.** Two columns, quiet, in the manner of Typora.
-- The sidebar: Open (⌘P), Today, then the folders: the pinned ones in their order, a rule, the
-  rest, then the notes at the root. Notes newest first with their day in mono; journals by
+- The sidebar: Open (⌘P), Today, the views (Todos with its open count, Calendar, Weekly,
+  Agents), then the folders: the pinned ones in their order, a rule, the rest, then the notes at
+  the root. An agent report shows its machine where a note shows its day. Notes newest first with their day in mono; journals by
   year; `assets/` hidden. Which folders are open is kept on the Mac (UserDefaults), never in the
   repository. The sync state is at its foot as glyph and word, and a click syncs now; it stays
   out of the toolbar, which would draw it as a glass button. View › Hide Sidebar (⌃⌘S) or the
@@ -432,6 +433,23 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   from today's journal and opens it with the cursor at its end.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
+
+**The views**, in the note's place; the note on screen is saved first.
+- **Todos** is the terminal browser's todo list: every open todo, overdue first, with its date in
+  words (`3d late` in `warn`, `fri`) and the note it is in, then the done ones under Done. A
+  field adds one to the root's `todo.md` (`due:fri` in the text sets its date). A click on `○`
+  checks it; arrows move, space checks, `d` sets the due date in place, Return or a double click
+  opens the note at the todo. Everything goes through `nt todo … --json`, which gives each
+  todo's `when` and `late`, so the app words dates as the browser does.
+- **Calendar** is the month, Monday first, beside the day chosen in it. A day with a journal is
+  `ink`, today `accent`, `•` under a day with open todos due (`warn` once it has passed). The
+  day: its journal and the lines of its Log, its agent sessions, its todos due or done, or the
+  next one due. Arrows move the day, ‹ › the month; a second click or Return opens the journal.
+- **Weekly** opens the newest weekly digest, read-only; without one it says which setting makes
+  them.
+- **Agents** is the sessions of the last 14 days, newest first, from every machine: the state's
+  glyph, the project and summary, the machine and the state in words. A click opens the report;
+  a day's `digest` opens its digest. Reports are read from their frontmatter, never written.
 
 **The editor.** CodeMirror 6 in a WKWebView, as MarkEdit does it, with nt's live preview
 (`app/macos/editor/src/livepreview.js`). The note is its markdown, byte for byte, and reads as
@@ -465,7 +483,7 @@ rendered text.
    preview, links, Linked from, Open and Search, the sync state. Done.
 2. **Writing.** Editing with autosave under the rules above, a new note (⌘N), tasks checked in
    the text, images pasted and dropped (`nt paste --from <file>`), focus mode (⇧⌘L). Done.
-3. **The views.** Todos, Calendar, Weekly, Agents.
+3. **The views.** Todos, Calendar, Weekly, Agents. Done.
 4. **Menu bar and capture.** The menu bar item (the template mark, its alert variant while sync
    needs you), a global hotkey (⌥⌘Space) that adds one line to today or a todo, and Settings:
    nt's through `nt config`, the app's own in UserDefaults.
@@ -568,12 +586,14 @@ open, in the background and on push; an App Intent "append to today".
     `.git/nt-edit` is held and the hold goes after; a line added on disk is merged with the
     typing; the same line changed on disk becomes a conflict copy; opening another note, Undo
     and Quit save first; a pasted image lands in `assets/`; a digest stays read-only.
+    AgendaTests: todos as nt prints them, reports' frontmatter, a journal's Log, a month Monday
+    first; and the Todos view's check, add and due date through the bundled nt.
   - `make mac-editor`: `node --test` on the live preview without a screen (what is hidden,
     replaced and styled for a state), on writing (the line diff, laying a version from disk
     under unsaved changes, ticking a task), and `editor.css` against `tokens.json`.
   - `go test` on `nt _editor save` (the compared write, the conflict copy) and
     `nt paste --from`.
   - Screenshots of each view in both themes on `assets/demo/scene.sh`'s notes; the app takes
-    `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTPalette open|text|new` and
-    `-NTQuery <text>`.
+    `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTView todos|calendar|weekly|agents`,
+    `-NTPalette open|text|new` and `-NTQuery <text>`.
 - **Manual.** In Ghostty + tmux, go through `nt` → `t a n e / i`, once with a dark terminal background and once with a light one. Then check on github.com that links, images, the README hero and the agents `README.md` digest render.
