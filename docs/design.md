@@ -678,6 +678,17 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     top. On the Mac and the iPad it opens in place.
   - The page has a viewport and, under 600 px, a phone's margins and 17 px text.
   - Notes are read-only until writing (step 3); todos tick and add already, through nt.
+- **Writing (step 3).**
+  - The note saves through the core as on the Mac (compare-and-swap, the edit hold, conflict
+    copies); after a save, or a todo or a line written through nt, the phone syncs half a minute
+    later, and when the person leaves the app (a background task) and comes back to it;
+    `BGAppRefreshTask` syncs in between when iOS allows.
+  - The keyboard bar is the input accessory of WebKit's content view, in place of WebKit's own
+    (Previous, Next, Done). On a touch screen the page corrects and capitalises as the keyboard
+    does, and a link on the line being edited shows an "open" chip.
+  - A photo goes in as a JPEG through `nt paste --from`, which takes no HEIC.
+  - Settings shows the repository's settings (`.nt/config.toml`); the phone's own machine
+    settings are its name and its key, which a new key replaces at once.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;

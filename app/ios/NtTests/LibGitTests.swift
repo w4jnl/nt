@@ -148,6 +148,34 @@ struct LibGitTests {
         #expect(err?.localizedDescription.hasPrefix("offline: ") == true, "\(err?.localizedDescription ?? "")")
     }
 
+    @Test func theAppWritesThroughTheCore() async throws {
+        let place = Place(base: base.appending(path: "phone"))
+        try place.configure(host: "iphone")
+        try LibGit.create(at: place.notes, bare: false)
+        try write(place.notes, "tech/nas.md", "# NAS\n\nbase\n")
+        let nt = NT(core: try Core(place: place, git: LibGit(root: place.notes, author: "iphone", remote: plain)))
+        struct Reply: Decodable {
+            let saved: Bool
+            let sha: String
+        }
+        // a save takes the place of the version it was read from, and one from an older version does not
+        let url = place.notes.appending(path: "tech/nas.md")
+        let sha = sha256(try Data(contentsOf: url))
+        let r = try await nt.json(Reply.self, ["_editor", "save", url.path, "--base", sha], input: Data("# NAS\n\nfrom the phone\n".utf8))
+        #expect(r.saved && read(place.notes, "tech/nas.md") == "# NAS\n\nfrom the phone\n")
+        let stale = try await nt.json(Reply.self, ["_editor", "save", url.path, "--base", sha], input: Data("# NAS\n\nstale\n".utf8))
+        #expect(!stale.saved && read(place.notes, "tech/nas.md") == "# NAS\n\nfrom the phone\n")
+        // the hold is nt's edit lock, as on the Mac
+        let hold = try #require(Hold(nt))
+        hold.release()
+        // a line added to today, and a command that fails, reading as nt's error
+        struct Added: Decodable { let rel: String }
+        let a = try await nt.json(Added.self, ["a", "--json", "--", "Called the ISP"])
+        #expect(read(place.notes, a.rel).contains("Called the ISP"))
+        let out = try await nt.run(["todo", "done", "nothing like this"])
+        #expect(out.status != 0 && !NTError.message(out.stderr).isEmpty)
+    }
+
     /// Over ssh with a key the phone made, when a test sshd is up (scripts/ios-ssh-test.sh):
     /// NT_SSH_URL is a bare repository behind it, and the key goes in NT_SSH_KEYS, its
     /// authorized_keys. The host is trusted the first time and refused when its key changes; a

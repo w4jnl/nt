@@ -14,7 +14,7 @@ struct TreeRows: View {
                     Label(node.name, systemImage: "folder")
                 }
             } else {
-                NoteRow(node: node)
+                NoteRow(node: node, selected: ws.selection == .note(node.id))
                     .tag(Workspace.Selection.note(node.id))
             }
         }
@@ -31,6 +31,7 @@ struct TreeRows: View {
 
 struct NoteRow: View {
     let node: TreeNode
+    var selected = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -41,8 +42,17 @@ struct NoteRow: View {
             if !node.date.isEmpty {
                 Text(node.date)
                     .font(Brand.mono(11))
-                    .foregroundStyle(Brand.muted)
+                    .foregroundStyle(dateStyle)
             }
         }
+    }
+
+    /// dateStyle is muted, but on the iPad's selected row, which is accent, the row's own colour
+    /// dimmed, so it stays readable.
+    private var dateStyle: AnyShapeStyle {
+        #if os(iOS)
+        if selected { return AnyShapeStyle(.secondary) }
+        #endif
+        return AnyShapeStyle(Brand.muted)
     }
 }

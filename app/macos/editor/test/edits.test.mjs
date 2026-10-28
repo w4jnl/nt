@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChangeSet, EditorState, Text } from "@codemirror/state";
-import { clashes, lineDiff, normalize, ownLine, paragraphAt, rebase, toggleTask } from "../src/edits.js";
+import { clashes, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, taskLine, toggleTask } from "../src/edits.js";
 
 // edit is the text after the person's changes, and those changes as a ChangeSet from base.
 function edit(base, ...specs) {
@@ -113,4 +113,20 @@ test("paragraphAt is the run of lines around the cursor", () => {
   assert.deepEqual(paragraphAt(doc, doc.line(4).from), [3, 4]);
   assert.deepEqual(paragraphAt(doc, doc.line(2).from), [2, 2]);
   assert.deepEqual(paragraphAt(doc, doc.length), [6, 6]);
+});
+
+test("taskLine gives a line a box and takes a task's away", () => {
+  assert.equal(taskLine("Call the ISP"), "- [ ] Call the ISP");
+  assert.equal(taskLine("  - Call the ISP"), "  - [ ] Call the ISP");
+  assert.equal(taskLine("1. Call the ISP"), "1. [ ] Call the ISP");
+  assert.equal(taskLine("- [ ] Call the ISP"), "- Call the ISP");
+  assert.equal(taskLine("- [x] Call the ISP done:2026-10-28"), "- Call the ISP done:2026-10-28");
+  assert.equal(taskLine(""), "- [ ] ");
+});
+
+test("headingLine steps through ## and ### back to text", () => {
+  assert.equal(headingLine("Open"), "## Open");
+  assert.equal(headingLine("## Open"), "### Open");
+  assert.equal(headingLine("### Open"), "Open");
+  assert.equal(headingLine("# NAS setup"), "## NAS setup");
 });

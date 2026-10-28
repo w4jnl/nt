@@ -70,6 +70,9 @@ final class Workspace {
     var calendarDay = "" // the day the calendar shows; "" for today
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
+    var editing = false // the note has the keyboard: the iPhone and iPad show the keyboard bar
+    var undoable = false // the note has something to undo, or to redo, for the keyboard bar
+    var redoable = false
     var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedFolders") ?? []) {
         didSet { UserDefaults.standard.set(Array(expanded), forKey: "expandedFolders") }
     }
@@ -87,6 +90,7 @@ final class Workspace {
     var settingsProblem = ""
     #if !os(macOS)
     var preview: URL? // a file a link points at, shown with Quick Look
+    var picking = false // the keyboard bar asked for a photo
     #endif
 
     /// navigate shows a note the person asked for on the iPhone: a screen of its own on the
@@ -104,6 +108,9 @@ final class Workspace {
     @ObservationIgnored private var reportCache: [String: [AgentReport]] = [:]
     @ObservationIgnored private var quitting = false
     @ObservationIgnored private var opening = 0 // counts opens, so the last one asked for wins
+    #if !os(macOS)
+    @ObservationIgnored private var syncSoon: Task<Void, Never>?
+    #endif
 
     #if os(macOS)
     init(nt: NT? = NT.locate()) {
@@ -276,7 +283,7 @@ final class Workspace {
             say("\(path) cannot be read: is it still there?")
             return
         }
-        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text) || !Self.writes, backlinks: backlinks(path))
+        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
         selection = selectionFor(path)
@@ -285,14 +292,6 @@ final class Workspace {
             expanded.insert(dir)
         }
     }
-
-    /// writes says whether the app writes notes: the iOS app reads them until it can write them
-    /// (docs/design.md §9, step 3).
-    #if os(macOS)
-    nonisolated static let writes = true
-    #else
-    nonisolated static let writes = false
-    #endif
 
     /// readOnly says whether a note is a digest, the day's or the week's, which nt writes again
     /// whenever it changes, so an edit would not last.
@@ -387,6 +386,22 @@ final class Workspace {
         await todo(["add", "--", text])
     }
 
+    #if !os(macOS)
+    /// wrote: nt wrote to the clone (a todo ticked or added, a line captured). The app reads the
+    /// notes again, the note on screen too, and half a minute later a sync follows, as after a
+    /// save; the Mac has its watcher and nt's sync timer for this.
+    func wrote() async {
+        if let nt { try? await reindex(nt) }
+        await reloadIfChanged()
+        syncSoon?.cancel()
+        syncSoon = Task {
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
+            await syncNow()
+        }
+    }
+    #endif
+
     @discardableResult
     private func todo(_ args: [String]) async -> Bool {
         guard let nt else { return false }
@@ -396,6 +411,9 @@ final class Workspace {
             let out = try await nt.run(["todo"] + args + ["--json"])
             ok = out.status == 0
             if !ok { say(NTError.message(out.stderr)) }
+            #if !os(macOS)
+            if ok { await wrote() }
+            #endif
         } catch {
             say(error.localizedDescription)
         }
@@ -489,11 +507,18 @@ final class Workspace {
         if focusMode { editor?.focus() }
     }
 
-    /// settle saves the note and syncs what was saved: the person left the app.
+    /// settle saves the note and syncs what was saved: the person left the app. The phone syncs
+    /// whether or not anything was written, to leave the clone as the remote has it.
     func settle() async {
         guard let editor else { return }
         await editor.save()
+        #if os(macOS)
         editor.kick()
+        #else
+        syncSoon?.cancel()
+        while syncing { try? await Task.sleep(for: .milliseconds(200)) }
+        await syncNow()
+        #endif
     }
 
     /// finish saves the note before the app quits, and says whether it may. When nt cannot save

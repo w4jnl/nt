@@ -134,8 +134,8 @@ struct WritingTests {
 
     @Test func aPastedImageGoesBesideTheNoteOnALineOfItsOwn() async throws {
         _ = try await opened("# NAS\n\nFour disks.\n")
-        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).base64EncodedString()
-        await ws.editor?.paste(name: "Rack front.png", mime: "image/png", base64: png, at: 15)
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        await ws.editor?.paste(name: "Rack front.png", mime: "image/png", data: png, at: 15)
         let day = await ws.day()
         let image = "homelab/assets/\(day)-rack-front.png"
         #expect(FileManager.default.fileExists(atPath: root.appending(path: image).path))

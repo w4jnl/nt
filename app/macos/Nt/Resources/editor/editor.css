@@ -113,6 +113,17 @@ html { -webkit-text-size-adjust: 100%; }
   text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
   cursor: pointer;
 }
+#editor .cm-open {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--ground);
+  font: 600 12px/20px var(--sans);
+  vertical-align: 1px;
+  cursor: pointer;
+}
 #editor .cm-link-broken { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
 #editor .cm-url { color: var(--ink-muted); font-size: 0.9em; }
 

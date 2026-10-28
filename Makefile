@@ -77,7 +77,7 @@ IOS_XCODEBUILD = cd $(IOS) && xcodebuild -project Nt.xcodeproj -scheme Nt -confi
 ios-core:
 	@[ -x "$(GOMOBILE)" ] || { echo "gomobile: go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest" >&2; exit 1; }
 	mkdir -p $(IOS)/build
-	PATH="$(dir $(GOMOBILE)):$$PATH" $(GOMOBILE) bind -target=ios,iossimulator -iosversion=26.0 -ldflags '$(LDFLAGS)' -o $(IOS)/build/NtCore.xcframework ./mobile
+	PATH="$(dir $(GOMOBILE)):$$PATH" $(GOMOBILE) bind -target=ios,iossimulator -iosversion=26.0 -ldflags '$(LDFLAGS) -X github.com/w4jnl/nt/mobile.version=$(VERSION)' -o $(IOS)/build/NtCore.xcframework ./mobile
 
 ios-libgit2:
 	scripts/ios-libgit2.sh

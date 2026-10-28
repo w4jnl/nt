@@ -10,6 +10,8 @@ struct HomeList: View {
     let stacked: Bool
     @State private var query = ""
     @State private var lines: [Workspace.SearchHit] = []
+    @State private var capturing = false
+    @State private var settings = false
 
     var body: some View {
         Group {
@@ -24,6 +26,25 @@ struct HomeList: View {
         .scrollContentBackground(.hidden)
         .background(stacked ? Brand.ground : Brand.sunk)
         .navigationTitle("Notes")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { Mark() }
+                .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) {
+                if stacked {
+                    NavigationLink(value: Route.settings) { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
+                } else {
+                    Button { settings = true } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
+                }
+            }
+        }
+        .sheet(isPresented: $settings) {
+            NavigationStack {
+                SettingsScreen()
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
+            }
+        }
         .searchable(text: $query, prompt: "Search notes")
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(250))
@@ -32,11 +53,26 @@ struct HomeList: View {
         }
         .refreshable { await ws.syncNow() }
         .safeAreaInset(edge: .bottom) {
-            SyncBadgeView()
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .padding(.horizontal, 14)
-                .background(Brand.ground)
-                .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
+            HStack {
+                SyncBadgeView()
+                Spacer()
+                Button { capturing = true } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Brand.accent)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Add to today")
+            }
+            .padding(.leading, 14)
+            .padding(.trailing, 6)
+            .background(Brand.ground)
+            .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
+        }
+        .sheet(isPresented: $capturing) { CaptureSheet(workspace: ws) }
+        .onAppear {
+            // for screenshots, as on the Mac: -NTCapture opens the capture sheet
+            if UserDefaults.standard.string(forKey: "NTCapture") != nil { capturing = true }
         }
     }
 
@@ -65,22 +101,26 @@ struct HomeList: View {
         let agents = ws.reports(on: ws.today).count
         Section {
             row(.today, Route.note(ws.todayPath)) {
-                ViewLabel(title: "Today", symbol: "sun.max", detail: Text(Self.short(ws.today)))
+                ViewLabel(title: "Today", symbol: "sun.max", detail: Text(Self.short(ws.today)), selected: on(.today))
             }
             row(.todos, .todos) {
                 ViewLabel(title: "Todos", symbol: "checkmark.circle",
-                          detail: open.isEmpty ? Text("") : late > 0 ? Text("\(open.count) · \(Text("\(late) late").foregroundStyle(Brand.warn))") : Text("\(open.count)"))
+                          detail: open.isEmpty ? Text("") : late > 0 && !on(.todos) ? Text("\(open.count) · \(Text("\(late) late").foregroundStyle(Brand.warn))") : Text(late > 0 ? "\(open.count) · \(late) late" : "\(open.count)"),
+                          selected: on(.todos))
             }
-            row(.calendar, .calendar) { ViewLabel(title: "Calendar", symbol: "calendar", detail: Text("")) }
+            row(.calendar, .calendar) { ViewLabel(title: "Calendar", symbol: "calendar", detail: Text(""), selected: on(.calendar)) }
             row(.weekly, ws.weeklyPath.map { Route.note($0) } ?? .weekly) {
-                ViewLabel(title: "Weekly", symbol: "text.alignleft", detail: Text(Self.week(ws.weeklyPath)))
+                ViewLabel(title: "Weekly", symbol: "text.alignleft", detail: Text(Self.week(ws.weeklyPath)), selected: on(.weekly))
             }
             row(.agents, .agents) {
-                ViewLabel(title: "Agents", symbol: "apple.terminal", detail: Text(agents > 0 ? "\(agents) today" : ""))
+                ViewLabel(title: "Agents", symbol: "apple.terminal", detail: Text(agents > 0 ? "\(agents) today" : ""), selected: on(.agents))
             }
         }
         .listRowBackground(stacked ? Brand.surface : nil)
     }
+
+    /// on says whether the sidebar has sel selected; its row is then in accent.
+    private func on(_ sel: Workspace.Selection) -> Bool { !stacked && ws.selection == sel }
 
     /// row is a view's row: a screen on the iPhone; a selection in the sidebar. Today is today's
     /// journal, which nt makes when it is missing, so it goes through nt first on the iPhone.
@@ -175,22 +215,24 @@ struct HomeList: View {
     }
 }
 
-/// ViewLabel is a view's row: its symbol, its name, and a word about it on the right.
+/// ViewLabel is a view's row: its symbol, its name, and a word about it on the right. Selected
+/// in the sidebar, on accent, it takes the row's own colour.
 struct ViewLabel: View {
     let title: String
     let symbol: String
     let detail: Text
+    var selected = false
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
-                .foregroundStyle(Brand.accent)
+                .foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(Brand.accent))
                 .frame(width: 24)
-            Text(title).foregroundStyle(Brand.ink)
+            Text(title).foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(Brand.ink))
             Spacer(minLength: 8)
             detail
                 .font(Brand.mono(13))
-                .foregroundStyle(Brand.muted)
+                .foregroundStyle(selected ? AnyShapeStyle(.secondary) : AnyShapeStyle(Brand.muted))
         }
     }
 }

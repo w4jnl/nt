@@ -41,6 +41,12 @@ type Git interface {
 	Files() (string, error)
 }
 
+// version is nt's version, stamped by make ios-core.
+var version = "dev"
+
+// Version is the version of nt in the app, for Settings.
+func Version() string { return version }
+
 // Result is what nt printed and how it ended: the command's standard output, its error message
 // (what nt prints after "nt: "), and its exit status. (Not Stdout and Stderr: C keeps those names.)
 type Result struct {

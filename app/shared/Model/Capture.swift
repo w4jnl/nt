@@ -1,6 +1,7 @@
-// Capture is what the capture panel adds (docs/design.md §8, Menu bar and capture): one line to
-// today's journal through nt a, or a todo through nt todo add, from anywhere on the Mac. Return
-// adds it the panel's way, Shift-Return the other.
+// Capture is what the capture panel adds on the Mac (docs/design.md §8, Menu bar and capture),
+// and the capture sheet on iPhone and iPad (§9): one line to today's journal through nt a, or a
+// todo through nt todo add. On the Mac Return adds it the panel's way, Shift-Return the other;
+// the phone has a switch.
 import Foundation
 import Observation
 
@@ -27,16 +28,20 @@ final class Capture {
     private(set) var shown = 0 // counts the times the panel opened, so its field takes the keys again
 
     @ObservationIgnored private unowned let ws: Workspace
+    #if os(macOS)
     @ObservationIgnored weak var panel: CapturePanel?
+    #endif
 
     init(workspace: Workspace) {
         ws = workspace
     }
 
+    #if os(macOS)
     /// open shows the panel, from the menu bar or the shortcut.
     func open(_ mode: Mode) {
         panel?.show(mode)
     }
+    #endif
 
     func began(_ mode: Mode) {
         self.mode = mode
@@ -73,6 +78,9 @@ final class Capture {
             }
             text = ""
             problem = ""
+            #if !os(macOS)
+            await ws.wrote()
+            #endif
             return true
         } catch {
             problem = error.localizedDescription

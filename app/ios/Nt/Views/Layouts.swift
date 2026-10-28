@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Route is a screen on the iPhone's stack.
 enum Route: Hashable {
-    case todos, calendar, weekly, agents
+    case todos, calendar, weekly, agents, settings
     case folder(String)
     case note(String, anchor: String = "", line: Int = 0)
 }
@@ -29,6 +29,7 @@ struct StackLayout: View {
                     case .calendar: CalendarView()
                     case .weekly: WeeklyEmptyView()
                     case .agents: AgentsView()
+                    case .settings: SettingsScreen()
                     case .folder(let id): FolderScreen(id: id)
                     case .note(let path, let anchor, let line): NoteScreen(path: path, anchor: anchor, line: line)
                     }
@@ -38,12 +39,14 @@ struct StackLayout: View {
             let r = router
             ws.navigate = { path, anchor, line in r.path.append(.note(path, anchor: anchor, line: line)) }
             // for screenshots, as Workspace.start does on the iPad: -NTView todos, calendar,
-            // weekly or agents shows a view, -NTFolder <path> a folder, -NTOpen <path> a note
+            // weekly, agents or settings shows a view, -NTFolder <path> a folder, -NTOpen <path>
+            // a note
             let d = UserDefaults.standard
             switch d.string(forKey: "NTView") {
             case "todos": r.path.append(.todos)
             case "calendar": r.path.append(.calendar)
             case "agents": r.path.append(.agents)
+            case "settings": r.path.append(.settings)
             case "weekly": r.path.append(ws.weeklyPath.map { .note($0) } ?? .weekly)
             default: break
             }
@@ -94,6 +97,7 @@ struct NoteScreen: View {
         .background(Brand.ground)
         .navigationTitle(ws.title(path))
         .navigationBarTitleDisplayMode(.inline)
+        .modifier(PhotoPicking())
         .task(id: path) { await ws.open(path, anchor: anchor, line: line) }
     }
 }
@@ -136,6 +140,7 @@ struct NoteDetail: View {
         .navigationTitle(ws.note.map { ws.title($0.path) } ?? "")
         .navigationSubtitle(ws.note.map { SidebarTree.ancestors($0.path).map { ($0 as NSString).lastPathComponent }.joined(separator: " › ") } ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .modifier(PhotoPicking())
     }
 }
 
