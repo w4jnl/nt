@@ -13,6 +13,7 @@ import (
 
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/render"
+	"github.com/w4jnl/nt/internal/vault"
 )
 
 // runEditor is the editor hand-off, a variable so tests can replace it.
@@ -153,7 +154,9 @@ func runList(args []string) int {
 			notes = append(notes, note{Path: rel, Title: titleOfFile(v.Abs(rel))})
 		}
 	}
-	sort.Strings(folders)
+	sort.Slice(folders, func(i, j int) bool {
+		return vault.FolderBefore(path.Base(folders[i]), path.Base(folders[j]))
+	})
 	sort.Slice(notes, func(i, j int) bool { return notes[i].Path > notes[j].Path })
 	if asJSON {
 		if folders == nil {

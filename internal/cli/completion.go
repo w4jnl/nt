@@ -63,7 +63,8 @@ const completionHelp = `usage: nt completion <bash|zsh>
 `
 
 // nt completion bash|zsh: the completion script. It completes commands, flags and their values,
-// and the repository's folders and notes, which it asks nt _complete for.
+// and the repository's folders and notes, which it asks nt _complete for; the first word is also
+// a file here, which nt shows.
 func runCompletion(args []string) int {
 	if len(args) != 1 || args[0] != "bash" && args[0] != "zsh" {
 		fmt.Fprint(os.Stderr, completionHelp)
@@ -130,7 +131,7 @@ _nt() {
     cmd=${COMP_WORDS[1]}
     if [ "$COMP_CWORD" -eq 1 ]; then
 `)
-	fmt.Fprintf(&b, "        COMPREPLY=( $(compgen -W \"%s $(nt _complete folders 2>/dev/null)\" -- \"$cur\") )\n", strings.Join(allNames(), " "))
+	fmt.Fprintf(&b, "        COMPREPLY=( $(compgen -W \"%s $(nt _complete folders 2>/dev/null)\" -- \"$cur\") $(compgen -f -- \"$cur\") )\n", strings.Join(allNames(), " "))
 	b.WriteString("        return 0\n    fi\n    case \"$prev\" in\n")
 	seen := map[string]bool{}
 	for _, c := range commands {
@@ -227,6 +228,7 @@ _nt() {
     if (( CURRENT == 2 )); then
         _describe -t commands 'nt command' cmds
         _nt_folders
+        _files
         return
     fi
     local cmd=${words[2]}

@@ -109,28 +109,56 @@ func hintLabels(n int) []string {
 	return out
 }
 
-// startHints labels each link on screen, one label per target.
-func (b *browser) startHints() tea.Cmd {
-	if b.showing == "" {
-		return nil
-	}
-	top := b.p.vp.YOffset()
+// label labels each link on screen, one label per target, and reports whether there was one.
+func (p *preview) label() bool {
+	top := p.vp.YOffset()
 	seen := map[string]bool{}
 	var spots []linkSpot
-	for _, s := range b.p.links {
-		if s.line >= top && s.line < top+b.p.height && !seen[s.dest] {
+	for _, s := range p.links {
+		if s.line >= top && s.line < top+p.height && !seen[s.dest] {
 			seen[s.dest] = true
 			spots = append(spots, s)
 		}
 	}
 	if len(spots) == 0 {
-		b.say("no links on screen", false)
+		return false
+	}
+	p.hints = map[string]linkSpot{}
+	for i, l := range hintLabels(len(spots)) {
+		p.hints[l] = spots[i]
+	}
+	return true
+}
+
+// typed takes the letters of a label typed so far, key being the last: the link of a whole
+// label, or more when a label goes on with them. Either way the labels go once it is not more.
+func (p *preview) typed(letters, key string) (dest string, more bool) {
+	if key == "esc" || len(key) != 1 || !strings.Contains(hintKeys, key) {
+		p.hints = nil
+		return "", false
+	}
+	if spot, ok := p.hints[letters]; ok {
+		p.hints = nil
+		return spot.dest, false
+	}
+	for l := range p.hints {
+		if strings.HasPrefix(l, letters) {
+			return "", true
+		}
+	}
+	p.hints = nil
+	return "", false
+}
+
+// startHints labels each link on screen, one label per target.
+func (b *browser) startHints() tea.Cmd {
+	if b.showing == "" {
 		return nil
 	}
-	b.p.hints, b.hinted = map[string]linkSpot{}, ""
-	for i, l := range hintLabels(len(spots)) {
-		b.p.hints[l] = spots[i]
+	if !b.p.label() {
+		b.say("no links on screen", false)
 	}
+	b.hinted = ""
 	return nil
 }
 
@@ -138,22 +166,14 @@ func (b *browser) startHints() tea.Cmd {
 // goes on with cancels.
 func (b *browser) hintKey(k tea.KeyPressMsg) tea.Cmd {
 	s := k.String()
-	if s == "esc" || len(s) != 1 || !strings.Contains(hintKeys, s) {
-		b.p.hints = nil
-		return nil
-	}
 	b.hinted += s
-	if spot, ok := b.p.hints[b.hinted]; ok {
-		b.p.hints = nil
-		return b.follow(spot.dest)
+	dest, more := b.p.typed(b.hinted, s)
+	switch {
+	case dest != "":
+		return b.follow(dest)
+	case !more && len(s) == 1 && strings.Contains(hintKeys, s):
+		b.say("no link has the letters "+b.hinted, false)
 	}
-	for l := range b.p.hints {
-		if strings.HasPrefix(l, b.hinted) {
-			return nil
-		}
-	}
-	b.say("no link has the letters "+b.hinted, false)
-	b.p.hints = nil
 	return nil
 }
 
@@ -204,7 +224,7 @@ func (b *browser) follow(dest string) tea.Cmd {
 		}
 		return cmd
 	case imageExt[strings.ToLower(path.Ext(p))]:
-		return b.openImage(b.v.Abs(p))
+		return openImage(b.o.Machine.ImageViewer, b.o.Bin, b.v.Abs(p))
 	}
 	b.say("opened "+p, false)
 	openDetached(osOpener(), b.v.Abs(p))

@@ -96,6 +96,22 @@ func (v *Vault) AgentsRel(day time.Time) string {
 	return fmt.Sprintf("%s/%s/%s", v.Cfg.Folders.Agents, day.Format("2006"), day.Format("2006-01-02"))
 }
 
+// datedName is a name that starts with a date: a year, a month, a day (2026, 2026-10, 2026-10-28).
+var datedName = regexp.MustCompile(`^\d{4}(-\d{2}){0,2}(\D|$)`)
+
+// FolderBefore orders a folder's folders as nt lists them: by name A to Z, then those named by a
+// date, newest first, as the notes are.
+func FolderBefore(a, b string) bool {
+	da, db := datedName.MatchString(a), datedName.MatchString(b)
+	switch {
+	case da && db:
+		return a > b
+	case da != db:
+		return db
+	}
+	return strings.ToLower(a) < strings.ToLower(b)
+}
+
 // WeekStart is the Monday of day's ISO week, at midnight.
 func WeekStart(day time.Time) time.Time {
 	d := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())

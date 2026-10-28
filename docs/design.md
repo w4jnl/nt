@@ -136,24 +136,34 @@ Decisions taken with the user (2026-10-26):
 | `nt completion bash\|zsh` | Print a completion script: commands, flags and their values, and the repository's folders and notes (from the hidden `nt _complete folders\|notes`), as flok's |
 | `nt import obsidian <vault> [--dry-run]` | One-shot import of an Obsidian vault (phase 1) |
 | `nt` / `nt <folder>` | Start the TUI, optionally in that folder |
+| `nt view <file>`, `nt <file>` | One file on the whole screen (The viewer, below) |
+
+**Names.** The first word of `nt …` is a command when it names one; else a file there or in the repository, which the viewer shows; else a folder of the repository, which the browser opens. No command has a `.` or a `/` in its name, so a path is never taken for a command; a file named exactly like one is reached as `./sync` or with `nt view`.
 
 **TUI: one screen, two panes.**
 ```
-┌ folder browser (dated names sort themselves) ┐┌ preview: glamour v2, frontmatter stripped ┐
-│ daily/ agents/ tech/ …  ▸ notes, newest first ││ … rendered note …                          │
-│ (an agent report: its host, faint, then title)││                                            │
-│                                               ││ Linked from: [3 notes]  Images: [2]        │
+┌ home at the root, then a folder browser ──────┐┌ preview: glamour v2, frontmatter stripped ┐
+│ Today  t · Todos 2 · 1 late  x · Calendar  c  ││ … rendered note …                          │
+│ Weekly  w · Agents  A  ─  pins  1–9  ─        ││                                            │
+│ daily/ agents/ tech/ …  ▸ notes, newest first ││                                            │
+│ (an agent report: its host, faint, then title)││ Linked from: [3 notes]  Images: [2]        │
 └───────────────────────────────────────────────┘└────────────────────────────────────────────┘
  ✓ synced · ↑2 · ⚠ 1 conflict        t today  [ ] day  a append  n new  / search  ? help
 ```
 
+**Home.** The root's list starts with the views, a row each with its key at the right: Today (`t`), Todos (`x`, with the open count and the late ones in `warn` with the word), Calendar (`c`), Weekly (`w`), Agents (`A`); then the pinned folders that exist, with their number; then the root's folders and notes. A rule in `line` follows each group and is never selected: `j` `k` and the wheel step over it, a click on it does nothing. Selecting a view shows what it stands for in the note's place, without writing anything: today's journal; the open todos, overdue first, each with its note (a todo list by its path, any other by its title) and its date in words, as many as fit; this month as the calendar draws it, with today's journal, todos and sessions; the newest weekly digest; today's agent digest. Where there is nothing (no journal yet, no digest) it says so, and what enter does. Enter does what the key does; `nt` starts on Today. `h` from a top-level folder comes back to it. Inside a folder the list is the folder's alone, so a long one is not pushed down; the keys work from anywhere. The todo count comes from `todo.Collect`, read in the background with the backlinks.
+
+**Order.** In every folder, the folders first, A to Z, then those named by a date (a year, a month, a day) newest first; then the notes, newest first by name, so dated ones by their date. In the agent reports a day's digest comes first, then its reports by when their session began (`created`), the latest first. `nt ls` lists folders in the same order.
+
 | Key | Action |
 |---|---|
 | `t` | Today |
+| `~` | The root, from any folder, on the top-level folder it was in; at the root, Today |
 | `[` `]` | Previous / next day |
 | `A` | Agents day folder, which opens on its digest |
 | `x` | The todo list (Todos, below) |
 | `c` | The calendar (Todos, below) |
+| `w` | The newest weekly digest |
 | `,` | The settings (Settings, below) |
 | `1`–`9` | Pinned folders, so preselected subfolders are one key away |
 | `a` | One-line append (text input) |
@@ -183,6 +193,8 @@ Decisions taken with the user (2026-10-26):
 - The mouse: dragging over the note selects its text, on `accent-soft`, within the note pane (the terminal's or tmux's own selection runs across both panes); `y` copies it without the margin, Escape clears it. Dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag still gives the terminal's own selection.
 - Deleting is plain: the files go, sync commits it, git keeps them. Other notes' links to a deleted note stay (the question says how many there are).
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
+
+**The viewer** (`nt view <file>`, `nt <file>`). One file on the whole screen: the brand line with its title and path, the file, a footer with the keys and the scroll position. It needs no repository; links are shown from the repository when the file is in it, else from the working folder. A markdown file is rendered as in the browser's preview; any other text file is shown as written, line by line, wrapped only at the edge, with escape sequences and control characters left out; a file with a NUL byte in its first 8 KB is refused, as git and grep tell binary files. It takes the browser's reading keys: `f` and a label or a click follow a link (a note or a `.txt` file opens in the viewer, an image in `image_viewer` as `i` does, anything else, a folder or a URL with the OS), `b` goes back (at most 50), `o` and `i` list the outline and the images in the file's place, the mouse selects text and `y` copies it (else the path), `e` edits, `r` reloads, `q` or esc quits. It polls the file once a second and shows it again when it changes and nothing is selected.
 
 - `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.
 
@@ -540,6 +552,7 @@ rendered text.
 **5. Next:**
 - A weekly digest: `weekly/GGGG/GGGG-Www.md` (ISO week-year), compiled by the one machine with `weekly = true` from the week's journals, the notes made or changed that week, its todos and its agent sessions, and kept up to date through the week.
 - Weekly summaries, one per machine (`[summary] tool`): Claude Code at home, Copilot CLI at the office, each about what was written on its own machine; the digest shows them all. They take the place of a daily `nt digest --summarize`.
+- Home and the viewer (0.5.0, 2026-10-28): the browser's root starts with the views and pins, as the Mac app's sidebar does (Home, §4); `nt <file>` and the viewer's reading keys make nt a viewer for any markdown or text file (The viewer, §4).
 - Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
 
 **6. Mac app** (§8). Steps 0 (design) and 1 (the reader) are done; writing, the views, the menu

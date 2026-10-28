@@ -123,7 +123,9 @@ t today  [ ] day  a append  n new  / search  ? help
 
 - The brand line: the wordmark `[nt]` at the top left (brackets in `mark`, name in `ink` bold),
   then the folder you are in, then the sync state at the right edge as glyph and word.
-- The list pane: a folder browser. Dated names sort themselves, newest first. It is
+- The list pane: at the root, the home list first (the views, then the pinned folders, each with
+  its key at the right in `accent`, a rule in `line` after each group), then a folder browser.
+  Dated names sort themselves, newest first, folders too. It is
   `list-width` columns wide, at least `list-min`. Dragging the `│` divider with the mouse, or
   `<` `>` (`list-step` columns a press), changes the width; nt remembers it per machine. The
   divider turns `accent` while it is held.

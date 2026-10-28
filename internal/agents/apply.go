@@ -46,7 +46,8 @@ func recallSession(stateDir, agent, session string) string {
 
 // Apply records ev in its session's report at now and returns the report's repository path.
 // The first event of a session makes the report; a start after the session ended, or on a later
-// day, makes a new one that continues it. ended is final and updated never moves back.
+// day, makes a new one that continues it, and ends the earlier one if it never ended. ended is
+// final and updated never moves back.
 func Apply(v *vault.Vault, stateDir string, ev Event, now time.Time) (string, error) {
 	unlock, err := v.Lock()
 	if err != nil {
@@ -110,7 +111,40 @@ func Apply(v *vault.Vault, stateDir string, ev Event, now time.Time) (string, er
 	if err := vault.WriteFile(v.Abs(rel), r.Bytes()); err != nil {
 		return "", err
 	}
+	if continues != "" {
+		if err := closeEarlier(v, continues, rel); err != nil {
+			return "", err
+		}
+	}
 	return rel, rememberSession(stateDir, ev.Agent, ev.Session, rel)
+}
+
+// closeEarlier ends the report a session went on from, at its last update, when it never ended:
+// a resume or a compaction on a later day sends a start without an end before it, and the report
+// would read in progress for good. Its last log line links to the report the session went on in.
+func closeEarlier(v *vault.Vault, rel, next string) error {
+	b, err := os.ReadFile(v.Abs(rel))
+	if err != nil {
+		return nil // gone meanwhile: nothing to end
+	}
+	r := ParseReport(b)
+	if r.Get("ended") != "" {
+		return nil
+	}
+	at := r.Get("updated")
+	if at == "" {
+		at = r.Get("created")
+	}
+	r.Set("ended", at)
+	if r.Get("status") == "in-progress" {
+		r.Set("status", endStatus(r, ""))
+	}
+	clock := ""
+	if t, err := time.Parse(time.RFC3339, at); err == nil {
+		clock = t.Format("15:04") + " "
+	}
+	r.Log("- " + clock + "continued in [" + path.Base(path.Dir(next)) + "](" + vault.RelLink(rel, next) + ")")
+	return vault.WriteFile(v.Abs(rel), r.Bytes())
 }
 
 // newSession is a new report for ev's session, at a path in the agents folder of now's day.

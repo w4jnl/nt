@@ -60,7 +60,7 @@ session() { if S has-session -t e2e 2>/dev/null; then echo running; else echo go
 expect_soon "the alt text gives way to the image" '^alt=0$' alt_lines
 expect_soon "the remote image stays a link" 'Remote' capture
 # a placeholder measured wider or narrower than one cell would shift the right-aligned scroll %
-expect_soon "the footer stays on the last line, right-aligned" '^ e edit .* q quit {20,}[ 0-9]{3}%$' footer
+expect_soon "the footer stays on the last line, right-aligned" '^ f follow .* q quit {20,}[ 0-9]{3}%$' footer
 S send-keys -t e2e G
 expect_soon "the text below the image follows it" 'Below the picture' capture
 S send-keys -t e2e q

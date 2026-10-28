@@ -29,7 +29,7 @@ type movedMsg struct {
 func (b *browser) target() (rel string, dir, ok bool) {
 	if b.focus == onList {
 		e, ok := b.selected()
-		return e.rel, e.dir, ok
+		return e.rel, e.dir, ok && e.view == "" && !e.pin
 	}
 	return b.showing, false, b.showing != ""
 }
