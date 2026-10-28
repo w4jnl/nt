@@ -199,7 +199,7 @@ func feed(b *browser, cmd tea.Cmd) {
 		for _, c := range m {
 			feed(b, c)
 		}
-	case todosMsg, movedMsg, calTodosMsg, calPreviewMsg:
+	case todosMsg, movedMsg, calTodosMsg, calPreviewMsg, previewMsg:
 		b.Update(m)
 	}
 }
@@ -595,6 +595,9 @@ func TestAgentReportsShowTheirHost(t *testing.T) {
 	for _, e := range listFolder(b.v, day) {
 		hosts[e.name] = e.host
 	}
+	if e := listFolder(b.v, day); e[0].name != "README.md" {
+		t.Errorf("the day's digest is not first: %s", e[0].name)
+	}
 	if hosts["work--copilot-cli--vuln-remediation--43fbe292.md"] != "work" || hosts["jaromac--claude-code--flok--f0ceca08.md"] != "jaromac" || hosts["README.md"] != "" {
 		t.Fatalf("hosts %v", hosts)
 	}
@@ -612,5 +615,158 @@ func TestAgentReportsShowTheirHost(t *testing.T) {
 	// outside the agents folder a name like that is just a note
 	if e := listFolder(b.v, "tech"); len(e) > 0 && e[0].host != "" {
 		t.Errorf("a note outside the agents folder got a host: %+v", e[0])
+	}
+}
+
+func TestHomeList(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.v.Now = func() time.Time { return time.Date(2026, 10, 28, 10, 0, 0, 0, time.Local) }
+	b.v.Cfg.Pins = []string{"tech", "gone"}
+	for f, body := range map[string]string{
+		"daily/2026/2026-10-28.md":  "# Wednesday 28 October 2026\n\n## Log\n\n- 08:58 Stand-up\n",
+		"weekly/2026/2026-W43.md":   "# Week 43\n",
+		"weekly/2026/2026-W44.md":   "# Week 44\n",
+		"weekly/2026/2026-W44-a.md": "# Week 44 on a\n",
+		"todo.md":                   "# Todo\n\n## Inbox\n\n- [ ] Call the plumber due:2026-10-25\n- [ ] Renew passport\n- [x] Done already\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b.openFolder("")
+	b.Update(b.reindex()())
+	var ids []string
+	for _, e := range b.entries {
+		ids = append(ids, firstNonEmpty(e.id(), "─"))
+	}
+	if got := strings.Join(ids, " "); got != "view:today view:todos view:calendar view:weekly view:agents ─ pin:tech ─ daily tech weekly todo.md" {
+		t.Fatalf("the root's list: %s", got)
+	}
+	// it starts on Today, showing today's journal without making one
+	if b.sel != 0 || b.showing != "daily/2026/2026-10-28.md" {
+		t.Fatalf("the root starts on %d showing %q", b.sel, b.showing)
+	}
+	screen := ansi.Strip(b.listPane(44, 20))
+	for _, want := range []string{"Today", "t \n", "Todos", "2 · 1 late  x", "Weekly", "w \n", "tech/", "1 \n", "  ────"} {
+		if !strings.Contains(screen+"\n", want) {
+			t.Errorf("the list lacks %q:\n%s", want, screen)
+		}
+	}
+	// a view shows what it stands for: the open todos with their notes and dates, the month
+	press(b, "j")
+	pane := ansi.Strip(b.previewPane(80, 20))
+	for _, want := range []string{"2 open todos · 1 late", "○ Call the plumber  todo.md", "3d late", "○ Renew passport", "enter opens the list"} {
+		if !strings.Contains(pane, want) {
+			t.Errorf("Todos shows no %q:\n%s", want, pane)
+		}
+	}
+	if strings.Contains(pane, "Done already") {
+		t.Errorf("Todos shows a done todo:\n%s", pane)
+	}
+	press(b, "j")
+	pane = ansi.Strip(b.previewPane(80, 20))
+	for _, want := range []string{"October 2026", "mo  tu  we", "25•", "Wednesday 28 October · today", "journal", "enter opens the calendar"} {
+		if !strings.Contains(pane, want) {
+			t.Errorf("Calendar shows no %q:\n%s", want, pane)
+		}
+	}
+	if b.cal != nil || b.showing != "" {
+		t.Fatalf("selecting Calendar opened it, or shows %q", b.showing)
+	}
+	// j and k step over the rules; a view shows its note, or says what enter does
+	press(b, "j")
+	if b.showing != "weekly/2026/2026-W44.md" {
+		t.Fatalf("Weekly shows %q", b.showing)
+	}
+	press(b, "jj")
+	if e, _ := b.selected(); e.id() != "pin:tech" {
+		t.Fatalf("j from Agents lands on %q", e.id())
+	}
+	press(b, "k")
+	if e, _ := b.selected(); e.id() != "view:agents" || b.showing != "" || !strings.Contains(ansi.Strip(b.previewPane(80, 10)), "no agent sessions today") {
+		t.Fatalf("k from the pin lands on %q showing %q", e.id(), b.showing)
+	}
+	// a click on a rule does nothing
+	b.Update(tea.MouseClickMsg{X: 5, Y: 2 + 5, Button: tea.MouseLeft})
+	if e, _ := b.selected(); e.id() != "view:agents" {
+		t.Fatalf("a click on the rule selected %q", e.id())
+	}
+	// enter on a view does what its key does; h comes back to the root
+	press(b, "k")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.dir != "weekly/2026" || b.showing != "weekly/2026/2026-W44.md" {
+		t.Fatalf("enter on Weekly: in %q showing %q", b.dir, b.showing)
+	}
+	press(b, "hh")
+	if e, _ := b.selected(); b.dir != "" || e.id() != "weekly" {
+		t.Fatalf("back at the root on %q in %q", e.id(), b.dir)
+	}
+	press(b, "w")
+	if b.dir != "weekly/2026" {
+		t.Fatalf("w goes to %q", b.dir)
+	}
+	// ~ goes to the root from anywhere, on the top-level folder the browser was in; again, Today
+	b.openFolder("weekly/2026")
+	b.focus = onPreview
+	press(b, "~")
+	if e, _ := b.selected(); b.dir != "" || e.id() != "weekly" || b.focus != onList {
+		t.Fatalf("~ from weekly/2026: in %q on %q", b.dir, e.id())
+	}
+	press(b, "~")
+	if e, _ := b.selected(); e.id() != "view:today" || b.showing != "daily/2026/2026-10-28.md" {
+		t.Fatalf("~ at the root: on %q showing %q", e.id(), b.showing)
+	}
+	// the views and pins are no notes: D, m and R leave them alone
+	b.openFolder("")
+	press(b, "D")
+	if b.ask != nil {
+		t.Fatalf("D on Today asks %q", b.ask.text)
+	}
+	if _, _, ok := b.target(); ok {
+		t.Fatal("m and R act on a view's row")
+	}
+	// a folder below the root has no home list
+	b.openFolder("tech")
+	if e, _ := b.selected(); e.view != "" || e.rule {
+		t.Fatalf("tech starts on %+v", e)
+	}
+}
+
+func TestDatesNewestFirst(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	for f, body := range map[string]string{
+		"agents/2025/2025-12-31/mbp--claude-code--old--00000001.md":        "---\ncreated: 2025-12-31T10:00:00+01:00\n---\n# old\n",
+		"agents/2026/2026-10-27/mbp--claude-code--infra--00000002.md":      "---\ncreated: 2026-10-27T09:00:00+01:00\n---\n# infra\n",
+		"agents/2026/2026-10-28/work--copilot-cli--vuln--00000003.md":      "---\ncreated: 2026-10-28T10:39:00+01:00\n---\n# vuln\n",
+		"agents/2026/2026-10-28/mbp--claude-code--flok--00000004.md":       "---\ncreated: 2026-10-28T08:15:00+01:00\n---\n# flok\n",
+		"agents/2026/2026-10-28/mbp--claude-code--notetaking--00000005.md": "---\ncreated: 2026-10-28T11:56:00+01:00\n---\n# noteTaking\n",
+		"agents/2026/2026-10-28/README.md":                                 "# Agents\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names := func(dir string) string {
+		var out []string
+		for _, e := range listFolder(b.v, dir) {
+			out = append(out, e.name)
+		}
+		return strings.Join(out, " ")
+	}
+	for dir, want := range map[string]string{
+		"agents":      "2026 2025",
+		"agents/2026": "2026-10-28 2026-10-27",
+		// the digest first, then the sessions by when they began, the latest first
+		"agents/2026/2026-10-28": "README.md mbp--claude-code--notetaking--00000005.md work--copilot-cli--vuln--00000003.md mbp--claude-code--flok--00000004.md",
+	} {
+		if got := names(dir); got != want {
+			t.Errorf("%s lists %s, want %s", dir, got, want)
+		}
 	}
 }

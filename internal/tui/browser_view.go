@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/internal/todo"
 )
 
 // narrow reports a screen too small for both panes.
@@ -164,6 +166,16 @@ func (b *browser) previewPane(w, h int) string {
 		if b.cal != nil {
 			return "\n  " + b.st.Muted.Render("no journal on "+b.cal.day.Format("Monday 2 January 2006")) + "\n  " + b.st.Faint.Render("e starts one")
 		}
+		if e, ok := b.selected(); ok && e.view == "todos" {
+			return b.todoPreview(w, h)
+		}
+		if e, ok := b.selected(); ok && e.view == "calendar" && b.homeCal != nil {
+			return b.monthPane(b.homeCal, w, h, true)
+		}
+		if e, ok := b.selected(); ok && e.view != "" {
+			what, how := b.viewHint(e.view)
+			return "\n  " + b.st.Muted.Render(what) + "\n  " + b.st.Faint.Render(how)
+		}
 		if e, ok := b.selected(); ok && e.dir {
 			return "\n  " + b.st.Muted.Render(e.rel+"/") + "\n  " + b.st.Faint.Render("enter opens the folder")
 		}
@@ -173,6 +185,68 @@ func (b *browser) previewPane(w, h int) string {
 		return ""
 	}
 	return b.p.View()
+}
+
+// todoPreview is the open todos in the note's place while the home list's Todos is selected:
+// overdue first, each with the note it is in and when it is due, as many as fit.
+func (b *browser) todoPreview(w, h int) string {
+	what, how := b.viewHint("todos")
+	rows := []string{"", "  " + b.st.Muted.Render(what), ""}
+	var open []todo.Item
+	for _, it := range b.todoItems {
+		if !it.Done {
+			open = append(open, it)
+		}
+	}
+	room := max(1, h-len(rows)-2) // the hint under them, after a blank line
+	for i, it := range open {
+		if i == room-1 && len(open) > room {
+			rows = append(rows, "  "+b.st.Faint.Render("and "+strconv.Itoa(len(open)-i)+" more"))
+			break
+		}
+		rows = append(rows, " "+b.todoRow(it, false, w-2, b.todoFrom(it)))
+	}
+	if len(open) > 0 {
+		rows = append(rows, "", "  "+b.st.Faint.Render("enter opens the list: x checks one, d sets its due date, a adds one"))
+	} else if b.todoKnown {
+		rows = append(rows, "  "+b.st.Faint.Render(how))
+	}
+	return strings.Join(rows, "\n")
+}
+
+// todoFrom names the note a todo is in: a todo list by its path, any other note by its title.
+func (b *browser) todoFrom(it todo.Item) string {
+	if path.Base(it.Path) == todo.File || b.ix == nil {
+		return it.Path
+	}
+	return firstNonEmpty(b.ix.Title(it.Path), it.Path)
+}
+
+// viewHint is what the preview says for a view's row with no note to show: what is there, and
+// what enter does.
+func (b *browser) viewHint(view string) (what, how string) {
+	switch view {
+	case "today":
+		return "no journal today yet", "enter starts it"
+	case "todos":
+		switch {
+		case !b.todoKnown:
+			return "reading the todos", ""
+		case b.todoOpen == 0:
+			return "no open todos", "enter opens the list, a adds one there"
+		case b.todoLate > 0:
+			return plural(b.todoOpen, "open todo") + " · " + strconv.Itoa(b.todoLate) + " late", "enter opens the list"
+		}
+		return plural(b.todoOpen, "open todo"), "enter opens the list"
+	case "weekly":
+		return "no weekly digest yet", "nt config set weekly true on one machine writes them"
+	case "agents":
+		if isDir(b.v.Abs(b.v.AgentsRel(b.v.Day(b.v.Now())))) {
+			return "today's agent sessions", "enter opens them"
+		}
+		return "no agent sessions today", "nt install --hooks reports Claude Code's and Copilot CLI's"
+	}
+	return "", ""
 }
 
 // listPane is the folder's rows, or the open picker in their place.
@@ -193,15 +267,20 @@ func (b *browser) listPane(w, h int) string {
 	return strings.Join(rows, "\n")
 }
 
-// row draws one entry: a folder as name/, a journal as its date and day, a dated note as its
-// date and title, any other note as its title. The selected row has the accent bar on a surface
+// row draws one entry: a view by its name, a folder as name/, a journal as its date and day, a
+// dated note as its date and title, any other note as its title; the home list's rows have their
+// key at the right, the todos their count. The selected row has the accent bar on a surface
 // background; when the preview has the focus the bar is faint.
 func (b *browser) row(e entry, selected bool, w int) string {
-	text, muted, faint, bar := b.st.Text, b.st.Muted, b.st.Faint, b.st.Bar
+	if e.rule {
+		return "  " + b.st.Rule.Render(strings.Repeat("─", max(0, w-4)))
+	}
+	text, muted, faint, bar, key := b.st.Text, b.st.Muted, b.st.Faint, b.st.Bar, b.st.Key
+	warn := lipgloss.NewStyle().Foreground(b.pal.Warn)
 	lead := " "
 	if selected {
 		bg := b.pal.Surface
-		text, muted, faint = text.Background(bg), muted.Background(bg), faint.Background(bg)
+		text, muted, faint, key, warn = text.Background(bg), muted.Background(bg), faint.Background(bg), key.Background(bg), warn.Background(bg)
 		if b.focus == onPreview {
 			bar = b.st.Faint.Background(bg)
 		}
@@ -209,6 +288,8 @@ func (b *browser) row(e entry, selected bool, w int) string {
 	}
 	var body string
 	switch {
+	case e.view != "":
+		body = text.Render(" " + e.name)
 	case e.dir:
 		body = text.Render(" "+e.name) + muted.Render("/")
 	case e.journal:
@@ -221,6 +302,19 @@ func (b *browser) row(e entry, selected bool, w int) string {
 		body = text.Render(" " + firstNonEmpty(e.title, e.name))
 	}
 	line := lead + body
+	if e.key != "" {
+		right := key.Render(e.key) + text.Render(" ")
+		if e.view == "todos" && b.todoKnown && b.todoOpen > 0 {
+			count := muted.Render(strconv.Itoa(b.todoOpen))
+			if b.todoLate > 0 {
+				count += muted.Render(" · ") + warn.Render(strconv.Itoa(b.todoLate)+" late")
+			}
+			right = count + text.Render("  ") + right
+		}
+		if gap := w - ansi.StringWidth(line) - ansi.StringWidth(right); gap > 0 {
+			line += text.Render(strings.Repeat(" ", gap)) + right
+		}
+	}
 	if n := ansi.StringWidth(line); n > w {
 		line = ansi.Truncate(line, w, "…")
 	} else if selected {
@@ -257,26 +351,10 @@ func (b *browser) pickerPane(w, h int) string {
 	for i := p.top; i < len(p.items) && len(rows) < h; i++ {
 		it := p.items[i]
 		if it.todo != nil {
-			rows = append(rows, b.todoRow(*it.todo, i == p.sel, w))
+			rows = append(rows, b.todoRow(*it.todo, i == p.sel, w, ""))
 			continue
 		}
-		text, muted := b.st.Text, b.st.Faint
-		lead := " "
-		if i == p.sel {
-			bg := b.pal.Surface
-			text, muted = text.Background(bg), muted.Background(bg)
-			lead = b.st.Bar.Render("▎")
-		}
-		line := lead + text.Render(" "+it.label)
-		if it.hint != "" && it.hint != strings.TrimPrefix(it.label, "→ ") {
-			line += muted.Render("  " + it.hint)
-		}
-		if n := ansi.StringWidth(line); n > w {
-			line = ansi.Truncate(line, w, "…")
-		} else if i == p.sel {
-			line += text.Render(strings.Repeat(" ", w-n))
-		}
-		rows = append(rows, line)
+		rows = append(rows, pickRow(b.st, b.pal, it, i == p.sel, w))
 	}
 	switch {
 	case len(p.items) == 0 && b.input != nil && b.input.Value() != "" && b.inputKind == "search":
@@ -289,11 +367,31 @@ func (b *browser) pickerPane(w, h int) string {
 	return strings.Join(rows, "\n")
 }
 
+// pickRow draws a picker's row: its label, and its hint faint after it.
+func pickRow(st theme.Styles, pal theme.Palette, it pickItem, selected bool, w int) string {
+	text, muted := st.Text, st.Faint
+	lead := " "
+	if selected {
+		text, muted = text.Background(pal.Surface), muted.Background(pal.Surface)
+		lead = st.Bar.Render("▎")
+	}
+	line := lead + text.Render(" "+it.label)
+	if it.hint != "" && it.hint != strings.TrimPrefix(it.label, "→ ") {
+		line += muted.Render("  " + it.hint)
+	}
+	if n := ansi.StringWidth(line); n > w {
+		line = ansi.Truncate(line, w, "…")
+	} else if selected {
+		line += text.Render(strings.Repeat(" ", w-n))
+	}
+	return line
+}
+
 // helpText is every key, in the preview pane: two columns when the pane is wide enough.
 func (b *browser) helpText(w, h int) string {
 	groups := [][]string{
-		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
-		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "1–9", "pinned folders", "A", "today's agent reports", ",", "the settings"},
+		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "~", "the root, from anywhere", "tab", "to the note and back", "g G", "top, bottom"},
+		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "w", "the newest weekly digest", "1–9", "pinned folders", "A", "today's agent reports", ",", "the settings"},
 		{"find", "/ ctrl-p", "search every note, find a title"},
 		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
 		{"in a note", "f", "follow a link: type its letters, or click it", "b", "back to the note before", "l o i", "its links, outline, images", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},

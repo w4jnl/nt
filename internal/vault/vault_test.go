@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -419,5 +420,13 @@ func TestSortPastLogs(t *testing.T) {
 	}
 	if read(t, v, "daily/2026/2026-10-26.md") != "# D\n\n## Log\n\n- 10:01 a\n- 10:05 c\n" || read(t, v, "daily/2026/2026-10-27.md") != jumbled {
 		t.Error("yesterday's journal is not in time order, or today's was touched")
+	}
+}
+
+func TestFolderBefore(t *testing.T) {
+	names := []string{"work", "2025", "2026-10-27", "Archive", "2026", "2026-10-28", "homelab", "2026-W44x"}
+	sort.Slice(names, func(i, j int) bool { return FolderBefore(names[i], names[j]) })
+	if got := strings.Join(names, " "); got != "Archive homelab work 2026-W44x 2026-10-28 2026-10-27 2026 2025" {
+		t.Fatalf("folders in the order %s", got)
 	}
 }

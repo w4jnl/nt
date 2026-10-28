@@ -3,6 +3,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -29,14 +30,17 @@ const usageText = `nt — plain markdown notes, synced by git
 usage: nt <command>; commands that print data take --json
 
 notes
-  (none) [folder]      the browser: folders and notes on the left, the note on the right; ? lists its keys
+  (none) [folder]      the browser: today, the todos, the calendar, the weekly digest and the agents,
+                       then the folders, on the left; the note on the right; ? lists its keys
+  <file>               show a note, or any text file, on the whole screen, as view does
   t                    open today's journal in $EDITOR
   a <text>             add a timestamped line to today's journal (or pipe the text in)
   n <title> [folder]   a new dated note in folder, linked from today's journal
   f                    find a note with fzf and open it
   s <query>            search the notes with rg
   ls [folder]          the folders and notes in a folder, newest first
-  view <file>          show one note rendered [--theme auto|dark|light] [--images auto|on|off]
+  view <file>          show one note rendered, any other text as written; f follows a link, b goes
+                       back [--theme auto|dark|light] [--images auto|on|off]
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
 
@@ -150,12 +154,21 @@ func Main(args []string) int {
 		usage()
 		return 0
 	}
-	if len(args) == 1 && !strings.HasPrefix(args[0], "-") {
-		if v, _, err := openVault(); err == nil && isDir(v.Abs(strings.Trim(args[0], "/"))) {
+	// Not a command: a file is shown, a folder of the notes browsed. No command has a . or a / in
+	// its name, so nt notes.md and nt ./sync always mean the file.
+	if !strings.HasPrefix(args[0], "-") {
+		p, perr := notePath(args[0])
+		if perr == nil && isFile(p) {
+			return runView(args) // nt <file> [--theme …] [--images …]
+		}
+		if v, _, err := openVault(); err == nil && len(args) == 1 && isDir(v.Abs(strings.Trim(args[0], "/"))) {
 			return runBrowser(args[0]) // nt <folder>
 		}
+		if perr != nil && strings.ContainsAny(args[0], "./") {
+			return fail(perr) // a path, so no command: say where nt looked
+		}
 	}
-	fmt.Fprintf(os.Stderr, "nt: unknown command %q\n\n", args[0])
+	fmt.Fprintf(os.Stderr, "nt: %q is not a command, a file or a folder of the notes\n\n", args[0])
 	usage()
 	return 2
 }
@@ -199,13 +212,38 @@ func runView(args []string) int {
 	if err != nil {
 		return fail(fmt.Errorf("view: %w", err))
 	}
+	if !textFile(path) {
+		return fail(fmt.Errorf("view: %s is not a text file; open it with the OS (open, xdg-open)", o.Path))
+	}
+	if !isTerminal(os.Stdout) {
+		return fail(errors.New("view: it needs a terminal; cat prints the file"))
+	}
 	o.Path, o.Root = path, ""
-	if v, _, err := openVault(); err == nil && strings.HasPrefix(path, v.Root+string(filepath.Separator)) {
+	o.Bin, _ = os.Executable()
+	v, m, verr := openVault()
+	if verr == nil {
+		o.ImageViewer = m.ImageViewer
+	}
+	if verr == nil && strings.HasPrefix(path, v.Root+string(filepath.Separator)) {
 		o.Root = v.Root
 	} else if wd, err := os.Getwd(); err == nil {
 		o.Root = wd
 	}
 	return report(tui.RunView(o))
+}
+
+// textFile reports a file the viewer can show: a regular file with no NUL byte in its first 8 KB,
+// the test git and grep use for binary files.
+func textFile(p string) bool {
+	f, err := os.Open(p)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 8192)
+	n, _ := f.Read(head)
+	st, err := f.Stat()
+	return err == nil && st.Mode().IsRegular() && !bytes.Contains(head[:n], []byte{0})
 }
 
 // nt, nt <folder>: the browser.

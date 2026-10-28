@@ -217,6 +217,15 @@ func newerSummary(v *vault.Vault, monday time.Time) bool {
 	return false
 }
 
+// Latest is the repository path of the newest weekly digest.
+func Latest(v *vault.Vault) (string, bool) {
+	monday, ok := latestWeek(v)
+	if !ok {
+		return "", false
+	}
+	return v.WeekRel(monday), true
+}
+
 // latestWeek is the Monday of the newest weekly digest in the repository.
 func latestWeek(v *vault.Vault) (time.Time, bool) {
 	var best time.Time

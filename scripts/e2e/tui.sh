@@ -101,14 +101,17 @@ expect_soon "q quits" '^gone$' session
 # the SGR reports a terminal sends (1-based columns; 32 is motion with the button held).
 divider() { capture | sed -n 3p | python3 -c 'import sys; print(sys.stdin.read().index("│"))'; }
 mouse() { key -l $'\e[<'"$1"'M'; }
+# the screen line of a folder's row in the list, below the home list's pinned row of it
+line_of() { capture | grep -n "^  $1/ *│" | tail -1 | cut -d: -f1; }
 start
 expect_soon "the list starts at list-width columns" '^44$' divider
 mouse '0;45;5' && mouse '32;55;5' && mouse '32;61;5' && key -l $'\e[<0;61;5m'
 expect_soon "dragging the divider resizes the list" '^60$' divider
 key '<'
 expect_soon "< makes the list narrower" '^56$' divider
-mouse '0;10;5'
-expect_soon "a click selects a row" '▎ work/' capture
+expect_soon "the root starts at home, on Today" '▎ Today +t │' capture
+mouse "0;10;$(line_of work)"
+expect_soon "a click selects a row" '▎ work/ +│' capture
 key q
 expect_soon "q quits" '^gone$' session
 start
@@ -145,7 +148,7 @@ expect_soon "q quits" '^gone$' session
 # the settings: , shows them in the note's pane, the selected one's meaning on the footer line
 start
 key ,
-expect_soon ", shows the settings beside the folders" 'tech/ +│  this machine' capture
+expect_soon ", shows the settings beside the list" 'Todos.*x │  this machine' capture
 expect_soon "with the selected one's meaning" 'enter change.*the notes repository this machine works on' footer
 key Escape
 expect_soon "esc closes them" 't today' footer
