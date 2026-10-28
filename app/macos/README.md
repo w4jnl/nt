@@ -2,7 +2,8 @@
 
 The notes repository in a Mac window: the folders beside the note, the note in live preview.
 A second client of the same repository; docs/design.md §8 is the spec, and phase 6 lists the
-steps. Steps 1 to 4 are here: it shows notes in live preview, follows links, saves what is
+steps, all done and released with 0.5.1 (`brew install --cask w4jnl/tap/nt-app`, or the
+notarized DMG on the release). It shows notes in live preview, follows links, saves what is
 written in them through nt (`nt _editor save`) as the nvim plugin does, and has the Todos,
 Calendar, Weekly and Agents views. It stays in the menu bar, where ⌥⌘Space opens a field that
 adds a line to today or a todo from anywhere, and Settings (⌘,) has nt's settings and its own.
