@@ -13,16 +13,10 @@ import (
 	"github.com/w4jnl/nt/internal/todo"
 )
 
-// The todo list (docs/design.md §4, Todos): every todo in the notes, open or done, in the list
-// pane where the pickers go, with the note it is in on the right. It is a picker whose rows are
-// todos, so moving, enter and esc work as in the others; x, d, a, e, X, D and r are its own.
-
-// openTodos shows the todo list: the open todos, or with done the done ones. A todo added there
-// goes to the todo.md of the folder the browser is in.
-func (b *browser) openTodos(done bool) tea.Cmd {
-	b.pick = &picker{title: "todo · reading the notes", todos: true, done: done, folder: b.plainFolder()}
-	return b.loadTodos("")
-}
+// A day's todo list (docs/design.md §4, Calendar): the todos due or done on a day, in the list
+// pane where the pickers go, with the note each is in on the right. It is a picker whose rows are
+// todos, so moving, enter and esc work as in the others; x, d, a, e, X, D and r are its own. The
+// todos of every day are in the note's pane (todoview.go).
 
 // plainFolder is the folder the browser is in, or the root from the journals and agent reports,
 // which keep no todo list and no folders of their own.
@@ -53,6 +47,9 @@ func (b *browser) setTodos(msg todosMsg) tea.Cmd {
 		return nil
 	}
 	b.count(msg.items)
+	if b.tv != nil {
+		b.setTodoView(msg.items, msg.keep)
+	}
 	if p == nil || !p.todos {
 		return nil
 	}
@@ -180,6 +177,20 @@ func (b *browser) toggleTodo(it todo.Item) tea.Cmd {
 		}
 		p.ticked[todoRef(&n)] = true
 	}
+	if tv := b.tv; tv != nil {
+		ref := todoRef(&n)
+		for i := range tv.items {
+			if todoRef(&tv.items[i]) == ref {
+				tv.items[i] = n
+			}
+		}
+		if tv.held == nil {
+			tv.held = map[string]bool{}
+		}
+		if _, ok := tv.held[ref]; !ok {
+			tv.held[ref] = it.Done // it stays in the list it was in until the ticks settle
+		}
+	}
 	var cmds []tea.Cmd
 	if b.showing == n.Path && b.p.changed() { // the note beside the list shows the tick too
 		b.p.load()
@@ -195,8 +206,20 @@ func (b *browser) toggleTodo(it todo.Item) tea.Cmd {
 // list. The selection stays on its row, or, on one that went, moves to the one that took its
 // place.
 func (b *browser) settleTodos(msg todoSettleMsg) tea.Cmd {
+	if msg.seq != b.todoSettleSeq {
+		return nil
+	}
+	if tv := b.tv; tv != nil {
+		keep := ""
+		if it := tv.selected(); it != nil {
+			if _, held := tv.held[todoRef(it)]; !held {
+				keep = todoRef(it)
+			}
+		}
+		return b.loadTodos(keep)
+	}
 	p := b.pick
-	if msg.seq != b.todoSettleSeq || p == nil || !p.todos {
+	if p == nil || !p.todos {
 		return nil
 	}
 	keep := ""
@@ -239,6 +262,8 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 		folder, due := "", ""
 		if b.pick != nil {
 			folder, due = b.pick.folder, b.pick.day
+		} else if b.tv != nil {
+			folder = b.tv.folder
 		}
 		it, err := todo.Add(b.v, folder, text, due, b.v.Now())
 		if err != nil {

@@ -57,21 +57,23 @@ key() { S send-keys -t e2e "$@"; }
 footer() { capture | tail -1; }
 expect_soon "the footer offers the todos" 'x todos' footer
 key x
-expect_soon "x lists the open todos" 'todo · 6 open · 1 late' capture
-expect_soon "the overdue one first, late in words" '○ Send the slides +[0-9]+d late' capture
-expect_soon "with the note it is in beside it" 'Meeting' capture
-expect_soon "and the todo keys in the footer" 'x done +d due +a add +X done ones' footer
+expect_soon "x shows the todos beside the folders" '6 open todos · 1 late' capture
+expect_soon "the overdue one first, late in words" '○ Send the slides .*[0-9]+d late' capture
+expect_soon "with the note it is in beside it" '○ Send the slides  Meeting' capture
+expect_soon "and the todo keys in the footer" 'x done +d due +a add +e edit +enter note +X fold done' footer
 key x
 expect_soon "x checks it" 'done: Send the slides' footer
-expect_soon "it leaves the open ones" 'todo · 5 open' capture
+expect_soon "it stays a moment with its tick, then goes under Done" '5 open todos' capture
+expect_soon "with when it was done" '✓ Send the slides .*today' capture
+expect_soon "under Done" '▾ Done 1' capture
 expect "in the file" '^- \[x\] Send the slides due:2020-01-06 done:[0-9-]{10}$' "$(sed -n 3p "$T/a/work/2026-10-20-meeting.md")"
 key d
 expect_soon "d asks for the due date" 'due \(fri, \+3d' footer
 key -l '+3d'; key Enter
 expect_soon "and sets it" 'due [a-z0-9 ]+: ' footer
 key X
-expect_soon "X shows the done ones" 'done · 1' capture
-expect_soon "with when they were done" '✓ Send the slides +today' capture
+expect_soon "X folds the done ones" '▸ Done 1' capture
+key X
 key a
 expect_soon "a asks for a todo, saying where it goes" 'todo in todo.md:' footer
 key -l 'From the browser'; key Enter
