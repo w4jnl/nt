@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/w4jnl/nt/internal/editor"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/render"
 	"github.com/w4jnl/nt/internal/vault"
 )
@@ -30,13 +31,13 @@ func runToday(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	rel, created, err := v.EnsureJournal(v.Now())
+	j, err := ops.Today(v)
 	if err != nil {
 		return fail(err)
 	}
-	abs := v.Abs(rel)
+	abs := j.Path
 	if asJSON {
-		return printJSON(map[string]any{"path": abs, "rel": rel, "created": created})
+		return printJSON(j)
 	}
 	if !isTerminal(os.Stdout) {
 		lipgloss.Println(abs)
@@ -64,15 +65,15 @@ func runAppend(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	rel, line, err := v.Append(text, v.Now())
+	l, err := ops.Append(v, text)
 	if err != nil {
 		return fail(err)
 	}
 	if asJSON {
-		return printJSON(map[string]any{"path": v.Abs(rel), "rel": rel, "line": line})
+		return printJSON(l)
 	}
 	st := cliStyles(m)
-	lipgloss.Println(st.Muted.Render(rel+": ") + st.Text.Render(strings.SplitN(line, "\n", 2)[0]))
+	lipgloss.Println(st.Muted.Render(l.Rel+": ") + st.Text.Render(strings.SplitN(l.Line, "\n", 2)[0]))
 	return 0
 }
 
@@ -98,13 +99,13 @@ func runNew(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	rel, err := v.NewNote(title, folder, v.Now())
+	n, err := ops.New(v, title, folder)
 	if err != nil {
 		return fail(err)
 	}
-	abs := v.Abs(rel)
+	abs := n.Path
 	if asJSON {
-		return printJSON(map[string]any{"path": abs, "rel": rel})
+		return printJSON(n)
 	}
 	if !isTerminal(os.Stdout) {
 		lipgloss.Println(abs)

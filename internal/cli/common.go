@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,80 +13,30 @@ import (
 	"golang.org/x/term"
 
 	"github.com/w4jnl/nt/internal/config"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
 // openVault finds and opens the notes repository with the machine config.
-func openVault() (*vault.Vault, config.Machine, error) {
-	m, err := config.LoadMachine()
-	if err != nil {
-		return nil, m, err
-	}
-	root := vault.Find(m)
-	if _, err := os.Stat(root); errors.Is(err, os.ErrNotExist) {
-		return nil, m, fmt.Errorf("no notes repository at %s: run nt init %s, or set repo in %s", tilde(root), tilde(root), tilde(config.MachinePath()))
-	}
-	v, err := vault.Open(root, m.Host)
-	return v, m, err
-}
+func openVault() (*vault.Vault, config.Machine, error) { return ops.Open() }
 
-// takeBool removes the flag name from args and reports whether it was there.
-func takeBool(args []string, name string) ([]string, bool) {
-	out, found := args[:0:0], false
-	for _, a := range args {
-		if a == name {
-			found = true
-			continue
-		}
-		out = append(out, a)
-	}
-	return out, found
-}
+// takeBool, takeValue and positional read a command's arguments, as the apps' runner does.
+func takeBool(args []string, name string) ([]string, bool) { return ops.Flag(args, name) }
 
-// takeValue removes "name value" or "name=value" from args.
 func takeValue(args []string, name string) ([]string, string, bool, error) {
-	var out []string
-	val, found := "", false
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		switch {
-		case a == name:
-			if i+1 >= len(args) {
-				return nil, "", false, fmt.Errorf("%s needs a value", name)
-			}
-			i++
-			val, found = args[i], true
-		case strings.HasPrefix(a, name+"="):
-			val, found = strings.TrimPrefix(a, name+"="), true
-		default:
-			out = append(out, a)
-		}
-	}
-	return out, val, found, nil
+	return ops.Value(args, name)
 }
 
-// positional checks no unknown flags are left; "--" ends the flags.
-func positional(cmd string, args []string) ([]string, error) {
-	var out []string
-	for i, a := range args {
-		if a == "--" {
-			return append(out, args[i+1:]...), nil
-		}
-		if strings.HasPrefix(a, "-") && a != "-" {
-			return nil, fmt.Errorf("%s: unknown flag %s", cmd, a)
-		}
-		out = append(out, a)
-	}
-	return out, nil
-}
+func positional(cmd string, args []string) ([]string, error) { return ops.Positional(cmd, args) }
 
+// printJSON prints v as every --json does (ops.JSON).
 func printJSON(v any) int {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(v); err != nil {
+	b, err := ops.JSON(v)
+	if err != nil {
 		return fail(err)
 	}
+	_, _ = os.Stdout.Write(b)
 	return 0
 }
 
@@ -178,14 +126,4 @@ func (s stamped) Write(b []byte) (int, error) {
 }
 
 // tilde shortens a path under the home directory to ~/….
-func tilde(p string) string {
-	if h, err := os.UserHomeDir(); err == nil {
-		if rest, ok := strings.CutPrefix(p, h+"/"); ok {
-			return "~/" + rest
-		}
-		if p == h {
-			return "~"
-		}
-	}
-	return p
-}
+func tilde(p string) string { return ops.Tilde(p) }

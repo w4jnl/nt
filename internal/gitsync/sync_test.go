@@ -350,3 +350,56 @@ func TestPastJournalsInTimeOrder(t *testing.T) {
 		t.Errorf("sync committed yesterday's journal as\n%s", got)
 	}
 }
+
+// recorder is a Git that notes the calls sync makes through it, for the test below.
+type recorder struct {
+	Git
+	calls []string
+}
+
+func (r *recorder) Merge(branch string) error {
+	r.calls = append(r.calls, "merge")
+	return r.Git.Merge(branch)
+}
+
+func (r *recorder) Blob(id string) ([]byte, error) {
+	r.calls = append(r.calls, "blob")
+	return r.Git.Blob(id)
+}
+
+func (r *recorder) Take(path string, theirs bool) error {
+	r.calls = append(r.calls, "take")
+	return r.Git.Take(path, theirs)
+}
+
+func (r *recorder) Push(branch string, first bool) error {
+	r.calls = append(r.calls, "push")
+	return r.Git.Push(branch, first)
+}
+
+// TestRunGoesThroughTheGitItIsGiven: Options.Git is the only way sync reaches the repository,
+// so another plumbing (libgit2 on the phone) runs the same policy: here a conflict.
+func TestRunGoesThroughTheGitItIsGiven(t *testing.T) {
+	w := newWorld(t)
+	vs := w.seeded("a", "b")
+	a, b := vs[0], vs[1]
+	write(t, a, "tech/nas.md", "# NAS\n\nfrom a\n")
+	if st := sync(t, a); st.State != "synced" {
+		t.Fatalf("a: %+v", st)
+	}
+	write(t, b, "tech/nas.md", "# NAS\n\nfrom b\n")
+	rec := &recorder{Git: newGit(b.Root)}
+	st := Run(b, Options{Wait: true, Retry: time.Millisecond, Git: rec})
+	if st.State != "conflict" || len(st.NewConflicts) != 1 {
+		t.Fatalf("b: %+v", st)
+	}
+	got := strings.Join(rec.calls, " ")
+	for _, want := range []string{"merge", "blob", "take", "push"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("sync did not %s through the Git it was given: %s", want, got)
+		}
+	}
+	if read(t, b, "tech/nas.md") != "# NAS\n\nfrom a\n" || !strings.Contains(read(t, b, st.NewConflicts[0]), "from b") {
+		t.Errorf("the remote version does not stay, or the local one is not kept beside it")
+	}
+}
