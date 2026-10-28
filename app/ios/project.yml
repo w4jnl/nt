@@ -50,6 +50,7 @@ targets:
         PRODUCT_MODULE_NAME: Nt
         PRODUCT_BUNDLE_IDENTIFIER: nl.w4j.nt.ios
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
     info:
       path: Nt/Info.plist

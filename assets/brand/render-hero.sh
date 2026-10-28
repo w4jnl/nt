@@ -15,6 +15,8 @@ shot hero.html 1280 320 nt-hero.png
 shot social.html 1280 640 nt-social.png
 rsvg-convert -w 460 -h 460 nt-tile.svg -o nt-avatar.png
 rsvg-convert -w 512 -h 512 nt-tile.svg -o nt-512.png
+# the iPhone and iPad app's icon: full bleed and opaque, as iOS masks it itself
+rsvg-convert -w 1024 -h 1024 -b '#0f1214' nt-appicon.svg -o ../../app/ios/Nt/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 for f in nt-hero.png nt-social.png nt-avatar.png nt-512.png; do
   printf '%s ' "$f"; sips -g pixelWidth -g pixelHeight "$f" | tail -2 | awk '{printf "%s ", $2}'; echo
 done

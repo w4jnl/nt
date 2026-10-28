@@ -53,7 +53,9 @@ struct WorkspaceView: View {
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready:
-                if size == .regular {
+                // the sidebar beside the note on an iPad with room for it; a stack on an iPhone,
+                // upright or on its side, and on an iPad in a narrow window
+                if UIDevice.current.userInterfaceIdiom == .pad && size == .regular {
                     SplitLayout()
                 } else {
                     StackLayout()
