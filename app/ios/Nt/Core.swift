@@ -28,7 +28,8 @@ struct Place: Sendable {
     }
 }
 
-/// Core is unchecked Sendable: its MobileCore is only ever used on its queue.
+/// Core is unchecked Sendable: its MobileCore runs commands on its queue only, and Go keeps the
+/// hold to itself.
 final class Core: @unchecked Sendable {
     /// Output is what a command printed and how it ended, as NT.Output is on the Mac.
     struct Output: Sendable {
@@ -59,6 +60,12 @@ final class Core: @unchecked Sendable {
             }
         }
     }
+
+    /// hold holds .git/nt-edit for a note with unsaved changes, until unhold; it does not wait
+    /// for a command running on the queue.
+    func hold() -> Bool { (try? core.hold()) != nil }
+
+    func unhold() { core.unhold() }
 
     /// json runs a command line and decodes what it printed; a failed run throws what nt said.
     func json<T: Decodable>(_ type: T.Type, _ args: [String], input: Data? = nil) async throws -> T {

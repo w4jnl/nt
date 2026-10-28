@@ -1,9 +1,13 @@
 // Workspace is the app's state: the repository nt works on, its index, the note on screen, the
 // sync state. Files are read here; everything that writes goes through nt, the note's text
 // through its editor (NoteEditor).
-import AppKit
 import Foundation
 import Observation
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 @MainActor
 @Observable
@@ -44,7 +48,7 @@ final class Workspace {
         var backlinks: [Backlink]
     }
 
-    struct SearchHit: Decodable, Equatable, Sendable {
+    struct SearchHit: Decodable, Hashable, Sendable {
         let path: String
         let line: Int
         let text: String
@@ -81,29 +85,48 @@ final class Workspace {
     var active = true // the app is in front; the menu bar's alert mark blinks only while it is not
     var settings: [ConfigSetting] = [] // nt config, for Settings
     var settingsProblem = ""
+    #if !os(macOS)
+    var preview: URL? // a file a link points at, shown with Quick Look
+    #endif
+
+    /// navigate shows a note the person asked for on the iPhone: a screen of its own on the
+    /// stack, so Back returns. Unset, on the Mac and the iPad, the note opens in place.
+    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int) -> Void)?
 
     @ObservationIgnored let nt: NT?
     @ObservationIgnored private(set) var editor: NoteEditor?
+    #if os(macOS)
     @ObservationIgnored private var watcher: RepoWatcher?
+    #endif
     @ObservationIgnored private var reindexTask: Task<Void, Never>?
     @ObservationIgnored private var flashTask: Task<Void, Never>?
     @ObservationIgnored private var sidebarBeforeFocus = true
     @ObservationIgnored private var reportCache: [String: [AgentReport]] = [:]
     @ObservationIgnored private var quitting = false
+    @ObservationIgnored private var opening = 0 // counts opens, so the last one asked for wins
 
+    #if os(macOS)
     init(nt: NT? = NT.locate()) {
         self.nt = nt
     }
+    #else
+    init(nt: NT?) {
+        self.nt = nt
+    }
+    #endif
 
     var root: URL? { index.map { URL(filePath: $0.root) } }
 
-    /// start finds the repository and opens today. Under tests it does nothing: the app must not
-    /// touch the person's notes there.
+    /// start finds the repository and, on the Mac, opens today; on iPhone and iPad the layout
+    /// opens a note (the iPad today, the iPhone none until one is asked for). Under tests it does
+    /// nothing: the app must not touch the person's notes there.
     func start() async {
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || phase == .ready { return }
         guard await prepare() else { return }
         watch()
+        #if os(macOS)
         await openToday()
+        #endif
         // For screenshots: -NTOpen <repository path> opens a note after today, -NTView todos,
         // calendar, weekly or agents a view, -NTPalette open, text or new the palette (and
         // -NTQuery types into it).
@@ -202,14 +225,24 @@ final class Workspace {
     }
 
     func openToday() async {
-        guard let nt else { return }
+        if let p = await todayNote() { show(p) }
+    }
+
+    /// goToday goes to today's journal, as a note the person asked for.
+    func goToday() async {
+        if let p = await todayNote() { go(p) }
+    }
+
+    /// todayNote is today's journal, which nt makes when it is not there yet.
+    private func todayNote() async -> String? {
+        guard let nt else { return nil }
         struct Today: Decodable { let rel: String }
         do {
-            let t = try await nt.json(Today.self, ["t", "--json"])
-            todayPath = t.rel
-            show(t.rel)
+            todayPath = try await nt.json(Today.self, ["t", "--json"]).rel
+            return todayPath
         } catch {
             say(error.localizedDescription)
+            return nil
         }
     }
 
@@ -219,8 +252,15 @@ final class Workspace {
         Task { await open(path, anchor: anchor, line: line, end: end, reload: reload) }
     }
 
+    /// go shows a note the person asked for: a link followed, a todo's note, a day's journal.
+    func go(_ path: String, anchor: String = "", line: Int = 0) {
+        if let navigate { navigate(path, anchor, line) } else { show(path, anchor: anchor, line: line) }
+    }
+
     func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) async {
         guard let root, let editor else { return }
+        opening += 1
+        let mine = opening
         if path == note?.path, !reload {
             if !anchor.isEmpty { editor.scroll(to: anchor) } else if line > 0 { editor.go(to: line) }
             selection = selectionFor(path)
@@ -230,12 +270,13 @@ final class Workspace {
             say("\(title(note?.path ?? path)) is not saved, so it stays open")
             return
         }
+        guard mine == opening else { return } // another note was asked for while this one waited
         let url = root.appending(path: path)
         guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else {
             say("\(path) cannot be read: is it still there?")
             return
         }
-        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
+        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text) || !Self.writes, backlinks: backlinks(path))
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
         selection = selectionFor(path)
@@ -244,6 +285,14 @@ final class Workspace {
             expanded.insert(dir)
         }
     }
+
+    /// writes says whether the app writes notes: the iOS app reads them until it can write them
+    /// (docs/design.md §9, step 3).
+    #if os(macOS)
+    nonisolated static let writes = true
+    #else
+    nonisolated static let writes = false
+    #endif
 
     /// readOnly says whether a note is a digest, the day's or the week's, which nt writes again
     /// whenever it changes, so an edit would not last.
@@ -292,11 +341,16 @@ final class Workspace {
             if path == n.path, !anchor.isEmpty {
                 scroll(to: anchor)
             } else {
-                show(path, anchor: anchor)
+                go(path, anchor: anchor)
             }
         case .anchor(let a): scroll(to: a)
+        #if os(macOS)
         case .file(let path): NSWorkspace.shared.open(root.appending(path: path))
         case .web(let url): NSWorkspace.shared.open(url)
+        #else
+        case .file(let path): preview = root.appending(path: path)
+        case .web(let url): UIApplication.shared.open(url)
+        #endif
         case .missing(let path): say("\(path) is not in the repository")
         case .invalid: say("\(href) is not a link nt can follow")
         }
@@ -522,7 +576,9 @@ final class Workspace {
     /// restart starts over on the repository nt names now, after repo changed.
     func restart() async {
         guard await editor?.save() ?? true else { return }
+        #if os(macOS)
         watcher = nil
+        #endif
         note = nil
         selection = nil
         guard await prepare() else { return }
@@ -542,10 +598,16 @@ final class Workspace {
         syncing = false
         if let ix = index { status = SyncStatus.read(stateDir: ix.state) }
         if let out, out.status != 0 { say(NTError.message(out.stderr)) }
+        #if !os(macOS)
+        // no watcher on the phone: what the sync merged is read here
+        try? await reindex(nt)
+        await reloadIfChanged()
+        #endif
     }
 
     // MARK: Changes on disk
 
+    #if os(macOS)
     private func watch() {
         guard let ix = index else { return }
         let root = ix.root, state = ix.state
@@ -567,6 +629,11 @@ final class Workspace {
             await reloadIfChanged()
         }
     }
+    #else
+    /// watch: nothing else writes the clone on the phone, so the app reindexes after its own
+    /// writes and syncs instead.
+    private func watch() {}
+    #endif
 
     /// reloadIfChanged hands the editor the note on screen as another writer left it on disk.
     func reloadIfChanged() async {

@@ -4,6 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
+#if os(macOS)
 struct EditorView: NSViewRepresentable {
     let editor: NoteEditor
 
@@ -11,6 +12,42 @@ struct EditorView: NSViewRepresentable {
 
     func updateNSView(_ web: NoteWebView, context: Context) {}
 }
+#else
+/// EditorView on iPhone and iPad: the one web view, moved into whichever screen shows the note
+/// now. A screen the stack goes back to takes it back when it is in the window again.
+struct EditorView: UIViewRepresentable {
+    let editor: NoteEditor
+
+    func makeUIView(context: Context) -> NoteHost { NoteHost(web: editor.web) }
+
+    func updateUIView(_ host: NoteHost, context: Context) { host.adopt() }
+}
+
+final class NoteHost: UIView {
+    let web: NoteWebView
+
+    init(web: NoteWebView) {
+        self.web = web
+        super.init(frame: .zero)
+        adopt()
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil { adopt() }
+    }
+
+    func adopt() {
+        guard web.superview !== self else { return }
+        web.removeFromSuperview()
+        web.frame = bounds
+        web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(web)
+    }
+}
+#endif
 
 /// WeakHandler keeps the message handler from holding the coordinator for ever: the content
 /// controller retains what it is given.

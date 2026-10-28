@@ -41,8 +41,15 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         super.init()
         config.userContentController.add(WeakHandler(self), name: "nt")
         web.navigationDelegate = self
+        #if os(macOS)
         web.setValue(false, forKey: "drawsBackground")
         web.setAccessibilityLabel("Note")
+        #else
+        web.isOpaque = false
+        web.backgroundColor = .clear
+        web.scrollView.backgroundColor = .clear
+        web.accessibilityLabel = "Note"
+        #endif
         if let page = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "editor"),
            let resources = Bundle.main.resourceURL {
             web.loadFileURL(page, allowingReadAccessTo: resources)
@@ -88,7 +95,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     }
 
     func focus() {
+        #if os(macOS)
         web.window?.makeFirstResponder(web)
+        #else
+        web.becomeFirstResponder()
+        #endif
         page("window.nt.focus()")
     }
 
@@ -241,7 +252,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             if let href = body["href"] as? String {
                 ws.follow(href)
             } else if let path = body["path"] as? String {
-                ws.show(path)
+                ws.go(path)
             }
         case "stats":
             ws.words = body["words"] as? Int ?? 0
@@ -313,6 +324,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     }
 }
 
+#if os(macOS)
 /// NoteWebView sends Undo and Redo to the editor's own history, not WebKit's.
 final class NoteWebView: WKWebView {
     @objc func undo(_ sender: Any?) {
@@ -328,6 +340,11 @@ final class NoteWebView: WKWebView {
         return super.validateUserInterfaceItem(item)
     }
 }
+#else
+/// NoteWebView is the note's web view; on iPhone and iPad it moves to the screen that shows the
+/// note (NoteHost).
+final class NoteWebView: WKWebView {}
+#endif
 
 /// sha256 is the hex SHA-256 of data, as nt _editor save takes it.
 nonisolated func sha256(_ data: Data) -> String {

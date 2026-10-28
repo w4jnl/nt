@@ -246,7 +246,7 @@ t today  [ ] day  a append  n new  / search  ? help
   `internal/render` builds the Glamour style from the same values.
 - The terminal tokens (`list-width`, `list-step`, `list-min`, `preview-min`, `preview-max`,
   `gutter`, `selection-bar`) are the layout rules above in numbers.
-- The Mac app holds the colours twice, in `app/macos/Nt/Brand.swift` for its views and in
-  `app/macos/editor/src/editor.css` for the note; a Swift test and a node test compare each with
-  `tokens.json`. It bundles `fonts/` and draws its icon from `nt-appicon.svg`. Its UI words use the
-  system face, as vink's web UI does. The iOS app will do the same.
+- The Mac and iOS apps hold the colours twice, in `app/shared/Brand.swift` for their views and
+  in `app/macos/editor/src/editor.css` for the note; a Swift test and a node test compare each
+  with `tokens.json`. They bundle `fonts/`, and the Mac app draws its icon from
+  `nt-appicon.svg`. Their UI words use the system face, as vink's web UI does.

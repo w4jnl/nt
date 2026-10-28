@@ -67,6 +67,12 @@ html, body { margin: 0; height: 100%; background: var(--ground); color: var(--in
   padding: 22px 40px 160px;
   caret-color: var(--accent);
 }
+/* a phone: the column is the screen, with a phone's margins and text size */
+@media (max-width: 600px) {
+  #editor .cm-editor { font-size: 17px; line-height: 27px; }
+  #editor .cm-content { padding: 12px 20px 120px; }
+}
+html { -webkit-text-size-adjust: 100%; }
 #editor .cm-line { position: relative; padding: 0; }
 #editor .cm-cursor, #editor .cm-dropCursor { border-left: 2px solid var(--accent); }
 #editor .cm-selectionBackground, #editor .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: var(--accent-soft); }

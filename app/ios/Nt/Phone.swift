@@ -1,5 +1,6 @@
-// Phone is the app's state for step 1 of docs/design.md §9: the first run (the repository's
-// address, this device's name, the phone's key, the clone), then the notes and their sync.
+// Phone is what the app keeps for this phone (docs/design.md §9): the first run (the repository's
+// address, this device's name, the phone's key, the clone), then nt on the clone, whose notes the
+// shared Workspace shows as the Mac app's does.
 import Foundation
 import Observation
 
@@ -12,20 +13,12 @@ final class Phone {
     private(set) var key: DeployKey?
     private(set) var cloned: Bool
     private(set) var cloning = false
-    private(set) var syncing = false
-    private(set) var notes: [Note] = []
-    private(set) var status: SyncStatus?
+    /// workspace is the notes once nt runs on the clone.
+    private(set) var workspace: Workspace?
     /// problem is the last thing that went wrong, as the person reads it.
     var problem: String?
 
     let place: Place
-    private var core: Core?
-
-    struct Note: Decodable, Identifiable, Hashable, Sendable {
-        let path: String
-        let title: String
-        var id: String { path }
-    }
 
     init(place: Place = .app) {
         self.place = place
@@ -33,7 +26,6 @@ final class Phone {
         host = UserDefaults.standard.string(forKey: "host") ?? "iphone"
         key = DeployKey.load()
         cloned = place.cloned
-        status = SyncStatus.read(stateDir: place.state.path)
     }
 
     /// hostOK is a name nt can put in file names: lowercase letters, digits and hyphens.
@@ -66,56 +58,25 @@ final class Phone {
                 try LibGit.clone(url, to: dest, remote: r)
             }
             cloned = true
-            try await open()
-            await reload()
+            await open()
         } catch {
             problem = error.localizedDescription
         }
     }
 
-    /// open starts nt on the clone, once.
-    func open() async throws {
-        guard core == nil, cloned else { return }
-        try place.configure(host: host)
-        core = try Core(place: place, git: LibGit(root: place.notes, author: host, remote: gitRemote))
-    }
-
-    /// reload lists the notes, newest first.
-    func reload() async {
-        guard let core else { return }
-        struct Index: Decodable { let notes: [Note] }
+    /// open starts nt on the clone, once, and shows today and the sync state.
+    func open() async {
+        guard workspace == nil, cloned else { return }
         do {
-            let ix = try await core.json(Index.self, ["_editor", "index"])
-            notes = ix.notes.sorted { $0.path > $1.path }
+            try place.configure(host: host)
+            let core = try Core(place: place, git: LibGit(root: place.notes, author: host, remote: gitRemote))
+            let ws = Workspace(nt: NT(core: core))
+            workspace = ws
+            await ws.start()
+            await ws.syncNow()
         } catch {
             problem = error.localizedDescription
         }
-    }
-
-    /// sync runs nt sync and reads where it left the repository.
-    func sync() async {
-        guard let core, !syncing else { return }
-        syncing = true
-        defer { syncing = false }
-        let out = await core.run(["sync", "--json"])
-        status = SyncStatus.decode(out.stdout) ?? status
-        problem = out.status == 0 ? nil : (out.stderr.isEmpty ? status?.message : out.stderr)
-        await reload()
-    }
-
-    /// add adds a line to today's journal, then syncs.
-    func add(_ line: String) async {
-        guard let core, !line.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let out = await core.run(["a", "--json", "--", line])
-        if out.status != 0 {
-            problem = out.stderr
-            return
-        }
-        await sync()
-    }
-
-    func text(of note: Note) -> String {
-        (try? String(contentsOf: place.notes.appending(path: note.path), encoding: .utf8)) ?? ""
     }
 }
 

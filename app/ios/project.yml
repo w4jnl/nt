@@ -4,7 +4,9 @@
 #
 # nt itself is in the app: the mobile package built with gomobile into build/NtCore.xcframework
 # (make ios-core), and its git is libgit2 with ssh, built into build/Git2.xcframework (make
-# ios-libgit2). Neither is committed. docs/design.md §9 is the spec.
+# ios-libgit2). Neither is committed. ../shared is the Mac app's model, editor and views, compiled
+# into both apps; the editor page is the Mac app's (make mac-editor), with the design system's
+# fonts beside it. docs/design.md §9 is the spec.
 name: Nt
 options:
   bundleIdPrefix: nl.w4j
@@ -32,8 +34,11 @@ targets:
     platform: iOS
     sources:
       - path: Nt
-      - path: ../macos/Nt/Model/SyncStatus.swift
-        group: Nt/Model
+      - path: ../shared
+      - path: ../macos/Nt/Resources/editor
+        type: folder
+      - path: ../../docs/design-system/fonts
+        type: folder
     dependencies:
       - framework: build/NtCore.xcframework
         embed: false

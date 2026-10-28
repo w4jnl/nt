@@ -12,11 +12,7 @@ struct AgentsView: View {
         let today = ws.reports(on: ws.today)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Agents")
-                    .font(.system(size: 28, weight: .semibold))
-                    .kerning(-0.3)
-                    .foregroundStyle(Brand.ink)
-                    .padding(.bottom, 4)
+                ViewTitle(text: "Agents", below: 4)
                 Text(summary(today))
                     .font(.system(size: 13))
                     .foregroundStyle(Brand.muted)
@@ -38,7 +34,7 @@ struct AgentsView: View {
                 }
             }
             .frame(maxWidth: 640, alignment: .leading)
-            .padding(EdgeInsets(top: 22, leading: 40, bottom: 64, trailing: 40))
+            .viewInsets(bottom: 64)
             .frame(maxWidth: .infinity)
         }
         .background(Brand.ground)
@@ -62,7 +58,7 @@ struct AgentsView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Brand.muted)
             if has {
-                Button("digest") { ws.show(digest) }
+                Button("digest") { ws.go(digest) }
                     .buttonStyle(.plain)
                     .font(Brand.mono(11))
                     .foregroundStyle(Brand.accent)
@@ -77,17 +73,14 @@ struct AgentsView: View {
 struct WeeklyEmptyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Weekly")
-                .font(.system(size: 28, weight: .semibold))
-                .kerning(-0.3)
-                .foregroundStyle(Brand.ink)
+            ViewTitle(text: "Weekly")
             Text("No weekly digest yet. The machine with weekly = true writes one when it syncs: nt config set weekly true on one machine.")
                 .font(.system(size: 14))
                 .foregroundStyle(Brand.muted)
                 .textSelection(.enabled)
         }
         .frame(maxWidth: 640, alignment: .leading)
-        .padding(EdgeInsets(top: 22, leading: 40, bottom: 64, trailing: 40))
+        .viewInsets(bottom: 64)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Brand.ground)
         .viewToolbar("Weekly")

@@ -1,5 +1,6 @@
-// nt for iPhone and iPad (docs/design.md §9). Step 1: the core and git on the phone. The first
-// run makes the phone's key and clones the notes; then the notes are listed and synced.
+// nt for iPhone and iPad (docs/design.md §9). The first run makes the phone's key and clones the
+// notes; then the home list, the notes in live preview and the views, as on the Mac: one stack on
+// an iPhone, the sidebar beside the note on an iPad.
 import SwiftUI
 
 @main
@@ -12,10 +13,8 @@ struct NtApp: App {
                 if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
                     // the tests' host: nt in this process belongs to the tests
                     Color.clear
-                } else if phone.cloned {
-                    NotesView()
                 } else {
-                    SetupView()
+                    RootView()
                 }
             }
             .environment(phone)

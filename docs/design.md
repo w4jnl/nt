@@ -671,6 +671,13 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     changes. A refused key is tried once, and like an unreachable remote it is offline, as for
     the command line.
   - `make ios-ssh-test` checks it in the simulator against a throwaway sshd.
+- **The reader (step 2).** `app/shared` holds Brand, the model, the editor's web view and the
+  Todos, Calendar and Agents views; `NT` is a process on the Mac and the core on iOS.
+  - On the iPhone a note the person asks for (a link, a todo's note, a day's journal) is a new
+    screen on the stack (`Workspace.go`), so Back returns; the one web view moves to the screen on
+    top. On the Mac and the iPad it opens in place.
+  - The page has a viewport and, under 600 px, a phone's margins and 17 px text.
+  - Notes are read-only until writing (step 3); todos tick and add already, through nt.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;
