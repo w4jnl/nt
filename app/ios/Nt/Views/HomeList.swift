@@ -11,6 +11,7 @@ struct HomeList: View {
     @State private var query = ""
     @State private var lines: [Workspace.SearchHit] = []
     @State private var capturing = false
+    @Environment(\.verticalSizeClass) private var height
     @State private var settings = false
 
     var body: some View {
@@ -54,7 +55,9 @@ struct HomeList: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
             }
         }
-        .searchable(text: $query, prompt: "Search notes")
+        // at the top, under the title, as designed (iOS 26 would put it at the bottom, where a
+        // phone on its side has no room for it); on its side it scrolls away with the list
+        .searchable(text: $query, placement: stacked ? .navigationBarDrawer(displayMode: upright ? .always : .automatic) : .sidebar, prompt: "Search notes")
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
@@ -127,6 +130,9 @@ struct HomeList: View {
         }
         .listRowBackground(stacked ? Brand.surface : nil)
     }
+
+    /// upright: a phone held upright, with the height for the search field to stay.
+    private var upright: Bool { height != .compact }
 
     /// on says whether the sidebar has sel selected; its row is then in accent.
     private func on(_ sel: Workspace.Selection) -> Bool { !stacked && ws.selection == sel }
