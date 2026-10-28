@@ -4,7 +4,8 @@ import SwiftUI
 
 @main
 struct NtApp: App {
-    @State private var workspace = Workspace()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var app
+    private var workspace: Workspace { app.workspace }
 
     var body: some Scene {
         Window("nt", id: "main") {
@@ -26,8 +27,13 @@ struct NtApp: App {
             CommandGroup(before: .sidebar) {
                 Button(workspace.sidebar ? "Hide Sidebar" : "Show Sidebar") { workspace.sidebar.toggle() }
                     .keyboardShortcut("s", modifiers: [.command, .control])
+                Toggle("Focus Mode", isOn: Binding(get: { workspace.focusMode }, set: { _ in workspace.toggleFocus() }))
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .newItem) {
+                Button("New Note…") { workspace.palette = .new }
+                    .keyboardShortcut("n")
+                    .disabled(workspace.phase != .ready)
                 Button("Today") { Task { await workspace.openToday() } }
                     .keyboardShortcut("t")
                 Button("Open…") { workspace.palette = .open }
@@ -39,5 +45,24 @@ struct NtApp: App {
                     .keyboardShortcut("s", modifiers: [.command, .option])
             }
         }
+    }
+}
+
+/// AppDelegate holds the workspace and saves the note when the person leaves the app or quits.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let workspace = Workspace()
+
+    func applicationDidResignActive(_ notification: Notification) {
+        Task { await workspace.settle() }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard workspace.editor != nil else { return .terminateNow }
+        Task {
+            let ok = await workspace.finish()
+            sender.reply(toApplicationShouldTerminate: ok)
+        }
+        return .terminateLater
     }
 }

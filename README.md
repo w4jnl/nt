@@ -134,7 +134,7 @@ Every command that prints data takes `--json`.
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered, images included; `e` edits it |
-| `nt paste <note>` | save the clipboard's image beside the note and print its markdown line |
+| `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
 | `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |

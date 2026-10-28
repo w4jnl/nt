@@ -41,8 +41,8 @@ struct NT: Sendable {
         return e
     }
 
-    /// run runs nt with args and waits for it, off the main thread.
-    func run(_ args: [String]) async throws -> Output {
+    /// run runs nt with args, input on its standard input, and waits for it, off the main thread.
+    func run(_ args: [String], input: Data? = nil) async throws -> Output {
         let exe = executable
         let env = environment
         return try await withCheckedThrowingContinuation { cont in
@@ -54,14 +54,20 @@ struct NT: Sendable {
                 p.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
                 let out = Pipe()
                 let err = Pipe()
+                let stdin = Pipe()
                 p.standardOutput = out
                 p.standardError = err
-                p.standardInput = FileHandle.nullDevice
+                p.standardInput = input == nil ? FileHandle.nullDevice : stdin
                 do {
                     try p.run()
                 } catch {
                     cont.resume(throwing: NTError.cannotRun(exe.path, error.localizedDescription))
                     return
+                }
+                if let input {
+                    // nt reads all of its input before it prints anything
+                    try? stdin.fileHandleForWriting.write(contentsOf: input)
+                    try? stdin.fileHandleForWriting.close()
                 }
                 let stdout = out.fileHandleForReading.readDataToEndOfFile()
                 let stderr = err.fileHandleForReading.readDataToEndOfFile()
@@ -72,8 +78,8 @@ struct NT: Sendable {
     }
 
     /// json runs nt and decodes what it printed; a failed run throws what nt said.
-    func json<T: Decodable>(_ type: T.Type, _ args: [String]) async throws -> T {
-        let out = try await run(args)
+    func json<T: Decodable>(_ type: T.Type, _ args: [String], input: Data? = nil) async throws -> T {
+        let out = try await run(args, input: input)
         guard out.status == 0 else { throw NTError.failed(NTError.message(out.stderr)) }
         do {
             return try JSONDecoder().decode(T.self, from: out.stdout)
@@ -81,6 +87,30 @@ struct NT: Sendable {
             throw NTError.failed("nt \(args.first ?? "") printed something this app cannot read: \(error.localizedDescription). Is nt older than the app?")
         }
     }
+}
+
+/// Hold is `nt _editor hold` running: .git/nt-edit held (shared) while a note has unsaved
+/// changes, so sync commits but does not merge under them. Closing its input lets it go; so does
+/// the app ending.
+final class Hold: @unchecked Sendable {
+    private let process = Process()
+    private let input = Pipe()
+
+    init?(_ nt: NT) {
+        process.executableURL = nt.executable
+        process.arguments = ["_editor", "hold"]
+        process.environment = nt.environment
+        process.standardInput = input
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do { try process.run() } catch { return nil }
+    }
+
+    func release() {
+        try? input.fileHandleForWriting.close()
+    }
+
+    deinit { release() }
 }
 
 enum NTError: LocalizedError, Equatable {

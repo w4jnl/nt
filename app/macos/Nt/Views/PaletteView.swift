@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// PaletteView is Open (⌘P): one field that finds notes by title, then by text, and Search
-/// (⇧⌘F), the same field for text only. Arrows move, Return opens, Escape closes.
+/// PaletteView is Open (⌘P): one field that finds notes by title, then by text, and makes a new
+/// note when the person picks that; Search (⇧⌘F), the same field for text only; and New note
+/// (⌘N), the same field for a new note's title. Arrows move, Return opens, Escape closes.
 struct PaletteView: View {
     let mode: Workspace.PaletteMode
     @Environment(Workspace.self) private var ws
@@ -11,7 +12,7 @@ struct PaletteView: View {
     @FocusState private var focused: Bool
 
     struct Row: Identifiable, Equatable {
-        enum Kind { case title, text }
+        enum Kind { case title, text, create }
         let kind: Kind
         let path: String
         let title: String
@@ -34,7 +35,7 @@ struct PaletteView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 15))
                         .foregroundStyle(Brand.muted)
-                    TextField(mode == .text ? "Search the notes" : "Open a note", text: $query)
+                    TextField(placeholder, text: $query)
                         .textFieldStyle(.plain)
                         .font(.system(size: 18))
                         .focused($focused)
@@ -48,7 +49,7 @@ struct PaletteView: View {
                 }
                 .padding(.horizontal, 18)
                 .frame(height: 56)
-                if !rows.isEmpty || !query.isEmpty {
+                if mode != .new && (!rows.isEmpty || !query.isEmpty) {
                     Rectangle().fill(Brand.line).frame(height: 1)
                     results(rows)
                 }
@@ -68,7 +69,7 @@ struct PaletteView: View {
         .onChange(of: query) { sel = 0 }
         .task(id: query) {
             let q = query.trimmingCharacters(in: .whitespaces)
-            guard q.count >= 2 else {
+            guard q.count >= 2, mode != .new else {
                 hits = []
                 return
             }
@@ -92,16 +93,21 @@ struct PaletteView: View {
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
                         if i == 0 || rows[i - 1].kind != row.kind {
-                            Text(row.kind == .title ? "Notes" : "In text")
+                            Text(row.kind == .title ? "Notes" : row.kind == .text ? "In text" : "New")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Brand.muted)
                                 .padding(.horizontal, 12)
                                 .padding(.top, i == 0 ? 4 : 10)
                                 .padding(.bottom, 2)
                         }
-                        rowView(row, selected: i == sel)
-                            .id(row.id)
-                            .onTapGesture { sel = i; open(rows) }
+                        Button {
+                            sel = i
+                            open(rows)
+                        } label: {
+                            rowView(row, selected: i == sel)
+                        }
+                        .buttonStyle(.plain)
+                        .id(row.id)
                     }
                 }
                 .padding(8)
@@ -143,12 +149,20 @@ struct PaletteView: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var placeholder: String {
+        switch mode {
+        case .open: "Open a note"
+        case .text: "Search the notes"
+        case .new: ws.newFolder.isEmpty ? "New note: its title" : "New note in \(ws.newFolder): its title"
+        }
     }
 
     private var hints: some View {
         HStack(spacing: 18) {
-            hint("↵", "open")
+            hint("↵", mode == .new ? "make it" : "open")
             if mode == .open { hint("⇧⌘F", "text only") }
             Spacer()
             hint("esc", "close")
@@ -179,11 +193,16 @@ struct PaletteView: View {
                 out.append(Row(kind: .title, path: hit.note.path, title: hit.note.title, at: hit.at, snippet: "", line: 0, meta: meta(hit.note.path)))
             }
         }
+        if mode == .new { return [] }
         var seen = Set(out.map(\.path))
         for h in hits where !seen.contains(h.path) {
             seen.insert(h.path)
             out.append(Row(kind: .text, path: h.path, title: ix.title(h.path), at: [], snippet: h.text.trimmingCharacters(in: .whitespaces), line: h.line, meta: meta(h.path)))
             if out.count >= 16 { break }
+        }
+        if mode == .open, !out.contains(where: { $0.kind == .title && $0.title.caseInsensitiveCompare(q) == .orderedSame }) {
+            let folder = ws.newFolder
+            out.append(Row(kind: .create, path: "", title: "New note “\(q)”", at: [], snippet: "", line: 0, meta: folder.isEmpty ? "" : folder))
         }
         return out
     }
@@ -228,9 +247,20 @@ struct PaletteView: View {
     }
 
     private func open(_ rows: [Row]) {
+        if mode == .new {
+            let title = query
+            close()
+            Task { await ws.create(title, in: ws.newFolder) }
+            return
+        }
         guard rows.indices.contains(sel) else { return }
         let row = rows[sel]
         close()
+        if row.kind == .create {
+            let title = query.trimmingCharacters(in: .whitespaces)
+            Task { await ws.create(title, in: ws.newFolder) }
+            return
+        }
         ws.show(row.path, line: row.kind == .text ? row.line : 0)
     }
 

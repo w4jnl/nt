@@ -93,3 +93,37 @@ func TestPaste(t *testing.T) {
 		t.Error("paste without a note did something")
 	}
 }
+
+func TestPasteFrom(t *testing.T) {
+	day := time.Now().Add(-4 * time.Hour).Format("2006-01-02") // day_starts 04:00
+	root := pasteRepo(t, func(string) (clip.Image, error) {
+		t.Error("--from read the clipboard")
+		return clip.Image{}, clip.ErrNoImage
+	})
+	dir := t.TempDir()
+	drop := filepath.Join(dir, "Rack diagram.png")
+	if err := os.WriteFile(drop, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out := paste(t, "tech/2026-10-20-nas.md", "--from", drop)
+	if want := "![Rack diagram](assets/" + day + "-rack-diagram.png)"; code != 0 || out != want {
+		t.Fatalf("a dropped file: %d %q, want %q", code, out, want)
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "tech", "assets", day+"-rack-diagram.png")); string(b) != "png" {
+		t.Fatalf("the image was not saved beside the note: %q", b)
+	}
+	code, out = paste(t, "tech/2026-10-20-nas.md", "--from", drop, "--name", "rack")
+	if want := "![rack](assets/" + day + "-rack.png)"; code != 0 || out != want {
+		t.Fatalf("--from with --name: %d %q, want %q", code, out, want)
+	}
+	pdf := filepath.Join(dir, "invoice.pdf")
+	if err := os.WriteFile(pdf, []byte("pdf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := paste(t, "tech/2026-10-20-nas.md", "--from", pdf); code == 0 {
+		t.Error("a file that is not an image was pasted")
+	}
+	if code, _ := paste(t, "tech/2026-10-20-nas.md", "--from", filepath.Join(dir, "gone.png")); code == 0 {
+		t.Error("a missing file was pasted")
+	}
+}

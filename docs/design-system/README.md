@@ -201,7 +201,12 @@ t today  [ ] day  a append  n new  / search  ? help
   badge, and a click on it syncs.
 - **Selection.** The system's, tinted with `accent` (the asset catalogue's AccentColor). In Open,
   the selected row is `accent-soft` with the family's accent bar at its left edge.
-- **No modals.** Open and Search are one floating field over the window; Escape closes it.
+- **No modals.** Open, Search and New note are one floating field over the window; Escape closes
+  it.
+- **Focus mode.** The sidebar goes and every paragraph but the one being written is at 30%
+  opacity; nothing else changes, no colour, no size.
+- **Read-only.** A digest says so in the bottom line, in mono `ink-muted` beside the word count,
+  with why in its tooltip.
 - **Nothing remote.** A note's remote image shows its alt text; the app loads only its own files
   and the repository's.
 

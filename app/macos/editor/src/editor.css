@@ -124,7 +124,7 @@ html, body { margin: 0; height: 100%; background: var(--ground); color: var(--in
 #editor .cm-image-missing .cm-caption::after { content: " (image not found)"; }
 #editor .cm-imgalt { color: var(--ink-muted); font-style: italic; }
 
-#editor .cm-check { display: inline-block; width: 1.3em; color: var(--ink-muted); }
+#editor .cm-check { display: inline-block; width: 1.3em; color: var(--ink-muted); cursor: pointer; }
 #editor .cm-check-done { color: var(--ok); }
 #editor .cm-done { color: var(--ink-muted); }
 #editor .cm-bullet { color: var(--ink-muted); }
@@ -174,3 +174,8 @@ html, body { margin: 0; height: 100%; background: var(--ground); color: var(--in
   text-decoration: none;
 }
 #editor .cm-backlink-folder { font-family: var(--mono); font-size: 11px; color: var(--ink-muted); }
+
+/* Focus mode: the paragraph being written stays, the rest of the note steps back. */
+#editor .cm-dim { opacity: 0.3; }
+#editor .cm-line { transition: opacity 0.2s ease-out; }
+#editor .cm-focusmode:has(.cm-dim) .cm-fm-summary, #editor .cm-focusmode:has(.cm-dim) .cm-backlinks { opacity: 0.3; }

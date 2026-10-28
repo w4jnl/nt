@@ -2,7 +2,8 @@
 
 The notes repository in a Mac window: the folders beside the note, the note in live preview.
 A second client of the same repository; docs/design.md §8 is the spec, and phase 6 lists the
-steps. This is step 1, the reader: it shows notes and follows links, and does not write yet.
+steps. Steps 1 and 2 are here: it shows notes in live preview, follows links, and saves what is
+written in them through nt (`nt _editor save`), as the nvim plugin does.
 
 ## Build
 
@@ -36,10 +37,11 @@ Nt/Brand.swift       the design system's colours and the brand face
 Nt/Model/            Workspace (the app's state), NT (runs nt), RepoIndex (the sidebar's tree),
                      SyncStatus, Fuzzy, Links, Watcher (FSEvents)
 Nt/Views/            the sidebar, the note, Open and Search
-Nt/Editor/           the web view the note is in, its bridge, and nt-asset: for images
+Nt/Editor/           NoteEditor: the web view the note is in, saving it, and nt-asset: for images
 Nt/Resources/editor  the editor page, built from editor/ and committed
-editor/              CodeMirror 6 and nt's live preview (src/livepreview.js), its tests
-NtTests/             Swift Testing
+editor/              CodeMirror 6, nt's live preview (src/livepreview.js) and writing (src/edits.js),
+                     their tests
+NtTests/             Swift Testing; WritingTests drive the editor page and the bundled nt
 ```
 
 The app bundles `nt` (`make nt-universal`) in `Contents/Helpers/nt`, the editor page and the

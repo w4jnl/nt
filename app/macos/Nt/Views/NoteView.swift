@@ -7,7 +7,9 @@ struct NoteView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            EditorView(workspace: ws, note: ws.note, scroll: ws.anchorRequest)
+            if let editor = ws.editor {
+                EditorView(editor: editor)
+            }
             HStack(alignment: .bottom) {
                 if !ws.flash.isEmpty {
                     Text(ws.flash)
@@ -20,10 +22,11 @@ struct NoteView: View {
                         .transition(.opacity)
                 }
                 Spacer()
-                if ws.note != nil {
-                    Text(ws.words == 1 ? "1 word" : "\(ws.words) words")
+                if let n = ws.note {
+                    Text((n.readOnly ? "read-only, nt writes it · " : "") + (ws.words == 1 ? "1 word" : "\(ws.words) words"))
                         .font(Brand.mono(11))
                         .foregroundStyle(Brand.muted)
+                        .help(n.readOnly ? "A digest: nt writes it again whenever its notes change, so edits would not last." : "")
                 }
             }
             .padding(.horizontal, 18)

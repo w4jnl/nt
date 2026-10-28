@@ -18,13 +18,17 @@ var readClipboard = clip.Read
 // pasteTypes are the image files nt paste takes as they are: what GitHub and browsers show.
 var pasteTypes = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true}
 
-// nt paste <note> [--name words]: save the clipboard's image beside the note, as
+// nt paste <note> [--name words] [--from file]: save the clipboard's image beside the note, as
 // assets/YYYY-MM-DD-<name>.<ext> in its folder, and print the markdown line that shows it, for
 // the editor to insert. Image data becomes PNG; a copied image file keeps its type and, without
-// --name, its name.
+// --name, its name. --from takes the image from a file instead, as when one is dropped on a note.
 func runPaste(args []string) int {
 	args, asJSON := takeBool(args, "--json")
 	args, name, _, err := takeValue(args, "--name")
+	if err != nil {
+		return fail(fmt.Errorf("paste: %w", err))
+	}
+	args, from, _, err := takeValue(args, "--from")
 	if err != nil {
 		return fail(fmt.Errorf("paste: %w", err))
 	}
@@ -43,24 +47,29 @@ func runPaste(args []string) int {
 	if err != nil {
 		return fail(fmt.Errorf("paste: %w", err))
 	}
-	tmp, err := os.CreateTemp("", "nt-paste-*.png")
-	if err != nil {
-		return fail(err)
+	file, what := from, filepath.Base(from)+" is"
+	var src, ext string
+	if from == "" {
+		tmp, err := os.CreateTemp("", "nt-paste-*.png")
+		if err != nil {
+			return fail(err)
+		}
+		tmp.Close()
+		defer os.Remove(tmp.Name())
+		im, err := readClipboard(tmp.Name())
+		if err != nil {
+			return fail(fmt.Errorf("paste: %w", err))
+		}
+		src, ext = tmp.Name(), ".png"
+		file, what = im.File, "the clipboard holds "+filepath.Base(im.File)+","
 	}
-	tmp.Close()
-	defer os.Remove(tmp.Name())
-	im, err := readClipboard(tmp.Name())
-	if err != nil {
-		return fail(fmt.Errorf("paste: %w", err))
-	}
-	src, ext := tmp.Name(), ".png"
-	if im.File != "" {
-		src, ext = im.File, filepath.Ext(im.File)
+	if file != "" {
+		src, ext = file, filepath.Ext(file)
 		if !pasteTypes[strings.ToLower(ext)] {
-			return fail(fmt.Errorf("paste: the clipboard holds %s, not an image nt shows (png, jpg, gif, webp, svg)", filepath.Base(im.File)))
+			return fail(fmt.Errorf("paste: %s not an image nt shows (png, jpg, gif, webp, svg)", what))
 		}
 		if name == "" {
-			name = strings.TrimSuffix(filepath.Base(im.File), ext)
+			name = strings.TrimSuffix(filepath.Base(file), ext)
 		}
 	}
 	st, err := os.Stat(src)
