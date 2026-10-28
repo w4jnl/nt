@@ -466,6 +466,35 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   glyph, the project and summary, the machine and the state in words. A click opens the report;
   a day's `digest` opens its digest. Reports are read from their frontmatter, never written.
 
+**The menu bar and capture.** The window can close; nt stays in the menu bar.
+- The item is nt's mark as a template image. While sync needs you (a conflict, an error;
+  offline is not one) it is the solid alert mark, alternating with the plain one every 1150 ms
+  until the app comes to the front.
+- Its menu: the sync state as glyph and word; Add to today… with the capture shortcut beside it;
+  New todo…; the three notes opened last (kept on the Mac, UserDefaults), each with its folder;
+  Sync now; Open nt; Settings… (⌘,); Quit nt.
+- The capture shortcut, ⌥⌘Space unless changed, opens a field over whatever is in front, from a
+  global hot key (Carbon's `RegisterEventHotKey`, no accessibility permission). Return adds the
+  line to today's journal (`nt a`), Shift-Return makes it a todo (`nt todo add`; `due:fri` in the
+  text sets its date); New todo… opens it the other way round. Under the field: the file and
+  section it goes to and the keys. Once added it says where, "Added to Tuesday 28 October at
+  11:42 · Log", and goes after a moment; esc or a click elsewhere closes it. When nt cannot, it
+  says why and keeps the text.
+- macOS keeps ⌥⌘Space for the Finder search window and ⌘Space for Spotlight unless they are
+  turned off; Settings says so for the shortcut chosen, from `com.apple.symbolichotkeys`, and
+  links to Keyboard Shortcuts.
+
+**Settings** (⌘,). Two tabs.
+- **nt**: `nt config --json`, a section for this Mac's file and one for the repository's, each
+  setting's key in mono, a control by its kind (a switch, a menu of its words, a field checked on
+  Return or on leaving it) and what it does. A change goes through `nt config set`; what nt will
+  not take it says under the setting, and the value stays. A change of `repo` starts the app over
+  on the new repository; of the folders, pins, `day_starts` or `default_folder`, it reads the
+  repository again.
+- **App**, kept on the Mac: the capture shortcut, recorded from the next key pressed with ⌘, ⌥
+  or ⌃ (esc keeps the old one, Reset goes back to ⌥⌘Space), and the note's text size (the
+  editor page's zoom).
+
 **The editor.** CodeMirror 6 in a WKWebView, as MarkEdit does it, with nt's live preview
 (`app/macos/editor/src/livepreview.js`). The note is its markdown, byte for byte, and reads as
 rendered text.
@@ -501,7 +530,7 @@ rendered text.
 3. **The views.** Todos, Calendar, Weekly, Agents. Done.
 4. **Menu bar and capture.** The menu bar item (the template mark, its alert variant while sync
    needs you), a global hotkey (⌥⌘Space) that adds one line to today or a todo, and Settings:
-   nt's through `nt config`, the app's own in UserDefaults.
+   nt's through `nt config`, the app's own in UserDefaults. Done.
 5. **Shipping.** Developer ID signing, notarization, the DMG on the GitHub release,
    `brew install --cask w4jnl/tap/nt-app`.
 
@@ -603,7 +632,10 @@ open, in the background and on push; an App Intent "append to today".
     typing; the same line changed on disk becomes a conflict copy; opening another note, Undo
     and Quit save first; a pasted image lands in `assets/`; a digest stays read-only.
     AgendaTests: todos as nt prints them, reports' frontmatter, a journal's Log, a month Monday
-    first; and the Todos view's check, add and due date through the bundled nt.
+    first; and the Todos view's check, add and due date through the bundled nt. CaptureTests:
+    the capture shortcut and the keys macOS keeps, the menu bar's mark, the notes opened last,
+    nt config as the app reads it; and, through the bundled nt, the capture panel adding a line
+    and a todo, and Settings changing a setting or saying why it cannot.
   - `make mac-editor`: `node --test` on the live preview without a screen (what is hidden,
     replaced and styled for a state), on writing (the line diff, laying a version from disk
     under unsaved changes, ticking a task), and `editor.css` against `tokens.json`.
@@ -611,5 +643,6 @@ open, in the background and on push; an App Intent "append to today".
     `nt paste --from`.
   - Screenshots of each view in both themes on `assets/demo/scene.sh`'s notes; the app takes
     `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTView todos|calendar|weekly|agents`,
-    `-NTPalette open|text|new` and `-NTQuery <text>`.
+    `-NTPalette open|text|new`, `-NTCapture today|todo` (the capture panel) and `-NTQuery <text>`
+    (typed into either).
 - **Manual.** In Ghostty + tmux, go through `nt` → `t a n e / i`, once with a dark terminal background and once with a light one. Then check on github.com that links, images, the README hero and the agents `README.md` digest render.

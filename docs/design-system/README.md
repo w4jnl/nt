@@ -220,10 +220,10 @@ t today  [ ] day  a append  n new  / search  ? help
 
 - `favicon.svg` is the teal tile with the white mark. `favicon-alert.svg` is an alert tile with
   the white alert mark, for a future web view while sync needs you.
-- A future menu bar item follows flok: a template icon in black and alpha, with the solid alert
-  variant while sync needs you. Optionally alternate the two every ~1150 ms and stop when the
-  window gets focus. The mark holds a cursor, so blinking is the one animation it is allowed.
-  Offline is not an alert.
+- The Mac app's menu bar item follows flok: a template icon in black and alpha, with the solid
+  alert variant while sync needs you, the two alternating every ~1150 ms until the app is in
+  front. The mark holds a cursor, so blinking is the one animation it is allowed. Offline is not
+  an alert. The capture panel shows the mark in `mark`, the one place the app uses that token.
 - `nt-appicon.svg` is the Mac and phone app icon: flok's recipe, the cyan mark on a dark
   gradient tile with a heavier frame and lines. The App Store wants it flattened without an
   alpha channel.
