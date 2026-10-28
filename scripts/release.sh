@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Tag an nt release and bump the Homebrew formula in w4jnl/homebrew-tap. The tag starts the
-# release workflow, which builds the Linux and macOS tarballs and writes the GitHub release from
-# CHANGELOG.md.
+# Tag an nt release and bump the Homebrew formula and the nt for Mac cask in w4jnl/homebrew-tap.
+# Before the tag, nt for Mac is built, signed and notarized (scripts/mac-release.sh), so a release
+# never stops half done; the tag starts the release workflow, which builds the Linux and macOS
+# tarballs and writes the GitHub release from CHANGELOG.md, and the app's DMG is added to it.
 #   scripts/release.sh 0.1.1          (macOS: uses BSD sed -i '')
-# Requires: a clean tree on main pushed to origin, and ssh access to both repositories.
+#   NT_NO_APP=1 scripts/release.sh 0.1.1   the command line alone, the cask left as it is
+# Requires: a clean tree on main pushed to origin, ssh access to both repositories, and for the
+# app what scripts/mac-release.sh requires, and gh.
 set -euo pipefail
 ver=${1:?usage: scripts/release.sh <version>   e.g. 0.1.1}
 # GitHub's SSH endpoint resets a connection now and then; a push or pull gets three tries.
@@ -29,6 +32,14 @@ f=$TAP/Formula/nt.rb
 [ -f "$f" ] || { echo "release.sh: no Formula/nt.rb in $TAP" >&2; exit 1; }
 retry git -C "$TAP" pull -q --ff-only
 
+dmg=""
+if [ "${NT_NO_APP:-}" != 1 ]; then
+  [ "$(uname)" = Darwin ] || { echo "release.sh: nt for Mac is built on a Mac; NT_NO_APP=1 releases the command line alone" >&2; exit 1; }
+  command -v gh >/dev/null || { echo "release.sh: gh adds the app's DMG to the release (brew install gh); NT_NO_APP=1 releases the command line alone" >&2; exit 1; }
+  "$R/scripts/mac-release.sh" "$ver"
+  dmg=$R/app/macos/build/release/nt-$ver.dmg
+fi
+
 git tag -a "v$ver" -m "nt v$ver"
 retry git push -q origin "v$ver"
 echo "tag v$ver pushed; the release workflow builds the tarballs and the release notes"
@@ -45,6 +56,46 @@ echo "sha256 $sha"
 retry git -C "$TAP" pull -q --ff-only
 sed -i '' -e "s#^  url \".*\"#  url \"$url\"#" -e "s#^  sha256 \".*\"#  sha256 \"$sha\"#" "$f"
 git -C "$TAP" add Formula/nt.rb
+
+if [ -n "$dmg" ]; then
+  # the release workflow makes the GitHub release a minute or so after the tag
+  for _ in $(seq 1 60); do gh release view "v$ver" >/dev/null 2>&1 && break; sleep 5; done
+  retry gh release upload "v$ver" "$dmg" --clobber
+  echo "added $(basename "$dmg") to the release"
+  mkdir -p "$TAP/Casks"
+  cat >"$TAP/Casks/nt-app.rb" <<EOF
+# nt for Mac: the notes repository in a window, nt's mark in the menu bar. Signed with a Developer
+# ID and notarized; scripts/release.sh in w4jnl/nt writes this file at every tag.
+cask "nt-app" do
+  version "$ver"
+  sha256 "$(shasum -a 256 "$dmg" | cut -d' ' -f1)"
+
+  url "https://github.com/w4jnl/nt/releases/download/v#{version}/nt-#{version}.dmg"
+  name "nt"
+  desc "Plain markdown notes, synced by git, in a Mac window"
+  homepage "https://github.com/w4jnl/nt"
+
+  depends_on macos: ">= :tahoe"
+
+  app "nt.app"
+
+  zap trash: [
+    "~/Library/Caches/nl.w4j.nt",
+    "~/Library/HTTPStorages/nl.w4j.nt",
+    "~/Library/Preferences/nl.w4j.nt.plist",
+    "~/Library/Saved Application State/nl.w4j.nt.savedState",
+    "~/Library/WebKit/nl.w4j.nt",
+  ]
+
+  caveats <<~EOS
+    nt for Mac works on a notes repository nt set up. Without one:
+      brew install w4jnl/tap/nt
+      nt init ~/notes
+  EOS
+end
+EOF
+  git -C "$TAP" add Casks/nt-app.rb
+fi
 git -C "$TAP" commit -q -m "nt $ver"
 retry git -C "$TAP" push -q
 echo "tap bumped: $f"
@@ -52,3 +103,4 @@ echo "tap bumped: $f"
 echo "release: https://github.com/w4jnl/nt/releases/tag/v$ver"
 echo "CI:      https://github.com/w4jnl/nt/actions  and  https://github.com/w4jnl/homebrew-tap/actions"
 echo "users:   brew update && brew upgrade nt"
+[ -z "$dmg" ] || echo "         brew install --cask w4jnl/tap/nt-app (brew upgrade --cask nt-app)"

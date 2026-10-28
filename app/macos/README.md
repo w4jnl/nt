@@ -55,6 +55,24 @@ The app bundles `nt` (`make nt-universal`) in `Contents/Helpers/nt`, the editor 
 design system's fonts. It is not sandboxed: it reads the repository where it is and runs nt,
 which takes the repository's locks.
 
+## Releasing
+
+`scripts/release.sh <version>` releases the app with the command line: before it tags, it runs
+`scripts/mac-release.sh <version>` (or `make mac-release V=<version>` on its own), which builds
+the app in Release with nt stamped with the version, signs both with the team's Developer ID,
+has Apple notarize the app and then the DMG, staples both and checks them as Gatekeeper does.
+After the tag it adds `nt-<version>.dmg` to the GitHub release and writes the cask
+(`brew install --cask w4jnl/tap/nt-app`).
+
+It needs, on the Mac that releases:
+
+- the team's Developer ID Application certificate in the keychain (Xcode › Settings › Accounts ›
+  Manage Certificates › + › Developer ID Application; keep a `.p12` backup of it);
+- in `Local.xcconfig`: `NT_TEAM_ID`, and the App Store Connect API key that notarizes,
+  `NT_ASC_KEY_ID` and `NT_ASC_ISSUER_ID` (a team key with the Developer role), its `.p8` in
+  `~/.appstoreconnect/private_keys/`;
+- `gh`, to add the DMG to the release.
+
 ## Third-party code
 
 The editor page bundles CodeMirror 6 and its parsers, MIT-licensed; their licences are in

@@ -422,6 +422,24 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
     them again whenever their notes change. The bottom line says so.
 - Not sandboxed and not on the Mac App Store: it reaches the repository where it is, runs nt and
   takes flocks. It ships Developer ID signed and notarized, as a DMG and a Homebrew cask.
+- **Shipping** (`scripts/mac-release.sh <version>`, which `scripts/release.sh` runs before it
+  tags). It ships on its own, apart from the command line: `brew install --cask
+  w4jnl/tap/nt-app`, or the DMG on the GitHub release; its version is the nt it bundles.
+  - nt is built for both architectures stamped `v<version>`, the app in Release for both, with
+    `MARKETING_VERSION` the version and the build number rising with it (0.5.1 → 501).
+  - The bundled nt, then the app, are signed with the team's Developer ID Application
+    certificate, with the hardened runtime and a secure timestamp. The app needs no exceptions
+    to the runtime and no entitlements.
+  - The app is notarized on its own and stapled, so the copy dragged to Applications carries its
+    ticket; then the DMG (the app and a link to Applications) is signed, notarized and stapled.
+    `notarytool` signs in with a team App Store Connect API key with the Developer role (in
+    `Local.xcconfig`, never committed); on anything but Accepted the script prints Apple's log.
+  - It checks both as Gatekeeper does (`spctl`: "Notarized Developer ID"; `stapler validate`)
+    before release.sh tags. After the tag, release.sh adds the DMG to the GitHub release and
+    writes `Casks/nt-app.rb` beside the formula in the tap: macOS 26 or later, `zap` for the
+    app's own files, a caveat that it works on a repository nt set up. `NT_NO_APP=1` releases
+    the command line alone.
+  - The app does not update itself: `brew upgrade --cask nt-app`, or a new DMG.
 - Nothing leaves the Mac. The editor page's content policy allows only the app's own files and
   `nt-asset:`, the repository's files, so a remote image in a note shows its alt text.
 
