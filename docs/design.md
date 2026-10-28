@@ -553,7 +553,23 @@ rendered text.
    needs you), a global hotkey (⌥⌘Space) that adds one line to today or a todo, and Settings:
    nt's through `nt config`, the app's own in UserDefaults. Done.
 5. **Shipping.** Developer ID signing, notarization, the DMG on the GitHub release,
-   `brew install --cask w4jnl/tap/nt-app`.
+   `brew install --cask w4jnl/tap/nt-app`. Done: 0.5.1, 2026-10-28.
+
+**Later**, kept for after the app has been used a while (nothing here is planned yet):
+- **First run without the command line.** Make or clone the notes repository from the app
+  (`nt init`, `nt init --clone`) with its bundled nt, so it stands on its own.
+- **The background sync and the agent hooks from Settings,** with the bundled nt or the one on
+  PATH (`nt install --sync`, `--hooks`); today they come from the command line.
+- **⌘K, the command palette**, every verb of the command line; in the first plan, not built.
+- **Typewriter scrolling and focus mode's defaults** in Settings; in the first plan, not built.
+- **The capture shortcut's default.** macOS keeps ⌥⌘Space for the Finder search window unless
+  it is turned off; Settings says so. Another default may serve better once it has been used.
+- **Tables rendered** in the editor; they are their source in mono now.
+- **The calendar's day:** tick its todos there too, as in Todos.
+- **The DMG:** a background and the icons laid out.
+- **Tests:** the Swift tests run inside the app and write its UserDefaults (the notes opened
+  last, the open folders); give them their own suite. `-NTOpen` can lose to today's journal
+  opening after it; open it after today.
 
 ---
 
@@ -608,8 +624,9 @@ rendered text.
 - Home and the viewer (0.5.0, 2026-10-28): the browser's root starts with the views and pins, as the Mac app's sidebar does (Home, §4); `nt <file>` and the viewer's reading keys make nt a viewer for any markdown or text file (The viewer, §4).
 - Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
 
-**6. Mac app** (§8). Steps 0 (design) and 1 (the reader) are done; writing, the views, the menu
-bar and capture, and shipping follow, one gate each.
+**6. Mac app** (§8). Done: steps 0 to 5, released with 0.5.1 (2026-10-28) as its own cask,
+`brew install --cask w4jnl/tap/nt-app`, or the notarized DMG. What could follow is under §8,
+Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27): swift-libgit2 or the GitHub API; sync on
 open, in the background and on push; an App Intent "append to today".

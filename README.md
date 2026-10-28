@@ -19,7 +19,7 @@ other editor.
 
 ## Setup
 
-Current version: 0.4.0 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
+Current version: 0.5.1 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
 search and find; details under [Requirements](#requirements).
 
 1. Install the binary. Homebrew, on macOS or Linux:
@@ -29,7 +29,7 @@ search and find; details under [Requirements](#requirements).
    Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
    (Linux and macOS, `amd64` and `arm64`, no Go, no root):
    ```sh
-   ver=0.4.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+   ver=0.5.1; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
    shasum -a 256 -c --ignore-missing sha256sums.txt
@@ -53,6 +53,11 @@ search and find; details under [Requirements](#requirements).
    nt install --hooks --skill   # a report for every Claude Code and Copilot CLI session
    ```
 5. Open the browser with `nt`, or one folder with `nt <folder>`; `?` lists the keys.
+6. Optional, on macOS 26 or later: nt for Mac, the note in live preview, nt's mark in the menu
+   bar and ⌥⌘Space to add a line from anywhere. Signed and notarized, with its own nt inside:
+   ```sh
+   brew install --cask w4jnl/tap/nt-app   # or the DMG from the releases page
+   ```
 
 `nt doctor` checks every step: the repository, git and the remote, the sync timer, the tools nt
 uses, the nvim plugin, the hooks and the skill, images, and the links in the notes.
@@ -225,7 +230,7 @@ What that means in practice:
   says how it changes. Read the release notes before `brew upgrade`.
 - Bug reports with a reproduction are welcome; support is best effort.
 
-nt is at 0.4.0 (2026-10-27). [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
+nt is at 0.5.1 (2026-10-28), the first release with nt for Mac. [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
 newest first; the same text is on each GitHub release.
 
 ## Credits and license
