@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// TreeRows are folders, each a disclosure group, and notes, newest first. A folder selects, as
-/// the place for a new note; a right-click, or a long press, has what can be done to either.
+/// the place for a new note; a right-click, a long press or a swipe has what can be done to
+/// either (itemActions).
 struct TreeRows: View {
     let nodes: [TreeNode]
     @Environment(Workspace.self) private var ws
@@ -13,13 +14,13 @@ struct TreeRows: View {
                     TreeRows(nodes: children)
                 } label: {
                     Label(node.name, systemImage: "folder")
-                        .contextMenu { ItemMenu(path: node.id, folder: true) }
+                        .itemActions(node.id, folder: true)
                 }
                 .tag(Workspace.Selection.folder(node.id))
             } else {
                 NoteRow(node: node, selected: ws.selection == .note(node.id))
                     .tag(Workspace.Selection.note(node.id))
-                    .contextMenu { ItemMenu(path: node.id, folder: false) }
+                    .itemActions(node.id, folder: false)
             }
         }
     }

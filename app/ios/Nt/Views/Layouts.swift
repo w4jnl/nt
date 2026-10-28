@@ -214,28 +214,3 @@ struct NoteMenu: ToolbarContent {
         }
     }
 }
-
-extension View {
-    /// itemActions are a row's long press (what can be done to it) and its swipe (delete).
-    func itemActions(_ path: String, folder: Bool) -> some View {
-        modifier(ItemActions(path: path, folder: folder))
-    }
-}
-
-struct ItemActions: ViewModifier {
-    @Environment(Workspace.self) private var ws
-    let path: String
-    let folder: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .contextMenu { ItemMenu(path: path, folder: folder) }
-            .swipeActions(edge: .trailing) {
-                if ws.deletable(path) {
-                    Button(role: .destructive) { ws.ask = .delete(path) } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-            }
-    }
-}

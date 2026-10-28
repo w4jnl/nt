@@ -180,3 +180,40 @@ struct ItemMenu: View {
         }
     }
 }
+
+extension View {
+    /// itemActions are what can be done to a row's note or folder: a right-click or a long press
+    /// has the menu; on iPhone and iPad a swipe to the right moves or renames, as Mail's rows
+    /// mark, and a swipe to the left deletes (after the question), a full swipe the first of each.
+    func itemActions(_ path: String, folder: Bool) -> some View {
+        modifier(ItemActions(path: path, folder: folder))
+    }
+}
+
+struct ItemActions: ViewModifier {
+    @Environment(Workspace.self) private var ws
+    let path: String
+    let folder: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu { ItemMenu(path: path, folder: folder) }
+            #if os(iOS)
+            .swipeActions(edge: .leading) {
+                if !ws.fixed(path) {
+                    Button { ws.ask = .move(path) } label: { Label("Move", systemImage: "folder") }
+                        .tint(Brand.accent)
+                    Button { ws.ask = .rename(path) } label: { Label("Rename", systemImage: "pencil") }
+                        .tint(Brand.muted)
+                }
+            }
+            .swipeActions(edge: .trailing) {
+                // no destructive role: that takes the row away before the question is answered
+                if ws.deletable(path) {
+                    Button { ws.ask = .delete(path) } label: { Label("Delete", systemImage: "trash") }
+                        .tint(Brand.alert)
+                }
+            }
+            #endif
+    }
+}

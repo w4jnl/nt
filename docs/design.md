@@ -700,7 +700,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     settings are its name and its key, which a new key replaces at once.
   - Notes and folders, as on the Mac: + on the home list (New Note at nt's default folder, New
     Folder at the root) and in a folder screen; a long press on a row has Rename, Move and
-    Delete, a swipe deletes, and a note's ⋯ has the same. On the iPhone a new note opens on a
+    Delete, and a note's ⋯ the same. A row swipes as in Mail: to the right Move and Rename, to
+    the left Delete, a full swipe the first of them (a delete still asks). On the iPhone a new note opens on a
     screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not
     tapped for), and a screen follows what it shows when it moves, or closes when it is deleted.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
