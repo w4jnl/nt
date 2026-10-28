@@ -49,7 +49,11 @@ func todoRef(it *todo.Item) string { return it.Path + ":" + strconv.Itoa(it.Line
 // setTodos fills the todo list with the todos read, open or done, in nt todo's order.
 func (b *browser) setTodos(msg todosMsg) tea.Cmd {
 	p := b.pick
-	if msg.seq != b.todoSeq || p == nil || !p.todos {
+	if msg.seq != b.todoSeq {
+		return nil
+	}
+	b.count(msg.items)
+	if p == nil || !p.todos {
 		return nil
 	}
 	todo.Sort(msg.items)

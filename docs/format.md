@@ -158,7 +158,7 @@ type: daily
 - **One file per agent session.**
   - The session's process is the only writer: the hook receiver, or the agent through `nt agent`.
   - The path is fixed by the date of the session's first event and never changes. A session that runs past midnight stays in its first day's folder.
-  - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`).
+  - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`). If the earlier one never ended, the writer ends it then: `ended` is its `updated`, its status is set as at an end, and its last log line links to the new file.
   - A writer that finds no report for the session (no hooks, or hooks added mid-session) starts one.
   - A session in a temporary folder (`/tmp`, `/var/tmp`, the system's temp folder) gets no report: it is a throwaway, such as a script's `claude -p` in a scratch folder.
 - **The host comes first in the name** (§3), so two machines never write the same file, also for the same project, agent and day. Clients show a report's host beside its title, which is the project's, so the reports of one project from two machines read apart.

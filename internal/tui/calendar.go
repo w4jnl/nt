@@ -85,6 +85,7 @@ func (b *browser) setCalTodos(msg calTodosMsg) {
 	if c == nil || msg.seq != c.seq {
 		return
 	}
+	b.count(msg.items)
 	todo.Sort(msg.items)
 	c.due, c.done = map[string][]todo.Item{}, map[string][]todo.Item{}
 	for _, it := range msg.items {

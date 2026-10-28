@@ -170,6 +170,27 @@ func TestSession(t *testing.T) {
 	if got := read(t, v, next).Get("continues"); got != "../2026-10-26/mbp--claude-code--notetaking--00893aaf.md" {
 		t.Errorf("continues: %q", got)
 	}
+	if r := read(t, v, rel); r.Get("ended") != stamp(at("2026-10-27 05:20")) || strings.Contains(r.Section("Log"), "continued in") {
+		t.Errorf("a report that ended is changed by the session going on: ended %q\n%s", r.Get("ended"), r.Section("Log"))
+	}
+
+	// went on the next day without ending (a resume, a compaction): the earlier report ends at
+	// its last update, with a line that links to the next
+	_, _ = Apply(v, state, ev("turn", "Wrote the plan.", ""), at("2026-10-27 22:40"))
+	third, _ := Apply(v, state, ev("start", "", ""), at("2026-10-28 08:15"))
+	if third == next || !strings.HasPrefix(third, "agents/2026/2026-10-28/") {
+		t.Fatalf("the session going on went to %s", third)
+	}
+	r = read(t, v, next)
+	if r.Get("ended") != stamp(at("2026-10-27 22:40")) || r.Get("status") != "done" || r.Get("updated") != stamp(at("2026-10-27 22:40")) {
+		t.Errorf("the earlier report: ended %q, status %q, updated %q", r.Get("ended"), r.Get("status"), r.Get("updated"))
+	}
+	if log := r.Section("Log"); !strings.Contains(log, "- 22:40 continued in [2026-10-28](../2026-10-28/mbp--claude-code--notetaking--00893aaf.md)") {
+		t.Errorf("the earlier report does not say where the session went on:\n%s", log)
+	}
+	if r := read(t, v, third); r.Get("status") != "in-progress" || r.Get("ended") != "" {
+		t.Errorf("the new report: status %q, ended %q", r.Get("status"), r.Get("ended"))
+	}
 }
 
 func TestEndStatus(t *testing.T) {

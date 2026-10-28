@@ -92,8 +92,9 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 
 ## Features
 
-- **The browser.** Folders and notes on the left, newest first; the note on the right, rendered,
-  with "Linked from" under it. Links in the note follow by click or by `f` and a letter, `b` goes
+- **The browser.** Today, the todos, the calendar, the weekly digest and the agents at the top
+  of the left pane, each with its key, then the pinned folders and every folder; in a folder, its
+  notes, newest first. The note on the right, rendered, with "Linked from" under it. Links in the note follow by click or by `f` and a letter, `b` goes
   back, and a link to a note that is not there is struck through. Search with `/`, a note by its
   title with `ctrl-p`, its links, outline and images with `l`, `o`, `i`. Images draw inline in
   Ghostty and kitty, tmux included.
@@ -128,12 +129,13 @@ Every command that prints data takes `--json`.
 | Command | What it does |
 |---|---|
 | `nt` / `nt <folder>` | the browser; `?` lists its keys |
+| `nt <file>` | any note or text file on the whole screen, as `nt view` shows it |
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "Title" [folder]` | a new dated note, linked from today's journal |
 | `nt f` / `nt s <query>` | find a note with fzf; search with rg |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
-| `nt view <file>` | one note rendered, images included; `e` edits it |
+| `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
 | `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
@@ -153,7 +155,7 @@ In the browser:
 |---|---|
 | `j` `k`, `enter`, `h` | move, open a folder or note, up a folder |
 | `tab` | to the note and back; `j` `k` then scroll it |
-| `t`, `[` `]`, `c`, `A` | today's journal, the day before or after, the calendar, today's agent reports |
+| `t`, `[` `]`, `c`, `w`, `A` | today's journal, the day before or after, the calendar, the newest weekly digest, today's agent reports |
 | `,` | the settings: enter changes one, `e` edits its file |
 | `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
 | `/`, `ctrl-p` | search every note, find a note by its title |

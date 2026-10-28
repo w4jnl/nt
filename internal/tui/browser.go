@@ -95,7 +95,8 @@ const (
 	onPreview
 )
 
-// entry is one row of the list: a folder or a note.
+// entry is one row of the list: a folder or a note; at the root also a view, a pinned folder or
+// the rule between them (home).
 type entry struct {
 	name, rel string
 	dir       bool
@@ -103,6 +104,22 @@ type entry struct {
 	host      string // the machine an agent report is from: <host>--… in its name
 	title     string
 	journal   bool
+
+	view string // today, todos, calendar, weekly or agents: a row of the home list
+	pin  bool   // a pinned folder in the home list
+	key  string // the key that does what the row does, at its right
+	rule bool   // the line between the home list's groups, never selected
+}
+
+// id tells rows apart: a view or a pinned folder by what it is, a folder or a note by its path.
+func (e entry) id() string {
+	switch {
+	case e.view != "":
+		return "view:" + e.view
+	case e.pin:
+		return "pin:" + e.rel
+	}
+	return e.rel
 }
 
 // pickItem is one row of a picker; what choosing it does depends on kind.
@@ -175,6 +192,9 @@ type browser struct {
 	todoSeq int
 	todoAt  *todo.Item // the todo the due prompt is for
 
+	todoOpen, todoLate int  // the open todos and the late ones, for the home list
+	todoKnown          bool // they have been counted
+
 	moving string // the note or folder m or R was pressed on
 
 	cal *calendar     // the calendar, in the list pane's place (calendar.go)
@@ -200,8 +220,9 @@ type (
 	previewMsg     struct{ seq int }
 	pickPreviewMsg struct{ seq int }
 	indexMsg       struct {
-		seq int
-		ix  *scan.Index
+		seq   int
+		ix    *scan.Index
+		todos []todo.Item
 	}
 	searchMsg struct {
 		seq     int
@@ -262,21 +283,101 @@ func (b *browser) tick() tea.Cmd {
 }
 
 // list reads the current folder: folders first, then notes, newest first. Hidden names, assets
-// folders and files other than notes are left out.
+// folders and files other than notes are left out. The root starts with the home list.
 func (b *browser) list() {
 	keep := ""
-	if b.sel < len(b.entries) {
-		keep = b.entries[b.sel].rel
+	if e, ok := b.selected(); ok {
+		keep = e.id()
 	}
 	b.entries = listFolder(b.v, b.dir)
+	if b.dir == "" {
+		b.entries = append(b.home(), b.entries...)
+	}
 	b.dirMod = modTime(b.v.Abs(b.dir))
 	b.sel = 0
 	for i, e := range b.entries {
-		if e.rel == keep {
+		if keep != "" && e.id() == keep {
 			b.sel = i
 		}
 	}
 	b.clampList()
+}
+
+// home is the top of the root's list (docs/design.md §4): the views, then the pinned folders,
+// each with the key that does the same, and a rule after each group.
+func (b *browser) home() []entry {
+	es := []entry{
+		{name: "Today", view: "today", key: "t"},
+		{name: "Todos", view: "todos", key: "x"},
+		{name: "Calendar", view: "calendar", key: "c"},
+		{name: "Weekly", view: "weekly", key: "w"},
+		{name: "Agents", view: "agents", key: "A"},
+		{rule: true},
+	}
+	pinned := false
+	for i, p := range b.v.Cfg.Pins {
+		rel := strings.Trim(p, "/")
+		if i >= 9 || !isDir(b.v.Abs(rel)) {
+			continue
+		}
+		es = append(es, entry{name: rel, rel: rel, dir: true, pin: true, key: strconv.Itoa(i + 1)})
+		pinned = true
+	}
+	if pinned {
+		es = append(es, entry{rule: true})
+	}
+	return es
+}
+
+// viewNote is the note a view's row shows while it is selected: today's journal, the newest
+// weekly digest, today's agent digest; "" when there is none, or for the todos and the calendar.
+func (b *browser) viewNote(view string) string {
+	today := b.v.Day(b.v.Now())
+	rel := ""
+	switch view {
+	case "today":
+		rel = b.v.JournalRel(today)
+	case "weekly":
+		rel, _ = weekly.Latest(b.v)
+	case "agents":
+		rel = b.v.AgentsRel(today) + "/README.md"
+	}
+	if rel == "" || !isFile(b.v.Abs(rel)) {
+		return ""
+	}
+	return rel
+}
+
+// openView does what a view's row stands for, as its key does.
+func (b *browser) openView(view string) tea.Cmd {
+	switch view {
+	case "today":
+		return b.today()
+	case "todos":
+		return b.openTodos(false)
+	case "calendar":
+		return b.openCalendar()
+	case "weekly":
+		return b.openWeekly()
+	case "agents":
+		return b.agents()
+	}
+	return nil
+}
+
+// count notes how many todos are open and how many of those are late, for the home list.
+func (b *browser) count(items []todo.Item) {
+	today := b.v.Day(b.v.Now())
+	b.todoOpen, b.todoLate, b.todoKnown = 0, 0, true
+	for _, it := range items {
+		if it.Done {
+			continue
+		}
+		b.todoOpen++
+		if _, late := it.Word(today); late {
+			b.todoLate++
+		}
+	}
 }
 
 var datePrefix = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})`)
@@ -347,19 +448,40 @@ func (b *browser) move(d int) tea.Cmd {
 		return nil
 	}
 	b.sel = max(0, min(len(b.entries)-1, b.sel+d))
+	b.offRule(d)
 	b.clampList()
 	b.loadSeq++
 	seq := b.loadSeq
 	return tea.Tick(60*time.Millisecond, func(time.Time) tea.Msg { return previewMsg{seq} })
 }
 
-// loadNow shows the selected note in the preview.
+// offRule moves the selection off a rule, on in the direction d it was going, else back.
+func (b *browser) offRule(d int) {
+	step := 1
+	if d < 0 {
+		step = -1
+	}
+	for n := 0; n < len(b.entries) && b.entries[b.sel].rule; n++ {
+		if next := b.sel + step; next >= 0 && next < len(b.entries) {
+			b.sel = next
+		} else {
+			step = -step
+		}
+	}
+}
+
+// loadNow shows the selected note in the preview, or for a view's row the note it stands for.
 func (b *browser) loadNow() tea.Cmd {
 	if b.cal != nil {
 		return b.calShow()
 	}
 	e, ok := b.selected()
-	if !ok || e.dir {
+	if ok && e.view != "" {
+		if rel := b.viewNote(e.view); rel != "" {
+			return b.show(rel)
+		}
+	}
+	if !ok || e.dir || e.view != "" {
 		b.showing = ""
 		b.p.open("", "")
 		b.p.vp.SetContent("")
@@ -533,6 +655,7 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return b, nil
 		}
 		b.ix = msg.ix
+		b.count(msg.todos)
 		if b.showing != "" {
 			b.p.extra = b.linkedFrom(b.showing)
 			b.p.render()
@@ -718,7 +841,7 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 	i := b.top + row
-	if i >= len(b.entries) {
+	if i >= len(b.entries) || b.entries[i].rule {
 		return nil
 	}
 	if i == b.sel {
@@ -748,9 +871,14 @@ func (b *browser) notePoint(x, y int) point {
 	return point{line: b.p.vp.YOffset() + row, col: max(0, x-left)}
 }
 
-// copy puts text on the clipboard with the OS, else through the terminal (OSC 52).
+// copy puts text on the clipboard and says so.
 func (b *browser) copy(text, what string) tea.Cmd {
 	b.say("copied "+what, false)
+	return copyText(text)
+}
+
+// copyText puts text on the clipboard with the OS, else through the terminal (OSC 52).
+func copyText(text string) tea.Cmd {
 	if clip.Write(text) == nil {
 		return nil
 	}
@@ -783,6 +911,9 @@ func (b *browser) poll() tea.Cmd {
 	}
 	if m := modTime(b.v.Abs(b.dir)); !m.Equal(b.dirMod) {
 		b.list()
+	}
+	if e, ok := b.selected(); ok && e.view != "" && b.pick == nil && b.cal == nil && b.viewNote(e.view) != b.showing {
+		cmds = append(cmds, b.loadNow()) // a journal or digest made since, by nt a or a sync
 	}
 	if b.cal != nil {
 		b.calRead()
@@ -862,16 +993,13 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		b.help = false
 		return nil
 	case "t":
-		rel, _, err := b.v.EnsureJournal(b.v.Now())
-		if err != nil {
-			b.say(err.Error(), true)
-			return nil
-		}
-		return b.reveal(rel)
+		return b.today()
 	case "[", "]":
 		return b.day(map[string]int{"[": -1, "]": 1}[s])
 	case "A":
 		return b.agents()
+	case "w":
+		return b.openWeekly()
 	case "x":
 		return b.openTodos(false)
 	case "c":
@@ -938,12 +1066,15 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// enter opens the selected row: a folder is entered, a note gets the focus, and on a narrow
-// screen the whole screen.
+// enter opens the selected row: a view does what its key does, a folder is entered, a note gets
+// the focus, and on a narrow screen the whole screen.
 func (b *browser) enter() tea.Cmd {
 	e, ok := b.selected()
 	if !ok {
 		return nil
+	}
+	if e.view != "" {
+		return b.openView(e.view)
 	}
 	if e.dir {
 		return b.openFolder(e.rel)
@@ -964,7 +1095,7 @@ func (b *browser) askDelete() tea.Cmd {
 	rel := b.showing
 	if b.focus == onList {
 		e, ok := b.selected()
-		if !ok {
+		if !ok || e.view != "" || e.pin {
 			return nil
 		}
 		if e.dir {
@@ -1039,6 +1170,7 @@ func (b *browser) afterDelete() tea.Cmd {
 	at := b.sel
 	b.list()
 	b.sel = max(0, min(at, len(b.entries)-1))
+	b.offRule(-1)
 	b.focus, b.full = onList, false
 	b.layout()
 	b.clampList()
@@ -1099,6 +1231,26 @@ func (b *browser) journalRel(day string) string {
 	return b.v.JournalRel(t)
 }
 
+// today goes to today's journal, starting it when there is none.
+func (b *browser) today() tea.Cmd {
+	rel, _, err := b.v.EnsureJournal(b.v.Now())
+	if err != nil {
+		b.say(err.Error(), true)
+		return nil
+	}
+	return b.reveal(rel)
+}
+
+// openWeekly goes to the newest weekly digest.
+func (b *browser) openWeekly() tea.Cmd {
+	rel, ok := weekly.Latest(b.v)
+	if !ok {
+		b.say("no weekly digest yet: nt config set weekly true on one machine", false)
+		return nil
+	}
+	return b.reveal(rel)
+}
+
 func (b *browser) agents() tea.Cmd {
 	rel := b.v.AgentsRel(b.v.Day(b.v.Now()))
 	if _, err := os.Stat(b.v.Abs(rel)); err != nil {
@@ -1141,7 +1293,7 @@ func (b *browser) editAt(rel string, line int) tea.Cmd {
 		line = b.p.sourceLine()
 	}
 	if line == 0 {
-		if e, ok := b.selected(); ok && e.journal && e.rel == rel {
+		if e, ok := b.selected(); ok && (e.journal && e.rel == rel || e.view == "today") {
 			line = editor.LastLine(b.v.Abs(rel))
 		}
 	}
@@ -1469,7 +1621,7 @@ func (b *browser) choose() tea.Cmd {
 		openDetached(osOpener(), it.target)
 		return nil
 	case "image":
-		return b.openImage(it.target)
+		return openImage(b.o.Machine.ImageViewer, b.o.Bin, it.target)
 	case "missing":
 		b.say(it.hint+": the link points to nothing", true)
 	case "folder":
@@ -1489,10 +1641,11 @@ func (b *browser) scrollTo(it pickItem) {
 	}
 }
 
-// openImage opens a picture full size: image_viewer from the config, else Quick Look on macOS,
-// xdg-open on a Linux desktop, and chafa in the terminal everywhere else (docs/design.md §5).
-func (b *browser) openImage(f string) tea.Cmd {
-	if v := strings.Fields(b.o.Machine.ImageViewer); len(v) > 0 {
+// openImage opens a picture full size: viewer (image_viewer from the config), else Quick Look on
+// macOS, xdg-open on a Linux desktop, and chafa through bin, nt itself, in the terminal
+// everywhere else (docs/design.md §5).
+func openImage(viewer, bin, f string) tea.Cmd {
+	if v := strings.Fields(viewer); len(v) > 0 {
 		openDetached(v, f)
 		return nil
 	}
@@ -1502,7 +1655,7 @@ func (b *browser) openImage(f string) tea.Cmd {
 	case os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "":
 		openDetached([]string{"xdg-open"}, f)
 	default:
-		return tea.ExecProcess(exec.Command(b.o.Bin, "_image", f), func(err error) tea.Msg { return editedMsg{err} })
+		return tea.ExecProcess(exec.Command(bin, "_image", f), func(err error) tea.Msg { return editedMsg{err} })
 	}
 	return nil
 }
@@ -1582,11 +1735,12 @@ func (b *browser) synced(st gitsync.Status) tea.Cmd {
 	return nil
 }
 
-// reindex reads every note again for titles and backlinks, off the screen's thread.
+// reindex reads every note again for titles and backlinks, and the todos for their count, off
+// the screen's thread.
 func (b *browser) reindex() tea.Cmd {
 	b.indexSeq++
-	seq, root := b.indexSeq, b.v.Root
-	return func() tea.Msg { return indexMsg{seq, scan.Build(root)} }
+	seq, root, v := b.indexSeq, b.v.Root, b.v
+	return func() tea.Msg { return indexMsg{seq, scan.Build(root), todo.Collect(v)} }
 }
 
 func modTime(p string) time.Time {

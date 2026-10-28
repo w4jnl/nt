@@ -100,6 +100,9 @@ func (p *preview) open(path, dir string) {
 func (p *preview) load() {
 	p.raw, p.err = os.ReadFile(p.path)
 	p.title = render.Title(p.raw, p.path)
+	if !markdown(p.path) {
+		p.title = filepath.Base(p.path)
+	}
 	if st, err := os.Stat(p.path); err == nil {
 		p.mod = st.ModTime()
 	}
@@ -124,16 +127,20 @@ func (p *preview) render() {
 		p.vp.SetContent(p.pal.Styles().Muted.Render("  " + p.err.Error()))
 		return
 	}
-	var place render.Placer
-	if p.img != nil {
-		place = p.place
-	}
-	r, err := render.NewAt(min(p.width-2, previewMax), p.dark, p.rel)
-	if err == nil {
-		p.body, err = r.RenderImages(p.raw, place)
-	}
-	if err != nil {
-		p.body = string(p.raw)
+	if markdown(p.path) {
+		var place render.Placer
+		if p.img != nil {
+			place = p.place
+		}
+		r, err := render.NewAt(min(p.width-2, previewMax), p.dark, p.rel)
+		if err == nil {
+			p.body, err = r.RenderImages(p.raw, place)
+		}
+		if err != nil {
+			p.body = string(p.raw)
+		}
+	} else {
+		p.body = p.plain()
 	}
 	lines := strings.Split(strings.TrimRight(p.body+p.extra, "\n"), "\n")
 	for i, l := range lines { // a pane never draws past its edge
@@ -145,6 +152,36 @@ func (p *preview) render() {
 	p.markMissing(lines)
 	p.lines = lines
 	p.vp.SetContentLines(lines)
+}
+
+// markdown reports a file the preview renders as markdown; any other is shown as written.
+func markdown(file string) bool {
+	switch strings.ToLower(filepath.Ext(file)) {
+	case ".md", ".markdown", ".mdown", ".mkd":
+		return true
+	}
+	return false
+}
+
+// plain is a file other than markdown as written: its lines in ink, in the margin a note has,
+// never joined, wrapped only where they reach the pane's edge. Escape sequences and other
+// control characters are left out, so a file cannot drive the terminal.
+func (p *preview) plain() string {
+	ink := lipgloss.NewStyle().Foreground(p.pal.Ink)
+	text := strings.ReplaceAll(strings.ReplaceAll(string(p.raw), "\r\n", "\n"), "\t", "    ")
+	var out []string
+	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		l = strings.Map(func(r rune) rune {
+			if r < 0x20 || r == 0x7f {
+				return -1
+			}
+			return r
+		}, ansi.Strip(l))
+		for _, part := range strings.Split(ansi.Wrap(l, max(1, p.width-4), ""), "\n") {
+			out = append(out, "  "+ink.Render(part))
+		}
+	}
+	return "\n" + strings.Join(out, "\n") + "\n"
 }
 
 // place draws a local image as placeholder rows, at most width cells wide and one row shorter
