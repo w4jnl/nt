@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -145,10 +146,10 @@ func ClaudeHooks(path, bin string, remove bool) (bool, error) {
 
 // ClaudeHooked lists the events of the Claude Code settings at path that have nt's hook, and
 // the binaries those hooks run.
-func ClaudeHooked(path string) (events []string) {
+func ClaudeHooked(path string) (events, bins []string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	var s struct {
 		Hooks map[string][]struct {
@@ -158,7 +159,7 @@ func ClaudeHooked(path string) (events []string) {
 		} `json:"hooks"`
 	}
 	if json.Unmarshal(data, &s) != nil {
-		return nil
+		return nil, nil
 	}
 	for _, kind := range kinds() {
 		event := Kinds[kind].Claude
@@ -166,11 +167,51 @@ func ClaudeHooked(path string) (events []string) {
 			for _, h := range e.Hooks {
 				if ours.MatchString(h.Command) {
 					events = append(events, event)
+					bins = append(bins, hookBinary(h.Command))
 				}
 			}
 		}
 	}
-	return events
+	return events, bins
+}
+
+// CopilotHooked lists the binaries the nt hooks in Copilot CLI's hooks file at path run; none
+// when there is no such file.
+func CopilotHooked(path string) (bins []string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var f struct {
+		Hooks map[string][]struct {
+			Bash string `json:"bash"`
+		} `json:"hooks"`
+	}
+	if json.Unmarshal(data, &f) != nil {
+		return nil
+	}
+	for _, kind := range kinds() {
+		for _, h := range f.Hooks[Kinds[kind].Copilot] {
+			if ours.MatchString(h.Bash) {
+				bins = append(bins, hookBinary(h.Bash))
+			}
+		}
+	}
+	return bins
+}
+
+// hookBinary is the binary a hook command of nt's runs: what comes before " agent ", unquoted
+// as quote quotes it.
+func hookBinary(cmd string) string {
+	i := strings.LastIndex(cmd, " agent ")
+	if i < 0 {
+		return ""
+	}
+	b := strings.TrimSpace(cmd[:i])
+	if len(b) >= 2 && b[0] == '\'' && b[len(b)-1] == '\'' {
+		b = strings.ReplaceAll(b[1:len(b)-1], `'\''`, `'`)
+	}
+	return b
 }
 
 // CopilotHooks writes nt's hooks file for Copilot CLI, or with remove deletes it. Copilot's

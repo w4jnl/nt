@@ -176,6 +176,8 @@ func syncChecks(m config.Machine, add func(name, state, format string, a ...any)
 		add("timer", "fail", "%v", err)
 	} else if !t.Loaded() {
 		add("timer", "warn", "not running: nt install --sync")
+	} else if bin := t.InstalledBin(); !runs(bin) {
+		add("timer", "fail", "it runs %s, which is not there, so nothing syncs: nt install --sync", tilde(bin))
 	} else {
 		add("timer", "ok", "%s every %s", gitsync.Label, short(t.Interval))
 	}
@@ -216,6 +218,52 @@ func summaryCheck(m config.Machine, add func(name, state, format string, a ...an
 	}
 }
 
+// hookChecks reports the agent hooks: which agents' sessions get reports, and that the nt the
+// hooks run is there, since a hook that cannot run fails without a word.
+func hookChecks(add func(name, state, format string, a ...any)) {
+	ev, bins := agents.ClaudeHooked(agents.ClaudeSettingsPath())
+	copilot := agents.CopilotHooked(agents.CopilotHooksPath())
+	for _, bin := range append(bins, copilot...) {
+		if !runs(bin) {
+			add("hooks", "fail", "they run %s, which is not there, so agent sessions get no reports: nt install --hooks", tilde(bin))
+			return
+		}
+	}
+	var who []string
+	if len(ev) == len(agents.Kinds) {
+		who = append(who, "Claude Code")
+	}
+	if len(copilot) == len(agents.Kinds) {
+		who = append(who, "Copilot CLI")
+	}
+	switch {
+	case len(ev) > 0 && len(ev) < len(agents.Kinds):
+		add("hooks", "warn", "only %s hooked in %s: nt install --hooks", strings.Join(ev, ", "), tilde(agents.ClaudeSettingsPath()))
+	case len(who) > 0:
+		add("hooks", "ok", "%s sessions get reports", strings.Join(who, " and "))
+	default:
+		add("hooks", "warn", "agent sessions get no reports: nt install --hooks")
+	}
+}
+
+// runs says whether bin, the nt a hook or the sync job runs, is there to run: an executable
+// file, or a name on PATH. An empty bin has nothing to check.
+func runs(bin string) bool {
+	if bin == "" {
+		return true
+	}
+	if rest, ok := strings.CutPrefix(bin, "~/"); ok {
+		home, _ := os.UserHomeDir()
+		bin = filepath.Join(home, rest)
+	}
+	if !filepath.IsAbs(bin) {
+		_, err := exec.LookPath(bin)
+		return err == nil
+	}
+	st, err := os.Stat(bin)
+	return err == nil && st.Mode().IsRegular() && st.Mode().Perm()&0o111 != 0
+}
+
 func toolChecks(add func(name, state, format string, a ...any)) {
 	if p, err := exec.LookPath("git"); err != nil {
 		add("git", "fail", "git is not installed")
@@ -229,14 +277,7 @@ func toolChecks(add func(name, state, format string, a ...any)) {
 	} else {
 		add("editor", "ok", "%s", ed)
 	}
-	switch ev := agents.ClaudeHooked(agents.ClaudeSettingsPath()); {
-	case len(ev) == len(agents.Kinds):
-		add("hooks", "ok", "Claude Code sessions get reports (%s)", tilde(agents.ClaudeSettingsPath()))
-	case len(ev) > 0:
-		add("hooks", "warn", "only %s hooked in %s: nt install --hooks", strings.Join(ev, ", "), tilde(agents.ClaudeSettingsPath()))
-	default:
-		add("hooks", "warn", "agent sessions get no reports: nt install --hooks")
-	}
+	hookChecks(add)
 	if s := skills.State(skills.Dir(), skills.Links()); s == "" {
 		add("skill", "ok", "%s", tilde(skills.Dir()))
 	} else {
