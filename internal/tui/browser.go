@@ -284,8 +284,9 @@ func (b *browser) tick() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{} })
 }
 
-// list reads the current folder: folders first, then notes, newest first. Hidden names, assets
-// folders and files other than notes are left out. The root starts with the home list.
+// list reads the current folder: folders first, then notes, newest first (in the agent reports,
+// a day's digest above them). Hidden names, assets folders and files other than notes are left
+// out. The root starts with the home list.
 func (b *browser) list() {
 	keep := ""
 	if e, ok := b.selected(); ok {
@@ -427,7 +428,12 @@ func listFolder(v *vault.Vault, dir string) []entry {
 		notes = append(notes, e)
 	}
 	sort.Slice(dirs, func(i, j int) bool { return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name) })
-	sort.Slice(notes, func(i, j int) bool { return notes[i].name > notes[j].name })
+	sort.Slice(notes, func(i, j int) bool {
+		if inAgents && (notes[i].name == "README.md") != (notes[j].name == "README.md") {
+			return notes[i].name == "README.md" // the day's digest above its reports
+		}
+		return notes[i].name > notes[j].name
+	})
 	return append(dirs, notes...)
 }
 

@@ -595,6 +595,9 @@ func TestAgentReportsShowTheirHost(t *testing.T) {
 	for _, e := range listFolder(b.v, day) {
 		hosts[e.name] = e.host
 	}
+	if e := listFolder(b.v, day); e[0].name != "README.md" {
+		t.Errorf("the day's digest is not first: %s", e[0].name)
+	}
 	if hosts["work--copilot-cli--vuln-remediation--43fbe292.md"] != "work" || hosts["jaromac--claude-code--flok--f0ceca08.md"] != "jaromac" || hosts["README.md"] != "" {
 		t.Fatalf("hosts %v", hosts)
 	}

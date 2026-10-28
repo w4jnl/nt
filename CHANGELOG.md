@@ -15,6 +15,7 @@ A home in the browser, and nt as a viewer for any file.
   their notes and dates; Calendar this month; Weekly the newest weekly digest; Agents today's
   digest. Enter does what the key does. Inside a folder the list is as before.
 - **`w`** goes to the newest weekly digest.
+- **A day's agent digest comes first** in its folder, above the reports, where it sorted last.
 - **`nt <file>`** shows a note, or any text file, on the whole screen, from anywhere: `nt
   README.md`, `nt ~/Downloads/spec.md`. Commands come first, and no command has a `.` or a `/`
   in its name, so `nt notes.md` or `nt ./sync` always means the file.
