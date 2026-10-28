@@ -72,10 +72,10 @@ cask "nt-app" do
 
   url "https://github.com/w4jnl/nt/releases/download/v#{version}/nt-#{version}.dmg"
   name "nt"
-  desc "Plain markdown notes, synced by git, in a Mac window"
+  desc "Plain markdown notes, synced by git, in live preview"
   homepage "https://github.com/w4jnl/nt"
 
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
 
   app "nt.app"
 
