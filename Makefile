@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/w4jnl/nt/internal/cli.Version=$(VERSION)
 
-.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core ios-libgit2 ios-project ios-build ios-test ios-ssh-test ios-device
+.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core ios-libgit2 ios-project ios-build ios-test ios-ssh-test ios-device ios-testflight
 
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/$(BIN) ./cmd/$(BIN)
@@ -73,6 +73,12 @@ IOS := app/ios
 GOMOBILE ?= $(shell command -v gomobile || echo $(HOME)/go/bin/gomobile)
 IOS_SIM ?= platform=iOS Simulator,name=iPhone 17
 IOS_XCODEBUILD = cd $(IOS) && xcodebuild -project Nt.xcodeproj -scheme Nt -configuration Debug -derivedDataPath build/DerivedData
+# The App Store Connect API key in app/ios/Local.xcconfig (NT_ASC_KEY_ID, NT_ASC_ISSUER_ID) signs in
+# for signing and uploads in place of Xcode's account; without one, Xcode's account is used.
+ios_conf = $(shell sed -n 's/^$(1)[[:space:]]*=[[:space:]]*//p' $(IOS)/Local.xcconfig 2>/dev/null)
+IOS_ASC_KEY_ID ?= $(call ios_conf,NT_ASC_KEY_ID)
+IOS_ASC_ISSUER_ID ?= $(call ios_conf,NT_ASC_ISSUER_ID)
+IOS_ASC_AUTH = $(if $(IOS_ASC_KEY_ID),-authenticationKeyPath '$(HOME)/.appstoreconnect/private_keys/AuthKey_$(IOS_ASC_KEY_ID).p8' -authenticationKeyID $(IOS_ASC_KEY_ID) -authenticationKeyIssuerID $(IOS_ASC_ISSUER_ID))
 
 ios-core:
 	@[ -x "$(GOMOBILE)" ] || { echo "gomobile: go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest" >&2; exit 1; }
@@ -106,9 +112,18 @@ ios-device: ios-project
 	[ -n "$$udid" ] || { echo "ios-device: no iPhone or iPad reachable: unlock it, on a cable or on the same Wi-Fi" >&2; exit 1; }; \
 	xcrun devicectl list devices 2>/dev/null | grep "$$udid" | grep -qE ' connected | available \(paired\) ' || { \
 	  echo "ios-device: $$udid is not reachable: wake and unlock it and connect it with a cable (Trust this computer); xcrun devicectl list devices shows it as connected once it is" >&2; exit 1; }; \
-	$(IOS_XCODEBUILD) -destination "id=$$udid" -allowProvisioningUpdates -allowProvisioningDeviceRegistration build -quiet && \
+	$(IOS_XCODEBUILD) -destination "id=$$udid" -allowProvisioningUpdates -allowProvisioningDeviceRegistration $(IOS_ASC_AUTH) build -quiet && \
 	xcrun devicectl device install app --device "$$udid" build/DerivedData/Build/Products/Debug-iphoneos/nt.app >/dev/null && \
 	xcrun devicectl device process launch --terminate-existing --device "$$udid" nl.w4j.nt.ios >/dev/null && echo "ios-device: installed and launched on $$udid"
+
+# TestFlight: nt for the phone built afresh, a Release archive, exported for App Store Connect and
+# uploaded (ExportOptions.plist; Xcode raises the build number when the one in project.yml is
+# taken). The app's record for nl.w4j.nt.ios must exist in App Store Connect.
+ios-testflight: ios-core ios-project
+	@echo "ios-testflight: archiving and uploading $(IOS) (the key's ids stay out of the log)"
+	@cd $(IOS) && rm -rf build/Nt.xcarchive build/export && \
+	xcodebuild -project Nt.xcodeproj -scheme Nt -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData -archivePath build/Nt.xcarchive -allowProvisioningUpdates $(IOS_ASC_AUTH) archive -quiet && \
+	xcodebuild -exportArchive -archivePath build/Nt.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/export -allowProvisioningUpdates $(IOS_ASC_AUTH)
 
 # nt for Mac for a release, V=0.5.1: signed with the Developer ID, notarized, stapled, and the
 # DMG that carries it, in app/macos/build/release (scripts/mac-release.sh; release.sh runs it).

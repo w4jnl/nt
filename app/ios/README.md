@@ -18,6 +18,7 @@ make ios-build      # the core and libgit2 when missing, the project, a simulato
 make ios-test       # the Swift tests in the simulator
 make ios-ssh-test   # ssh with the phone's key, against a throwaway sshd on 127.0.0.1
 make ios-device     # build, install and launch on a connected iPhone or iPad
+make ios-testflight # archive and upload to App Store Connect, for TestFlight
 make ios-core       # rebuild nt for the phone after a change to the Go code
 ```
 
@@ -25,8 +26,13 @@ make ios-core       # rebuild nt for the phone after a change to the Go code
 `make ios-libgit2` (`scripts/ios-libgit2.sh`) builds libgit2 1.9 with ssh through libssh2 on
 mbedTLS, from source tarballs whose SHA-256 it checks, into `build/Git2.xcframework`. Neither is
 committed. `make ios-project` writes an empty `Local.xcconfig`; put your team id in it
-(`Local.xcconfig.example`) for a device build. Simulator builds are signed ad hoc, so the
-Keychain works there.
+(`Local.xcconfig.example`) for a device build, and an App Store Connect API key for TestFlight.
+Simulator builds are signed ad hoc, so the Keychain works there.
+
+TestFlight needs the app's record in App Store Connect once (Apps › New App, iOS, bundle id
+`nl.w4j.nt.ios`); `make ios-testflight` then archives a Release build, exports it with
+`ExportOptions.plist` (Xcode raises the build number) and uploads it. App Store Connect asks
+about encryption for each build: the app uses ssh (libssh2 and mbedTLS) to reach the repository.
 
 ## The first run
 
