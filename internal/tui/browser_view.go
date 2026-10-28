@@ -215,6 +215,8 @@ func (b *browser) row(e entry, selected bool, w int) string {
 		body = text.Render(" "+e.date) + muted.Render("  "+dayWord(e.date))
 	case e.date != "":
 		body = faint.Render(" "+e.date+" ") + text.Render(firstNonEmpty(e.title, e.name))
+	case e.host != "":
+		body = faint.Render(" "+e.host+" ") + text.Render(firstNonEmpty(e.title, e.name))
 	default:
 		body = text.Render(" " + firstNonEmpty(e.title, e.name))
 	}

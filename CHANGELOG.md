@@ -4,6 +4,19 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.4.1 (2026-10-28)
+
+Agent reports from two machines read apart, without noise.
+
+- **Which machine.** The browser shows an agent report's host, faint, before its title, as it
+  shows a note's date: `work vuln-remediation`, `jaromac flok`. Reports of one project from two
+  machines never share a file, since the host is the first part of the name, and now read apart
+  too.
+- **No throwaway sessions.** A session in a temporary folder (`/tmp`, `/var/tmp`, `$TMPDIR`), such
+  as a script's `claude -p` probe in a scratch folder, gets no report.
+- **No repeated lines.** Copilot CLI sends several `agentStop`s for one turn; a log line that
+  repeats the last one in the same minute is no longer written again.
+
 ## 0.4.0 (2026-10-27)
 
 Weekly summaries, and settings from nt.

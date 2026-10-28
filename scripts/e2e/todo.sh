@@ -81,12 +81,13 @@ key Escape
 expect_soon "esc goes back to the folders" 't today.*x todos' footer
 
 # --- the calendar
-A todo add "Dentist" --due +2d >/dev/null
+# eight days on: never this week's Friday, when the passport is due
+A todo add "Dentist" --due +8d >/dev/null
 key c
 expect_soon "c shows this month" "$(LC_ALL=C date '+%B %Y')" capture
 expect_soon "with its keys in the footer" 'h l day +j k week +\[ \] month' footer
-key l; key l
-expect_soon "the day two days on has the dentist" '○ Dentist' capture
+key j; key l
+expect_soon "the day eight days on has the dentist" '○ Dentist' capture
 key x
 expect_soon "x lists that day's todos" '· todo · 1 open' capture
 key Escape
