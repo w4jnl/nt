@@ -5,7 +5,9 @@ A second client of the same repository; docs/design.md §8 is the spec, and phas
 steps, all done and released with 0.5.1 (`brew install --cask w4jnl/tap/nt-app`, or the
 notarized DMG on the release). It shows notes in live preview, follows links, saves what is
 written in them through nt (`nt _editor save`) as the nvim plugin does, and has the Todos,
-Calendar, Weekly and Agents views. It stays in the menu bar, where ⌥⌘Space opens a field that
+Calendar, Weekly and Agents views. A folder selects as the place for a new note, and a
+right-click makes, renames, moves or deletes notes and folders, their links kept. It stays in the
+menu bar, where ⌥⌘Space opens a field that
 adds a line to today or a todo from anywhere, and Settings (⌘,) has nt's settings and its own.
 
 macOS keeps ⌥⌘Space for the Finder search window until it is turned off in System Settings ›

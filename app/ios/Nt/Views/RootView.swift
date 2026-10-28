@@ -63,6 +63,7 @@ struct WorkspaceView: View {
         .background(Brand.ground)
         .tint(Brand.accent)
         .overlay(alignment: .bottom) { Flash() }
+        .modifier(Asking())
         .quickLookPreview(Binding(get: { ws.preview }, set: { ws.preview = $0 }))
     }
 }

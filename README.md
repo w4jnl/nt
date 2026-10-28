@@ -110,8 +110,9 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   `x` lists them all, overdue first; `x` checks one, `d` sets its due date. `c` shows the month,
   with the days that have a journal and the days with todos due marked. `nt todo` does the same
   from the shell.
-- **Folders.** `nt mv`, `nt rename` and `nt mkdir`, or `m`, `R` and `N` in the browser. A move
-  rewrites every link to what moved and in it, and takes along the images only that note uses.
+- **Folders.** `nt mv`, `nt rename`, `nt mkdir` and `nt rm`, or `m`, `R`, `N` and `D` in the
+  browser. A move rewrites every link to what moved and in it, and takes along the images only
+  that note uses; a delete takes those images and the note's line in its day's journal.
 - **The weekly digest.** One machine compiles each week into `weekly/2026/2026-W44.md`: the notes
   made and changed, the todos done and due, the agent sessions, and every day's journal lines.
   With a summary tool set, each machine adds its own week in three short lists, Done, Decided and
@@ -143,7 +144,7 @@ Every command that prints data takes `--json`.
 | `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
-| `nt mv`, `nt rename`, `nt mkdir` | move and rename notes and folders with their links, make a folder |
+| `nt mv`, `nt rename`, `nt mkdir`, `nt rm` | move and rename notes and folders with their links, make a folder, delete a note or an empty folder |
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
 | `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
 | `nt sync`, `nt doctor` | sync now; check the setup |

@@ -120,6 +120,7 @@ Decisions taken with the user (2026-10-26):
 | `nt mv <note\|folder> <to> [--dry-run]` | Move a note or a folder; every link to it and in it is fixed, and the images only it uses go along (Folders, below) |
 | `nt rename <note\|folder> <new>` | A note's new title and the file name that goes with it, its date kept; a folder's new name |
 | `nt mkdir <folder>` | A new folder, with a `.gitkeep` so git keeps it while it is empty |
+| `nt rm <note\|folder> [--dry-run]` | Delete a note, with the images no other note uses and its line in the journal of its day, or an empty folder, as the browser's `D` does; `--json` says what goes and how many notes link to it |
 | `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
 | `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
@@ -460,9 +461,17 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
   the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
-- New note (⌘N) is the same field for a title: `nt n` makes the note in the folder of the one on
-  screen (nt's default folder from a journal, an agent report, a digest or the root), links it
-  from today's journal and opens it with the cursor at its end.
+- New note (⌘N) is the same field for a title: `nt n` makes the note in the folder selected in
+  the sidebar, else in the folder of the one on screen (nt's default folder from a journal, an
+  agent report, a digest or the root), links it from today's journal and opens it with the
+  cursor at its end.
+- **Notes and folders** (added 2026-10-28). A folder in the sidebar selects, as the place for
+  ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, Rename…,
+  Move… and Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note… and
+  New Folder… at the root. They ask first, in an alert or a sheet of folders (a name that is no
+  folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
+  a delete says what goes with it and how many notes link to it. The journals, the agents'
+  reports and the digests are not renamed or moved.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
 
@@ -689,6 +698,11 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - A photo goes in as a JPEG through `nt paste --from`, which takes no HEIC.
   - Settings shows the repository's settings (`.nt/config.toml`); the phone's own machine
     settings are its name and its key, which a new key replaces at once.
+  - Notes and folders, as on the Mac: + on the home list (New Note at nt's default folder, New
+    Folder at the root) and in a folder screen; a long press on a row has Rename, Move and
+    Delete, a swipe deletes, and a note's ⋯ has the same. On the iPhone a new note opens on a
+    screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not
+    tapped for), and a screen follows what it shows when it moves, or closes when it is deleted.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;

@@ -39,6 +39,7 @@ var commands = []command{
 	{[]string{"mv", "move"}, "move a note or folder, its links fixed", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", "folder"}},
 	{[]string{"rename"}, "a note's new title and file name, or a folder's new name", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", ""}},
 	{[]string{"mkdir"}, "a new folder, kept by git while it is empty", []flag{jsonFlag}, []string{"folder"}},
+	{[]string{"rm"}, "delete a note, its unshared images and journal line, or an empty folder", []flag{{"--dry-run", "show what goes, delete nothing", ""}, jsonFlag}, []string{"path"}},
 	{[]string{"todo"}, "the todo list: add, check, due dates", []flag{{"--done", "the done ones", ""}, {"--all", "open and done", ""}, {"--due", "when it is due", "(today tomorrow mon tue wed thu fri sat sun none)"}, {"--in", "add to this folder's todo.md", "folder"}, jsonFlag}, []string{"(add done undo due rm)"}},
 	{[]string{"init"}, "make a folder a notes repository", []flag{{"--clone", "clone this repository", "url"}, jsonFlag}, []string{"dir"}},
 	{[]string{"sync"}, "commit, merge and push now", []flag{jsonFlag}, nil},

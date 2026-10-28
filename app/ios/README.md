@@ -48,7 +48,9 @@ after the typing stops, a save that lands only on the version it was read from, 
 while unsaved, a conflict copy when both changed the same line. The bar above the keyboard has a
 task box, a heading, a link, a photo (from the library or the camera, saved beside the note as a
 JPEG), undo, redo and done. The pencil at the foot of the home list adds a line to today, or a
-todo. The phone syncs when it opens, half a minute after it wrote, when you leave it (a background
+todo. + on the home list and in a folder makes a note or a folder there; a long press on a row,
+or a note's ⋯, renames, moves or deletes it (nt rename, mv and rm, which keep the links), and a
+swipe deletes. The phone syncs when it opens, half a minute after it wrote, when you leave it (a background
 task lets it finish), when you come back to it, and in background refresh when iOS allows.
 
 ## The screens

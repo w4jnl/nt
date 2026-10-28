@@ -30,6 +30,15 @@ struct HomeList: View {
             ToolbarItem(placement: .topBarLeading) { Mark() }
                 .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("New Note…") { ws.ask = .newNote("") }
+                    Button("New Folder…") { ws.ask = .newFolder("") }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("New note or folder")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 if stacked {
                     NavigationLink(value: Route.settings) { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
@@ -142,11 +151,14 @@ struct HomeList: View {
     private func folders(_ nodes: [TreeNode], counts: Bool = false) -> some View {
         if stacked {
             ForEach(nodes) { node in
-                if node.isFolder {
-                    NavigationLink(value: Route.folder(node.id)) { FolderLabel(node: node, count: counts) }
-                } else {
-                    NavigationLink(value: Route.note(node.id)) { NoteRow(node: node) }
+                Group {
+                    if node.isFolder {
+                        NavigationLink(value: Route.folder(node.id)) { FolderLabel(node: node, count: counts) }
+                    } else {
+                        NavigationLink(value: Route.note(node.id)) { NoteRow(node: node) }
+                    }
                 }
+                .itemActions(node.id, folder: node.isFolder)
             }
             .listRowBackground(Brand.surface)
         } else {

@@ -22,6 +22,7 @@ import (
 	"github.com/w4jnl/nt/internal/editor"
 	"github.com/w4jnl/nt/internal/gitsync"
 	"github.com/w4jnl/nt/internal/mdparse"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/render"
 	"github.com/w4jnl/nt/internal/scan"
 	"github.com/w4jnl/nt/internal/search"
@@ -1198,29 +1199,21 @@ func (b *browser) askDelete() tea.Cmd {
 	if rel == "" {
 		return nil
 	}
-	raw, _ := os.ReadFile(b.v.Abs(rel))
-	var images []string
-	for _, l := range mdparse.Parse(raw).Links {
-		if !l.Image {
-			continue
-		}
-		if f, ok := localImage(b.v.Abs(rel), l.Dest); ok {
-			if r := b.v.RelPath(f); !strings.HasPrefix(r, "../") && strings.Contains("/"+r, "/assets/") && isFile(f) {
-				images = append(images, r)
-			}
-		}
+	r, err := ops.Remove(b.v, rel, true)
+	if err != nil {
+		b.say(err.Error(), true)
+		return nil
 	}
-	images = b.v.Unshared(rel, images)
-	what := strconv.Quote(firstNonEmpty(render.Title(raw, rel), rel))
-	if len(images) > 0 {
-		what += " and " + plural(len(images), "image")
+	what := strconv.Quote(firstNonEmpty(r.Title, rel))
+	if len(r.Images) > 0 {
+		what += " and " + plural(len(r.Images), "image")
 	}
 	text := "delete " + what + "?"
-	if n := b.linkers(rel); n > 0 {
-		text += " " + plural(n, "note") + " link to it"
+	if r.Links > 0 {
+		text += " " + plural(r.Links, "note") + " link to it"
 	}
 	b.ask = &question{text, func() tea.Cmd {
-		if err := b.v.Delete(rel, images); err != nil {
+		if _, err := ops.Remove(b.v, rel, false); err != nil {
 			b.say(err.Error(), true)
 			return nil
 		}
@@ -1228,21 +1221,6 @@ func (b *browser) askDelete() tea.Cmd {
 		return b.afterDelete()
 	}}
 	return nil
-}
-
-// linkers is how many notes link to rel, leaving out the journal line delete takes away.
-func (b *browser) linkers(rel string) int {
-	if b.ix == nil {
-		return 0
-	}
-	n := 0
-	day := datePrefix.FindString(path.Base(rel))
-	for _, from := range b.ix.Back[rel] {
-		if day == "" || from != b.journalRel(day) {
-			n++
-		}
-	}
-	return n
 }
 
 // afterDelete shows the list again with the row that took the deleted one's place.
