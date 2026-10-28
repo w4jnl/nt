@@ -221,30 +221,56 @@ func TestTodoList(t *testing.T) {
 	}
 	read := func() string { s, _ := os.ReadFile(b.v.Abs("todo.md")); return string(s) }
 	rows := func() (out []string) {
-		for _, it := range b.pick.items {
-			out = append(out, it.todo.Text)
+		for _, it := range b.tv.rows() {
+			out = append(out, it.Text)
 		}
 		return out
 	}
+	selected := func() string {
+		if it := b.tv.selected(); it != nil {
+			return it.Text
+		}
+		return ""
+	}
 
+	// x shows every todo in the note's pane, the folder list staying as it was
 	press(b, "x")
-	if b.pick == nil || !b.pick.todos || b.pick.title != "todo · 3 open · 1 late" {
-		t.Fatalf("x does not show the todo list: %+v", b.pick)
+	if b.tv == nil || b.focus != onPreview || b.dir != "tech" || b.pick != nil {
+		t.Fatalf("x does not show the todos beside the list: %+v", b.tv)
 	}
 	if got := strings.Join(rows(), ", "); got != "Call the plumber, Renew passport, from a note" {
 		t.Fatalf("the open todos: %s", got)
 	}
-	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "○ Call the plumber") || !strings.Contains(screen, "2d late") {
-		t.Fatalf("the list on screen:\n%s", screen)
+	screen := ansi.Strip(b.View().Content)
+	for _, want := range []string{"3 open todos · 1 late", "○ Call the plumber", "2d late", "[nt]  todos"} {
+		if !strings.Contains(screen, want) {
+			t.Fatalf("the todos on screen lack %q:\n%s", want, screen)
+		}
 	}
 	if f := ansi.Strip(b.footer()); !strings.Contains(f, "x done") || !strings.Contains(f, "d due") {
 		t.Errorf("footer: %s", f)
 	}
 
-	press(b, "x") // checks the selected one
-	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") || len(b.pick.items) != 2 {
-		t.Fatalf("x does not check the todo:\n%s", read())
+	press(b, "x") // checks the selected one, which stays a moment with its tick
+	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") || rows()[0] != "Call the plumber" {
+		t.Fatalf("x does not check the todo, or moves it at once: %v\n%s", rows(), read())
 	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "✓ Call the plumber") {
+		t.Fatalf("the ticked row does not show its tick:\n%s", screen)
+	}
+	press(b, "x") // another x takes it back
+	press(b, "x")
+	if !strings.Contains(read(), "- [x] Call the plumber due:2026-10-25 done:2026-10-27\n") {
+		t.Fatalf("x twice more does not check it again:\n%s", read())
+	}
+	run(b, todoSettleMsg{b.todoSettleSeq}) // the ticks settle: it goes under Done, the next is selected
+	if got := strings.Join(rows(), ", "); got != "Renew passport, from a note, Call the plumber" || selected() != "Renew passport" {
+		t.Fatalf("after the ticks settle: %s, selected %q", got, selected())
+	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "▾ Done 1") {
+		t.Fatalf("no Done under the open ones:\n%s", screen)
+	}
+	run(b, todoSettleMsg{b.todoSettleSeq - 1}) // an older tick's settling does nothing
 
 	press(b, "d") // the selected one, Renew passport, is due friday
 	press(b, "fri")
@@ -260,22 +286,35 @@ func TestTodoList(t *testing.T) {
 	press(b, "Buy milk")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
 	list, _ := os.ReadFile(b.v.Abs("tech/todo.md"))
-	if string(list) != "# Todo\n\n## Inbox\n\n- [ ] Buy milk\n" || b.todoSelected() == nil || b.todoSelected().Text != "Buy milk" {
-		t.Fatalf("a does not add a todo to the folder's list:\n%s", list)
+	if string(list) != "# Todo\n\n## Inbox\n\n- [ ] Buy milk\n" || selected() != "Buy milk" {
+		t.Fatalf("a does not add a todo to the folder's list (selected %q):\n%s", selected(), list)
 	}
 
+	press(b, "X") // folds Done
+	if got := strings.Join(rows(), ", "); got != "Renew passport, Buy milk, from a note" || !strings.Contains(ansi.Strip(b.footer()), "X show done") {
+		t.Fatalf("X does not fold the done ones: %s", got)
+	}
 	press(b, "X")
-	if got := strings.Join(rows(), ", "); got != "Call the plumber" || !strings.Contains(ansi.Strip(b.footer()), "x open again") {
-		t.Fatalf("X does not show the done ones: %s", got)
+	press(b, "G") // the done one, last
+	if selected() != "Call the plumber" || !strings.Contains(ansi.Strip(b.footer()), "x open again") {
+		t.Fatalf("G selects %q", selected())
 	}
 	press(b, "D")
 	press(b, "y")
-	if strings.Contains(read(), "plumber") || len(b.pick.items) != 0 {
+	if strings.Contains(read(), "plumber") || strings.Contains(strings.Join(rows(), ","), "plumber") {
 		t.Fatalf("D y does not delete the todo:\n%s", read())
 	}
+
+	press(b, "g") // enter opens the note a todo is in, at it
+	press(b, "jj")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.tv != nil || b.showing != "tech/2026-10-20-a.md" {
+		t.Fatalf("enter on a todo opens %q (todos still shown: %v)", b.showing, b.tv != nil)
+	}
+	press(b, "x")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
-	if b.pick != nil {
-		t.Fatal("esc does not close the todo list")
+	if b.tv != nil || b.focus != onList {
+		t.Fatal("esc does not close the todos")
 	}
 }
 
@@ -658,13 +697,21 @@ func TestHomeList(t *testing.T) {
 	// a view shows what it stands for: the open todos with their notes and dates, the month
 	press(b, "j")
 	pane := ansi.Strip(b.previewPane(80, 20))
-	for _, want := range []string{"2 open todos · 1 late", "○ Call the plumber  todo.md", "3d late", "○ Renew passport", "enter opens the list"} {
+	for _, want := range []string{"2 open todos · 1 late", "○ Call the plumber  todo.md", "3d late", "○ Renew passport", "▾ Done 1", "✓ Done already", "enter, then: x checks"} {
 		if !strings.Contains(pane, want) {
 			t.Errorf("Todos shows no %q:\n%s", want, pane)
 		}
 	}
-	if strings.Contains(pane, "Done already") {
-		t.Errorf("Todos shows a done todo:\n%s", pane)
+	if b.tv != nil {
+		t.Fatal("selecting Todos gave it the keys")
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter}) // enter gives them the keys, esc takes them back
+	if b.tv == nil || b.focus != onPreview || b.tv.selected() == nil || b.tv.selected().Text != "Call the plumber" {
+		t.Fatalf("enter on Todos: %+v", b.tv)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if e, _ := b.selected(); b.tv != nil || b.focus != onList || e.id() != "view:todos" {
+		t.Fatalf("esc from the todos: on %q, todos %v", e.id(), b.tv != nil)
 	}
 	press(b, "j")
 	pane = ansi.Strip(b.previewPane(80, 20))

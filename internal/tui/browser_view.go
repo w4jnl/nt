@@ -63,6 +63,9 @@ func (b *browser) brandLine() string {
 	if b.set != nil {
 		where = "settings"
 	}
+	if b.tv != nil {
+		where = "todos"
+	}
 	if b.full && b.showing != "" {
 		where = b.showing
 	}
@@ -162,12 +165,15 @@ func (b *browser) previewPane(w, h int) string {
 	if b.set != nil {
 		return b.settingsPane(w, h)
 	}
+	if b.tv != nil {
+		return b.todoViewPane(b.tv, w, h, true)
+	}
 	if b.showing == "" {
 		if b.cal != nil {
 			return "\n  " + b.st.Muted.Render("no journal on "+b.cal.day.Format("Monday 2 January 2006")) + "\n  " + b.st.Faint.Render("e starts one")
 		}
-		if e, ok := b.selected(); ok && e.view == "todos" {
-			return b.todoPreview(w, h)
+		if b.homeTodosShown() {
+			return b.todoViewPane(b.homeTodos(), w, h, false)
 		}
 		if e, ok := b.selected(); ok && e.view == "calendar" && b.homeCal != nil {
 			return b.monthPane(b.homeCal, w, h, true)
@@ -185,33 +191,6 @@ func (b *browser) previewPane(w, h int) string {
 		return ""
 	}
 	return b.p.View()
-}
-
-// todoPreview is the open todos in the note's place while the home list's Todos is selected:
-// overdue first, each with the note it is in and when it is due, as many as fit.
-func (b *browser) todoPreview(w, h int) string {
-	what, how := b.viewHint("todos")
-	rows := []string{"", "  " + b.st.Muted.Render(what), ""}
-	var open []todo.Item
-	for _, it := range b.todoItems {
-		if !it.Done {
-			open = append(open, it)
-		}
-	}
-	room := max(1, h-len(rows)-2) // the hint under them, after a blank line
-	for i, it := range open {
-		if i == room-1 && len(open) > room {
-			rows = append(rows, "  "+b.st.Faint.Render("and "+strconv.Itoa(len(open)-i)+" more"))
-			break
-		}
-		rows = append(rows, " "+b.todoRow(it, false, w-2, b.todoFrom(it)))
-	}
-	if len(open) > 0 {
-		rows = append(rows, "", "  "+b.st.Faint.Render("enter opens the list: x checks one, d sets its due date, a adds one"))
-	} else if b.todoKnown {
-		rows = append(rows, "  "+b.st.Faint.Render(how))
-	}
-	return strings.Join(rows, "\n")
 }
 
 // todoFrom names the note a todo is in: a todo list by its path, any other note by its title.
@@ -393,7 +372,7 @@ func (b *browser) helpText(w, h int) string {
 		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "~", "the root, from anywhere", "tab", "to the note and back", "g G", "top, bottom"},
 		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "w", "the newest weekly digest", "1–9", "pinned folders", "A", "today's agent reports", ",", "the settings"},
 		{"find", "/ ctrl-p", "search every note, find a title"},
-		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},
+		{"todos", "x", "the todos beside the list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "fold the done ones", "e D", "edit, delete", "enter", "its note"},
 		{"in a note", "f", "follow a link: type its letters, or click it", "b", "back to the note before", "l o i", "its links, outline, images", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
 		{"write", "a", "add a line to today", "n", "a new note here", "N", "a new folder here", "m R", "move, rename it", "s", "sync now", "r", "reload"},
 		{"mouse", "drag text", "select it in the note", "drag │", "resize the list (< > too)", "click", "select; again opens", "wheel", "scroll"},
@@ -462,6 +441,15 @@ func (b *browser) footer() string {
 		left = hints(b.st, "x", check, "d", "due", "a", "add", "X", other, "e", "edit", "D", "delete", "esc", "back")
 	case b.set != nil:
 		left = hints(b.st, "j k", "move", "enter", "change", "e", "edit the file", "esc", "back")
+	case b.tv != nil:
+		check, fold := "done", "fold done"
+		if it := b.tv.selected(); it != nil && it.Done {
+			check = "open again"
+		}
+		if b.tv.fold {
+			fold = "show done"
+		}
+		left = hints(b.st, "x", check, "d", "due", "a", "add", "e", "edit", "enter", "note", "X", fold, "D", "delete", "esc", "back")
 	case b.pick != nil:
 		left = hints(b.st, "enter", "open", "j k", "move", "esc", "back")
 	case b.cal != nil && b.focus == onList:

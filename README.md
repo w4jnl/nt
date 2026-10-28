@@ -161,7 +161,7 @@ In the browser:
 | `/`, `ctrl-p` | search every note, find a note by its title |
 | `f`, `b` | follow a link by its letters (a click works too), back to the note before |
 | `l`, `o`, `i` | the note's links, its outline, its images full size |
-| `x` | the todo list: `x` check, `d` due date, `a` add, `X` the done ones |
+| `x` | the todos beside the folders, open then done: `x` check, `d` due date, `a` add, `X` fold Done, enter its note |
 | `a`, `n`, `N` | add a line to today, a new note here, a new folder here |
 | `e`, `v`, `y` | edit in `$EDITOR`, read in glow, copy the selection or the path |
 | `m`, `R`, `D` | move, rename, delete (after asking) |

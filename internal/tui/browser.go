@@ -149,8 +149,9 @@ type picker struct {
 	ready  bool   // its todos are read
 	folder string // whose todo.md a todo added there goes to; "" is the root's
 
-	folders []string // the move picker's folders, before what is typed filters them
-	day     string   // the todo list from the calendar: only the todos due or done that day
+	folders []string        // the move picker's folders, before what is typed filters them
+	day     string          // the todo list from the calendar: only the todos due or done that day
+	ticked  map[string]bool // the todos ticked since the list was read, by path:line
 }
 
 type browser struct {
@@ -190,8 +191,9 @@ type browser struct {
 	help bool
 	ask  *question // a yes-or-no question on the footer line
 
-	todoSeq int
-	todoAt  *todo.Item // the todo the due prompt is for
+	todoSeq       int
+	todoAt        *todo.Item // the todo the due prompt is for
+	todoSettleSeq int        // the last tick in the todo list, which reads it again (todos.go)
 
 	todoOpen, todoLate int         // the open todos and the late ones, for the home list
 	todoKnown          bool        // they have been counted
@@ -202,6 +204,7 @@ type browser struct {
 
 	cal *calendar     // the calendar, in the list pane's place (calendar.go)
 	set *settingsView // the settings, in the note pane's place (settings.go)
+	tv  *todoView     // the todos, in the note pane's place, with the keys (todoview.go)
 
 	history []visit // the notes links were followed from, for b (follow.go)
 	hinted  string  // the letters typed after f so far
@@ -358,7 +361,7 @@ func (b *browser) openView(view string) tea.Cmd {
 	case "today":
 		return b.today()
 	case "todos":
-		return b.openTodos(false)
+		return b.openTodoView()
 	case "calendar":
 		return b.openCalendar()
 	case "weekly":
@@ -702,6 +705,8 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b, b.searched(msg)
 	case todosMsg:
 		return b, b.setTodos(msg)
+	case todoSettleMsg:
+		return b, b.settleTodos(msg)
 	case movedMsg:
 		return b, b.moved(msg)
 	case calTodosMsg:
@@ -727,10 +732,15 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		b.p.forget()
 		b.list()
-		if b.pick != nil && b.pick.todos {
+		if b.pick != nil && b.pick.todos || b.tv != nil {
 			keep := ""
 			if it := b.todoSelected(); it != nil {
 				keep = todoRef(it)
+			}
+			if b.tv != nil {
+				if it := b.tv.selected(); it != nil {
+					keep = todoRef(it)
+				}
 			}
 			return b, tea.Batch(b.loadTodos(keep), b.reindex())
 		}
@@ -771,6 +781,11 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if b.p.hints != nil {
 			return b, b.hintKey(msg)
+		}
+		if b.tv != nil {
+			if cmd, ok := b.todoViewKey(msg); ok {
+				return b, cmd
+			}
 		}
 		if b.set != nil {
 			if cmd, ok := b.settingsKey(msg); ok {
@@ -831,6 +846,8 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 		case d == 0:
 		case onNote && b.set != nil:
 			b.settingMove(d)
+		case onNote && b.tv != nil:
+			b.todoViewMove(d)
 		case onNote && d > 0:
 			b.p.vp.ScrollDown(3)
 		case onNote:
@@ -852,6 +869,11 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 		return nil
 	case onNote && b.set != nil:
 		return b.settingsClick(row)
+	case onNote && b.tv != nil:
+		return b.todoViewClick(row, noteX(m.X, lw, b.full))
+	case onNote && b.homeTodosShown():
+		cmd := b.openTodoView()
+		return tea.Batch(cmd, b.todoViewClick(row, noteX(m.X, lw, b.full)))
 	case onNote:
 		if b.showing != "" {
 			b.focus = onPreview
@@ -874,6 +896,9 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	case b.input != nil:
 		return nil
 	}
+	if b.tv != nil { // a click on the list gives it the keys back
+		b.closeTodoView()
+	}
 	i := b.top + row
 	if i >= len(b.entries) || b.entries[i].rule {
 		return nil
@@ -884,6 +909,20 @@ func (b *browser) mouse(msg tea.MouseMsg) tea.Cmd {
 	b.sel, b.focus = i, onList
 	b.clampList()
 	return b.loadNow()
+}
+
+// noteX is the column in the note's pane of the screen column x.
+func noteX(x, listW int, full bool) int {
+	if full {
+		return x
+	}
+	return x - listW - 1
+}
+
+// homeTodosShown reports the home list's Todos row selected, its todos in the note's pane.
+func (b *browser) homeTodosShown() bool {
+	e, ok := b.selected()
+	return ok && e.view == "todos" && b.tv == nil && b.pick == nil && b.cal == nil && b.set == nil
 }
 
 // notePoint is the place in the rendered note under the screen cell x, y. Above or below the
@@ -1042,7 +1081,7 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	case "w":
 		return b.openWeekly()
 	case "x":
-		return b.openTodos(false)
+		return b.openTodoView()
 	case "c":
 		return b.openCalendar()
 	case ",":
