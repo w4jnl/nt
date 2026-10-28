@@ -69,6 +69,18 @@ final class Workspace {
     var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedFolders") ?? []) {
         didSet { UserDefaults.standard.set(Array(expanded), forKey: "expandedFolders") }
     }
+    var recent: [String] = UserDefaults.standard.stringArray(forKey: "recentNotes") ?? [] { // the notes opened last, newest first
+        didSet { UserDefaults.standard.set(recent, forKey: "recentNotes") }
+    }
+    var textSize = TextSize(rawValue: UserDefaults.standard.double(forKey: "textSize")) ?? .standard {
+        didSet {
+            UserDefaults.standard.set(textSize.rawValue, forKey: "textSize")
+            editor?.zoom(textSize.rawValue)
+        }
+    }
+    var active = true // the app is in front; the menu bar's alert mark blinks only while it is not
+    var settings: [ConfigSetting] = [] // nt config, for Settings
+    var settingsProblem = ""
 
     @ObservationIgnored let nt: NT?
     @ObservationIgnored private(set) var editor: NoteEditor?
@@ -124,7 +136,10 @@ final class Workspace {
             phase = .problem(error.localizedDescription)
             return false
         }
-        if editor == nil { editor = NoteEditor(workspace: self) }
+        if editor == nil {
+            editor = NoteEditor(workspace: self)
+            editor?.zoom(textSize.rawValue)
+        }
         phase = .ready
         return true
     }
@@ -224,6 +239,7 @@ final class Workspace {
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
         selection = selectionFor(path)
+        recent = Self.remember(path, in: recent)
         for dir in SidebarTree.ancestors(path) where !expanded.contains(dir) {
             expanded.insert(dir)
         }
@@ -299,7 +315,12 @@ final class Workspace {
 
     /// toggle checks a todo, adding done:, or opens it again, through nt.
     func toggle(_ t: Todo) async {
-        await todo([t.done ? "undo" : "done", t.id])
+        await setDone(t, !t.done)
+    }
+
+    /// setDone checks a todo (done) or opens it again, through nt.
+    func setDone(_ t: Todo, _ done: Bool) async {
+        await todo([done ? "done" : "undo", t.id])
     }
 
     /// setDue sets a todo's due date from words: fri, +3d, 2026-11-03; none clears it.
@@ -454,7 +475,65 @@ final class Workspace {
         return (try? JSONDecoder().decode([SearchHit].self, from: out.stdout)) ?? []
     }
 
+    /// remember puts path first among the notes opened last, at most max of them.
+    nonisolated static func remember(_ path: String, in list: [String], max: Int = 8) -> [String] {
+        Array(([path] + list.filter { $0 != path }).prefix(max))
+    }
+
+    /// recentNotes are the notes opened last that are still there, newest first.
+    func recentNotes(_ n: Int) -> [String] {
+        guard let ix = index else { return [] }
+        let have = Set(ix.notes.map(\.path))
+        return Array(recent.filter { have.contains($0) }.prefix(n))
+    }
+
+    // MARK: Settings
+
+    /// loadSettings reads nt config, this Mac's settings and every machine's.
+    func loadSettings() async {
+        guard let nt else { return }
+        do {
+            settings = try await nt.json(ConfigSetting.List.self, ["config", "--json"]).settings
+            settingsProblem = ""
+        } catch {
+            settingsProblem = error.localizedDescription
+        }
+    }
+
+    /// setSetting changes one setting through nt config set, which checks it; it returns nt's
+    /// complaint when it would not take the value, else nil, and does what the change needs.
+    func setSetting(_ s: ConfigSetting, to value: String) async -> String? {
+        guard let nt else { return "nt is not installed" }
+        do {
+            let out = try await nt.run(["config", "set", s.key, value])
+            if out.status != 0 { return NTError.message(out.stderr) }
+        } catch {
+            return error.localizedDescription
+        }
+        await loadSettings()
+        switch ConfigSetting.effect(of: s.key) {
+        case .none: break
+        case .reindex: try? await reindex(nt)
+        case .restart: await restart()
+        }
+        return nil
+    }
+
+    /// restart starts over on the repository nt names now, after repo changed.
+    func restart() async {
+        guard await editor?.save() ?? true else { return }
+        watcher = nil
+        note = nil
+        selection = nil
+        guard await prepare() else { return }
+        watch()
+        await openToday()
+    }
+
     // MARK: Sync
+
+    /// needsYou says sync needs the person: a conflict or an error. Offline is not one.
+    var needsYou: Bool { status?.state == "conflict" || status?.state == "error" }
 
     func syncNow() async {
         guard let nt, !syncing else { return }

@@ -78,6 +78,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         page("window.nt.line(n)", ["n": line])
     }
 
+    /// zoom sets the note's text size, the page's zoom.
+    func zoom(_ z: Double) {
+        web.pageZoom = z
+    }
+
     func focusMode(_ on: Bool) {
         page("window.nt.focusMode(o)", ["o": on])
     }

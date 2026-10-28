@@ -4,20 +4,37 @@ import SwiftUI
 /// ones overdue first with their dates in words, a field that adds one to todo.md, and the done
 /// ones below. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
 /// Return opens the note at the todo.
+///
+/// A tick shows at once: the glyph turns, with a small pop, and the text fades. The row stays
+/// where it is until the ticks settle, a moment after the last, so the person sees what they did
+/// and can take it back; then it moves to the done ones, or back up to the open ones.
 struct TodosView: View {
     @Environment(Workspace.self) private var ws
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var newText = ""
     @State private var selected: String?
     @State private var editingDue: String?
     @State private var dueText = ""
     @State private var showDone = true
+    @State private var frozen: [Todo]? // the list as it stood at the first tick, while the ticks settle
+    @State private var ticked: [String: Bool] = [:] // a todo just ticked → the state it was given
+    @State private var after: [String: String] = [:] // a todo just ticked → the open one below it
+    @State private var settle: Task<Void, Never>?
+    @State private var writes: Task<Void, Never>?
     @FocusState private var focus: Field?
+    @Namespace private var rows
 
     enum Field: Hashable { case add, list, due }
 
+    /// shown is the list on screen: as it stood at the first tick while ticks settle, so a row
+    /// just ticked stays in its place, else as nt lists it.
+    private var shown: [Todo] { frozen ?? ws.todos }
+
+    private func isDone(_ t: Todo) -> Bool { ticked[t.id] ?? t.done }
+
     var body: some View {
-        let open = ws.todos.filter { !$0.done }
-        let done = ws.todos.filter(\.done)
+        let open = shown.filter { !$0.done }
+        let done = shown.filter(\.done)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Todos")
@@ -71,7 +88,7 @@ struct TodosView: View {
         .focusEffectDisabled()
         .onKeyPress(.downArrow) { move(1, open + (showDone ? done : [])); return .handled }
         .onKeyPress(.upArrow) { move(-1, open + (showDone ? done : [])); return .handled }
-        .onKeyPress(.space) { act { t in Task { await ws.toggle(t) } } }
+        .onKeyPress(.space) { act { tick($0) } }
         .onKeyPress(.return) { act { t in ws.show(t.rel, line: t.line) } }
         .onKeyPress("d") { act { t in startDue(t) } }
         .viewToolbar("Todos")
@@ -116,22 +133,31 @@ struct TodosView: View {
     }
 
     private func row(_ t: Todo) -> some View {
-        let isSelected = selected == t.id && !t.done
+        let done = isDone(t)
+        let isSelected = selected == t.id
         return HStack(spacing: 12) {
             Button {
-                Task { await ws.toggle(t) }
+                tick(t)
             } label: {
-                Text(t.done ? "✓" : "○")
+                Text(done ? "✓" : "○")
                     .font(.system(size: 16))
-                    .foregroundStyle(t.done ? Brand.ok : Brand.muted)
+                    .foregroundStyle(done ? Brand.ok : Brand.muted)
                     .frame(width: 20)
+                    .keyframeAnimator(initialValue: 1.0, trigger: reduceMotion ? false : done) { glyph, scale in
+                        glyph.scaleEffect(scale)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            CubicKeyframe(1.4, duration: 0.08)
+                            SpringKeyframe(1.0, duration: 0.24, spring: .bouncy)
+                        }
+                    }
             }
             .buttonStyle(.plain)
-            .help(t.done ? "Open it again" : "Mark it done")
-            .accessibilityLabel(t.done ? "Done; open it again" : "Open; mark it done")
+            .help(done ? "Open it again" : "Mark it done")
+            .accessibilityLabel(done ? "Done; open it again" : "Open; mark it done")
             Text(t.text)
                 .font(.system(size: 15))
-                .foregroundStyle(t.done ? Brand.muted : Brand.ink)
+                .foregroundStyle(done ? Brand.muted : Brand.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)
             Button(source(t)) { ws.show(t.rel, line: t.line) }
@@ -163,6 +189,8 @@ struct TodosView: View {
                 RoundedRectangle(cornerRadius: 2).fill(Brand.accent).frame(width: 3, height: 16)
             }
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: done)
+        .matchedGeometryEffect(id: t.id, in: rows)
         .contentShape(Rectangle())
         .onTapGesture {
             selected = t.id
@@ -170,8 +198,8 @@ struct TodosView: View {
         }
         .onTapGesture(count: 2) { ws.show(t.rel, line: t.line) }
         .contextMenu {
-            Button(t.done ? "Open Again" : "Done") { Task { await ws.toggle(t) } }
-            if !t.done { Button("Set Due Date…") { startDue(t) } }
+            Button(done ? "Open Again" : "Done") { tick(t) }
+            if !done { Button("Set Due Date…") { startDue(t) } }
             Button("Open Note") { ws.show(t.rel, line: t.line) }
         }
         .accessibilityElement(children: .contain)
@@ -183,10 +211,55 @@ struct TodosView: View {
         (t.rel as NSString).lastPathComponent == "todo.md" ? t.rel : ws.title(t.rel)
     }
 
+    /// tick checks a todo, or opens it again: the glyph turns at once and nt writes it, one
+    /// write after the other. The row stays in its place until the ticks settle.
+    private func tick(_ t: Todo) {
+        let base = shown
+        if frozen == nil { frozen = base }
+        let now = !isDone(t)
+        let open = base.filter { !$0.done }
+        if let i = open.firstIndex(where: { $0.id == t.id }) {
+            after[t.id] = open.dropFirst(i + 1).first { ticked[$0.id] == nil }?.id
+        }
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.15)) {
+            ticked[t.id] = now == t.done ? nil : now
+        }
+        let before = writes
+        writes = Task {
+            await before?.value
+            await ws.setDone(t, now)
+        }
+        settle?.cancel()
+        settle = Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            await writes?.value
+            if !Task.isCancelled { land() }
+        }
+    }
+
+    /// land lets the ticked rows go where they belong now; the selection moves from a row that
+    /// left the open ones to the one that was below it.
+    private func land() {
+        if let s = selected, ticked[s] == true, let next = after[s] { selected = next }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+            frozen = nil
+            ticked = [:]
+        }
+        after = [:]
+    }
+
+    /// settled lands the ticks now, for a change that rereads the list (a todo added, a due date).
+    private func settled() async {
+        settle?.cancel()
+        await writes?.value
+        if frozen != nil { land() }
+    }
+
     private func add() {
         let text = newText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
         Task {
+            await settled()
             if await ws.addTodo(text) { newText = "" }
         }
     }
@@ -199,13 +272,13 @@ struct TodosView: View {
 
     /// act runs f on the selected todo.
     private func act(_ f: (Todo) -> Void) -> KeyPress.Result {
-        guard editingDue == nil, focus == .list, let t = ws.todos.first(where: { $0.id == selected }) else { return .ignored }
+        guard editingDue == nil, focus == .list, let t = shown.first(where: { $0.id == selected }) else { return .ignored }
         f(t)
         return .handled
     }
 
     private func startDue(_ t: Todo) {
-        guard !t.done else { return }
+        guard !isDone(t) else { return }
         selected = t.id
         dueText = t.due
         editingDue = t.id
@@ -217,7 +290,10 @@ struct TodosView: View {
         editingDue = nil
         focus = .list
         guard !when.isEmpty else { return }
-        Task { await ws.setDue(t, when) }
+        Task {
+            await settled()
+            await ws.setDue(t, when)
+        }
     }
 }
 

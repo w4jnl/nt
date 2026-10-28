@@ -17,6 +17,7 @@ enum Brand {
         "ink-faint": (0x98A5A7, 0x5E6D70),
         "accent": (0x0B7A7E, 0x3FD0D4),
         "accent-soft": (0xE8F6F6, 0x173437),
+        "mark": (0x12999D, 0x3FD0D4),
         "ok": (0x1F7A3A, 0x5FC47A),
         "warn": (0x9A5A0E, 0xE8963C),
         "alert": (0xC0342B, 0xF0645A),
@@ -31,6 +32,7 @@ enum Brand {
     static let faint = color("ink-faint")
     static let accent = color("accent")
     static let accentSoft = color("accent-soft")
+    static let mark = color("mark") // the nt mark only
     static let ok = color("ok")
     static let warn = color("warn")
     static let alert = color("alert")
