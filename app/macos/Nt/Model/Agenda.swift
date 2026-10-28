@@ -143,6 +143,13 @@ enum Agenda {
         return s
     }
 
+    /// instant is an RFC 3339 time as nt writes them (created, ended); nil when it is none.
+    nonisolated static func instant(_ stamp: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: stamp.replacing(/\.\d+/, with: "", maxReplacements: 1))
+    }
+
     /// clock is the HH:MM of an RFC 3339 time.
     nonisolated static func clock(_ stamp: String) -> String {
         guard let t = stamp.firstMatch(of: /T(\d{2}:\d{2})/) else { return "" }

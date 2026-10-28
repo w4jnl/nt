@@ -95,9 +95,9 @@ func TestMatchAndFind(t *testing.T) {
 		t.Errorf("a word start should beat letters scattered inside words: %d vs %d", a, b)
 	}
 	ix := &Index{Notes: []Note{
-		{"notes/2023-10-16-docker-to-podman-migration.md", "Docker to Podman migration"},
-		{"notes/2026-04-11-nas-mount-setup.md", "NAS Mount Setup"},
-		{"technical-notes/2023-03-06-docker-service-override.md", "DockerServiceOverride"},
+		{Path: "notes/2023-10-16-docker-to-podman-migration.md", Title: "Docker to Podman migration"},
+		{Path: "notes/2026-04-11-nas-mount-setup.md", Title: "NAS Mount Setup"},
+		{Path: "technical-notes/2023-03-06-docker-service-override.md", Title: "DockerServiceOverride"},
 	}}
 	got := ix.Find("docker", 10)
 	if len(got) != 2 {
@@ -145,5 +145,23 @@ func TestBrokenLinks(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("%d: %+v, want %+v", i, got[i], want[i])
 		}
+	}
+}
+
+// TestBuildKeepsCreated: the index carries a note's created, so an app can put a day's agent
+// sessions in the order they began without reading every report.
+func TestBuildKeepsCreated(t *testing.T) {
+	root := t.TempDir()
+	for name, body := range map[string]string{
+		"a.md": "---\ntype: agent-report\ncreated: 2026-10-28T11:56:00+01:00\n---\n# a\n",
+		"b.md": "# b\n\ncreated: not frontmatter\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ix := Build(root)
+	if len(ix.Notes) != 2 || ix.Notes[0].Created != "2026-10-28T11:56:00+01:00" || ix.Notes[1].Created != "" {
+		t.Fatalf("notes %+v", ix.Notes)
 	}
 }

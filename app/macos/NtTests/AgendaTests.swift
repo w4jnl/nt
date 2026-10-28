@@ -109,6 +109,8 @@ struct TodoActionTests {
         try "# NAS\n\n- [ ] Replace the fan due:2026-10-25\n".write(to: root.appending(path: "homelab/2026-10-21-nas.md"), atomically: true, encoding: .utf8)
         try "---\ntype: agent-report\nproject: infra\nhost: work\nstatus: blocked\ncreated: 2026-10-27T09:00:00+01:00\n---\n# infra\n"
             .write(to: root.appending(path: "agents/2026/2026-10-27/work--claude-code--infra--1a2b3c4d.md"), atomically: true, encoding: .utf8)
+        try "---\ntype: agent-report\nproject: web\nhost: mbp\nstatus: done\ncreated: 2026-10-27T10:30:00+01:00\n---\n# web\n"
+            .write(to: root.appending(path: "agents/2026/2026-10-27/mbp--claude-code--web--5e6f7a8b.md"), atomically: true, encoding: .utf8)
         let config = base.appending(path: "config.toml")
         try "repo = \"\(root.path)\"\nhost = \"mbp\"\n[sync]\nauto = false\n".write(to: config, atomically: true, encoding: .utf8)
         let bundled = try #require(NT.locate(), "the app bundles nt")
@@ -151,7 +153,8 @@ struct TodoActionTests {
     @Test func reportsAndJournalsAreReadFromTheirFiles() async throws {
         #expect(await ws.prepare())
         let reports = ws.reports(on: "2026-10-27")
-        #expect(reports.map(\.project) == ["infra"] && reports.first?.host == "work")
+        #expect(reports.map(\.project) == ["web", "infra"], "the latest session first")
+        #expect(reports.last?.host == "work")
         #expect(ws.agentDays == ["2026-10-27"])
         #expect(ws.reports(on: "2026-10-26").isEmpty)
         #expect(ws.journalPath("2026-10-27") == "daily/2026/2026-10-27.md")

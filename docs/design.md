@@ -428,8 +428,10 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 **The window.** Two columns, quiet, in the manner of Typora.
 - The sidebar: Open (⌘P), Today, the views (Todos with its open count, Calendar, Weekly,
   Agents), then the folders: the pinned ones in their order, a rule, the rest, then the notes at
-  the root. An agent report shows its machine where a note shows its day. Notes newest first with their day in mono; journals by
-  year; `assets/` hidden. Which folders are open is kept on the Mac (UserDefaults), never in the
+  the root. An agent report shows its machine where a note shows its day. In the order nt lists
+  them (§4, Order): folders A to Z, then dated ones newest first; notes newest first with their
+  day in mono; an agents day's digest first, then its sessions by when they began (`created`, in
+  `nt _editor index`), the latest first; journals by year; `assets/` hidden. Which folders are open is kept on the Mac (UserDefaults), never in the
   repository. The sync state is at its foot as glyph and word, and a click syncs now; it stays
   out of the toolbar, which would draw it as a glass button. View › Hide Sidebar (⌃⌘S) or the
   toolbar's button hides the sidebar.
@@ -459,7 +461,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   next one due. Arrows move the day, ‹ › the month; a second click or Return opens the journal.
 - **Weekly** opens the newest weekly digest, read-only; without one it says which setting makes
   them.
-- **Agents** is the sessions of the last 14 days, newest first, from every machine: the state's
+- **Agents** is the sessions of the last 14 days, newest first, and in a day the latest session
+  first, from every machine: the state's
   glyph, the project and summary, the machine and the state in words. A click opens the report;
   a day's `digest` opens its digest. Reports are read from their frontmatter, never written.
 

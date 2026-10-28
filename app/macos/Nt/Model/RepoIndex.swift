@@ -5,6 +5,7 @@ struct RepoIndex: Codable, Sendable, Equatable {
     struct Note: Codable, Sendable, Hashable {
         let path: String
         let title: String
+        var created: String? = nil // the frontmatter's created: when an agent report's session began
     }
 
     struct Folders: Codable, Sendable, Equatable {
@@ -50,7 +51,8 @@ struct SidebarTree: Equatable, Sendable {
     var rootNotes: [TreeNode] = []
 
     /// build lays out the index. assets folders are attachments and hidden; dated names sort
-    /// newest first, so a folder's newest note comes first and journals' years run backwards.
+    /// newest first, so a folder's newest note comes first and journals' years run backwards,
+    /// after the folders named otherwise, A to Z, as nt lists them.
     nonisolated static func build(_ ix: RepoIndex, thisYear: String) -> SidebarTree {
         let dirs = ix.dirs.filter { !$0.split(separator: "/").contains("assets") }
         var notesIn: [String: [RepoIndex.Note]] = [:]
@@ -66,9 +68,14 @@ struct SidebarTree: Equatable, Sendable {
         func node(_ dir: String) -> TreeNode {
             let folders = (subdirs[dir] ?? []).sorted { a, b in
                 let na = (a as NSString).lastPathComponent, nb = (b as NSString).lastPathComponent
-                return dated(na) && dated(nb) ? na > nb : na.localizedStandardCompare(nb) == .orderedAscending
+                switch (dated(na), dated(nb)) {
+                case (true, true): return na > nb
+                case (false, false): return na.localizedStandardCompare(nb) == .orderedAscending
+                case (let da, _): return !da // named folders before dated ones
+                }
             }
-            let notes = (notesIn[dir] ?? []).sorted { $0.path > $1.path }.map { noteNode($0, ix: ix, thisYear: thisYear) }
+            let agents = !ix.folders.agents.isEmpty && (dir == ix.folders.agents || dir.hasPrefix(ix.folders.agents + "/"))
+            let notes = order(notesIn[dir] ?? [], agents: agents).map { noteNode($0, ix: ix, thisYear: thisYear) }
             return TreeNode(id: dir, name: (dir as NSString).lastPathComponent, date: "", children: folders.map(node) + notes)
         }
 
@@ -78,6 +85,18 @@ struct SidebarTree: Equatable, Sendable {
         tree.rest = top.filter { !ix.pins.contains($0) }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.map(node)
         tree.rootNotes = (notesIn[""] ?? []).sorted { $0.path < $1.path }.map { noteNode($0, ix: ix, thisYear: thisYear) }
         return tree
+    }
+
+    /// order is a folder's notes as nt lists them: newest first by name; among the agent reports,
+    /// a day's digest first, then the sessions by when they began, the latest first.
+    nonisolated static func order(_ notes: [RepoIndex.Note], agents: Bool) -> [RepoIndex.Note] {
+        guard agents else { return notes.sorted { $0.path > $1.path } }
+        let began = notes.map { ($0, Agenda.instant($0.created ?? "") ?? .distantPast) }
+        return began.sorted { a, b in
+            let da = (a.0.path as NSString).lastPathComponent == "README.md", db = (b.0.path as NSString).lastPathComponent == "README.md"
+            if da != db { return da }
+            return a.1 != b.1 ? a.1 > b.1 : a.0.path > b.0.path
+        }.map(\.0)
     }
 
     nonisolated static func noteNode(_ n: RepoIndex.Note, ix: RepoIndex, thisYear: String) -> TreeNode {

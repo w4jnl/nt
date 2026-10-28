@@ -63,6 +63,29 @@ private func index() throws -> RepoIndex {
         #expect(daily[0].children?.first?.date == "", "journals show no date: the title is one")
     }
 
+    @Test func agentDaysNewestFirstDigestOnTop() throws {
+        let json = """
+            {"root": "/r", "state": "/s", "day": "2026-10-28", "pins": [],
+             "folders": {"daily": "daily", "agents": "agents", "weekly": "weekly"},
+             "dirs": ["agents", "agents/2025", "agents/2026", "agents/2026/2026-10-27", "agents/2026/2026-10-28", "projects", "projects/2026", "projects/web"],
+             "notes": [
+               {"path": "agents/2026/2026-10-28/README.md", "title": "Agents"},
+               {"path": "agents/2026/2026-10-28/work--copilot-cli--vuln--43fbe292.md", "title": "vuln", "created": "2026-10-28T10:39:00+01:00"},
+               {"path": "agents/2026/2026-10-28/jaromac--claude-code--flok--f0ceca08.md", "title": "flok", "created": "2026-10-28T08:15:00+01:00"},
+               {"path": "agents/2026/2026-10-28/jaromac--claude-code--notetaking--27810133.md", "title": "noteTaking", "created": "2026-10-28T11:56:39+01:00"}
+             ],
+             "back": {}}
+            """
+        let tree = SidebarTree.build(try JSONDecoder().decode(RepoIndex.self, from: Data(json.utf8)), thisYear: "2026")
+        let agents = try #require(tree.rest.first { $0.id == "agents" })
+        #expect(agents.children?.map(\.id) == ["agents/2026", "agents/2025"])
+        #expect(agents.children?.first?.children?.map(\.id) == ["agents/2026/2026-10-28", "agents/2026/2026-10-27"])
+        let day = agents.children?.first?.children?.first?.children?.map(\.name)
+        #expect(day == ["Agents", "noteTaking", "vuln", "flok"], "the digest, then the latest session first")
+        let projects = try #require(tree.rest.first { $0.id == "projects" })
+        #expect(projects.children?.map(\.id) == ["projects/web", "projects/2026"], "named folders before dated ones")
+    }
+
     @Test func dates() {
         #expect(SidebarTree.dated("2026-10-21-nas.md"))
         #expect(SidebarTree.dated("2026"))

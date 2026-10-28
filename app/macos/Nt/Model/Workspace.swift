@@ -328,7 +328,7 @@ final class Workspace {
         return ok
     }
 
-    /// reports are a day's agent reports, read from their frontmatter, oldest first.
+    /// reports are a day's agent reports, read from their frontmatter, the latest session first.
     func reports(on day: String) -> [AgentReport] {
         if let r = reportCache[day] { return r }
         guard let root, let ix = index, let p = Agenda.parts(day) else { return [] }
@@ -341,7 +341,11 @@ final class Workspace {
                   let r = AgentReport.parse(text, path: rel) else { continue }
             out.append(r)
         }
-        out.sort { ($0.created, $0.path) < ($1.created, $1.path) }
+        let began = Dictionary(out.map { ($0.path, Agenda.instant($0.created) ?? .distantPast) }, uniquingKeysWith: { a, _ in a })
+        out.sort { a, b in
+            let da = began[a.path] ?? .distantPast, db = began[b.path] ?? .distantPast
+            return da != db ? da > db : a.path > b.path
+        }
         reportCache[day] = out
         return out
     }
