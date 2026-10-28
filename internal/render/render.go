@@ -139,6 +139,18 @@ func NewAt(width int, dark bool, dir string) (*Renderer, error) {
 // Render styles a note: frontmatter stripped, the body rendered, images as their alt text.
 func (r *Renderer) Render(note []byte) (string, error) { return r.RenderImages(note, nil) }
 
+// Field is the value of a top-level key in the note's frontmatter, unquoted; "" when the note
+// has no such key.
+func Field(note []byte, key string) string {
+	front, _ := SplitFrontmatter(note)
+	for _, l := range strings.Split(string(front), "\n") {
+		if v, ok := strings.CutPrefix(l, key+":"); ok {
+			return strings.Trim(strings.TrimSpace(v), `"'`)
+		}
+	}
+	return ""
+}
+
 // Title is a note's title (docs/format.md §4): the frontmatter title, then the first "# "
 // heading, then the file name without its extension. A date at the start of a title is left
 // out (the date is shown on its own), and a title that is nothing but a date and time, as

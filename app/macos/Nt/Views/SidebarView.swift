@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// SidebarView is the left column: Open, Today and the folders, pinned first, with the sync state
-/// at its foot. The sync state stays out of the toolbar, which would draw it as a glass button
-/// and fold it into the overflow menu when the sidebar is hidden.
+/// SidebarView is the left column: Open, Today, the views (Todos, Calendar, Weekly, Agents) and the
+/// folders, pinned first, with the sync state at its foot. The sync state stays out of the
+/// toolbar, which would draw it as a glass button and fold it into the overflow menu when the
+/// sidebar is hidden.
 struct SidebarView: View {
     @Environment(Workspace.self) private var ws
 
@@ -10,6 +11,24 @@ struct SidebarView: View {
         List(selection: Binding(get: { ws.selection }, set: { ws.select($0) })) {
             Label("Today", systemImage: "sun.max")
                 .tag(Workspace.Selection.today)
+            HStack {
+                Label("Todos", systemImage: "checkmark.circle")
+                Spacer()
+                let open = ws.todos.count { !$0.done }
+                if open > 0 {
+                    Text("\(open)")
+                        .font(Brand.mono(11))
+                        .foregroundStyle(Brand.muted)
+                        .accessibilityLabel("\(open) open")
+                }
+            }
+            .tag(Workspace.Selection.todos)
+            Label("Calendar", systemImage: "calendar")
+                .tag(Workspace.Selection.calendar)
+            Label("Weekly", systemImage: "text.alignleft")
+                .tag(Workspace.Selection.weekly)
+            Label("Agents", systemImage: "apple.terminal")
+                .tag(Workspace.Selection.agents)
             Section("Folders") {
                 TreeRows(nodes: ws.tree.pinned)
                 if !ws.tree.pinned.isEmpty && !ws.tree.rest.isEmpty {

@@ -17,8 +17,9 @@ import (
 
 // Note is one note in the index.
 type Note struct {
-	Path  string `json:"path"` // repository path
-	Title string `json:"title"`
+	Path    string `json:"path"` // repository path
+	Title   string `json:"title"`
+	Created string `json:"created,omitempty"` // the frontmatter's created, as written: an agent report's start
 }
 
 // Index is the repository's notes and links.
@@ -51,7 +52,7 @@ func Build(root string) *Index {
 		rel = filepath.ToSlash(rel)
 		notes[rel] = b
 		t := render.Title(b, rel)
-		ix.Notes = append(ix.Notes, Note{Path: rel, Title: t})
+		ix.Notes = append(ix.Notes, Note{Path: rel, Title: t, Created: render.Field(b, "created")})
 		ix.title[rel] = t
 		stem := strings.ToLower(strings.TrimSuffix(path.Base(rel), ".md"))
 		ix.stems[stem] = append(ix.stems[stem], rel)

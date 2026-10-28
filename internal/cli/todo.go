@@ -33,10 +33,12 @@ func runTodo(args []string) int {
 	return runTodoList(args)
 }
 
-// todoJSON is a todo as the commands print it with --json.
+// todoJSON is a todo as the commands print it with --json: when is its date in words as the
+// browser shows it (2d late, fri, 3 nov; yesterday for a done one), late whether it is overdue.
 func todoJSON(v *vault.Vault, it todo.Item) map[string]any {
+	when, late := it.Word(v.Day(v.Now()))
 	return map[string]any{"path": v.Abs(it.Path), "rel": it.Path, "line": it.Line, "done": it.Done,
-		"text": it.Text, "due": it.Due, "done_on": it.DoneOn, "section": it.Section}
+		"text": it.Text, "due": it.Due, "done_on": it.DoneOn, "section": it.Section, "when": when, "late": late}
 }
 
 // nt todo [folder] [--done|--all]: the open todos in every note, or in the notes under folder,

@@ -16,6 +16,10 @@ final class Workspace {
 
     enum Selection: Hashable {
         case today
+        case todos
+        case calendar
+        case weekly
+        case agents
         case note(String)
     }
 
@@ -57,6 +61,9 @@ final class Workspace {
     var palette: PaletteMode?
     var sidebar = true // shown; the split view's toggle and View > Hide Sidebar change it
     var focusMode = false
+    var todos: [Todo] = [] // every todo, open ones overdue first, as nt todo --all lists them
+    var journalDays: Set<String> = [] // the days that have a journal, YYYY-MM-DD
+    var calendarDay = "" // the day the calendar shows; "" for today
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
     var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedFolders") ?? []) {
@@ -69,6 +76,7 @@ final class Workspace {
     @ObservationIgnored private var reindexTask: Task<Void, Never>?
     @ObservationIgnored private var flashTask: Task<Void, Never>?
     @ObservationIgnored private var sidebarBeforeFocus = true
+    @ObservationIgnored private var reportCache: [String: [AgentReport]] = [:]
     @ObservationIgnored private var quitting = false
 
     init(nt: NT? = NT.locate()) {
@@ -84,9 +92,17 @@ final class Workspace {
         guard await prepare() else { return }
         watch()
         await openToday()
-        // For screenshots: -NTOpen <repository path> opens a note after today, -NTPalette open,
-        // text or new opens the palette (and -NTQuery types into it).
-        if let path = UserDefaults.standard.string(forKey: "NTOpen") { show(path) }
+        // For screenshots: -NTOpen <repository path> opens a note after today, -NTView todos,
+        // calendar, weekly or agents a view, -NTPalette open, text or new the palette (and
+        // -NTQuery types into it).
+        if let path = UserDefaults.standard.string(forKey: "NTOpen") { await open(path) }
+        switch UserDefaults.standard.string(forKey: "NTView") {
+        case "todos": select(.todos)
+        case "calendar": select(.calendar)
+        case "weekly": select(.weekly)
+        case "agents": select(.agents)
+        default: break
+        }
         switch UserDefaults.standard.string(forKey: "NTPalette") {
         case "open": palette = .open
         case "text": palette = .text
@@ -118,6 +134,13 @@ final class Workspace {
         index = ix
         tree = SidebarTree.build(ix, thisYear: String(ix.day.prefix(4)))
         status = SyncStatus.read(stateDir: ix.state)
+        reportCache = [:]
+        journalDays = Set(ix.notes.compactMap { n -> String? in
+            guard n.path.hasPrefix(ix.folders.daily + "/") else { return nil }
+            let name = (n.path as NSString).lastPathComponent
+            return name.wholeMatch(of: /\d{4}-\d{2}-\d{2}\.md/) != nil ? String(name.prefix(10)) : nil
+        })
+        await loadTodos()
         if let n = note {
             let back = backlinks(n.path)
             if back != n.backlinks {
@@ -133,8 +156,34 @@ final class Workspace {
         guard let sel, sel != selection else { return }
         switch sel {
         case .today: Task { await openToday() }
+        case .weekly: Task { await openWeekly() }
         case .note(let path): show(path)
+        case .todos, .calendar, .agents:
+            Task {
+                await editor?.save()
+                selection = sel
+            }
         }
+    }
+
+    /// weeklyPath is the newest weekly digest, which Weekly opens.
+    var weeklyPath: String? {
+        index.flatMap { Agenda.latestWeekly($0.notes.map(\.path), folder: $0.folders.weekly) }
+    }
+
+    /// openWeekly opens the newest weekly digest, read-only; without one, Weekly says how one
+    /// is made.
+    func openWeekly() async {
+        guard let path = weeklyPath else {
+            await editor?.save()
+            selection = .weekly
+            return
+        }
+        await open(path)
+    }
+
+    private func selectionFor(_ path: String) -> Selection {
+        path == todayPath ? .today : path == weeklyPath ? .weekly : .note(path)
     }
 
     func openToday() async {
@@ -159,6 +208,7 @@ final class Workspace {
         guard let root, let editor else { return }
         if path == note?.path, !reload {
             if !anchor.isEmpty { editor.scroll(to: anchor) } else if line > 0 { editor.go(to: line) }
+            selection = selectionFor(path)
             return
         }
         guard await editor.save() else {
@@ -173,7 +223,7 @@ final class Workspace {
         let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
-        selection = path == todayPath ? .today : .note(path)
+        selection = selectionFor(path)
         for dir in SidebarTree.ancestors(path) where !expanded.contains(dir) {
             expanded.insert(dir)
         }
@@ -239,6 +289,86 @@ final class Workspace {
     func scroll(to anchor: String) {
         editor?.scroll(to: anchor)
     }
+
+    // MARK: Todos, agents and journals
+
+    func loadTodos() async {
+        guard let nt, let list = try? await nt.json(Todo.List.self, ["todo", "--all", "--json"]) else { return }
+        if list.todos != todos { todos = list.todos }
+    }
+
+    /// toggle checks a todo, adding done:, or opens it again, through nt.
+    func toggle(_ t: Todo) async {
+        await todo([t.done ? "undo" : "done", t.id])
+    }
+
+    /// setDue sets a todo's due date from words: fri, +3d, 2026-11-03; none clears it.
+    func setDue(_ t: Todo, _ when: String) async {
+        await todo(["due", t.id, when])
+    }
+
+    /// addTodo adds a todo to the root's todo.md; due:fri in the text sets its due date.
+    func addTodo(_ text: String) async -> Bool {
+        await todo(["add", "--", text])
+    }
+
+    @discardableResult
+    private func todo(_ args: [String]) async -> Bool {
+        guard let nt else { return false }
+        await editor?.save() // the note on screen may hold the todo
+        var ok = false
+        do {
+            let out = try await nt.run(["todo"] + args + ["--json"])
+            ok = out.status == 0
+            if !ok { say(NTError.message(out.stderr)) }
+        } catch {
+            say(error.localizedDescription)
+        }
+        await loadTodos()
+        return ok
+    }
+
+    /// reports are a day's agent reports, read from their frontmatter, the latest session first.
+    func reports(on day: String) -> [AgentReport] {
+        if let r = reportCache[day] { return r }
+        guard let root, let ix = index, let p = Agenda.parts(day) else { return [] }
+        let dir = "\(ix.folders.agents)/\(String(format: "%04d", p.year))/\(day)"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.appending(path: dir).path)) ?? []
+        var out: [AgentReport] = []
+        for name in names where name.hasSuffix(".md") && name != "README.md" && !name.hasPrefix(".") && !name.contains(".conflict-") {
+            let rel = dir + "/" + name
+            guard let text = try? String(contentsOf: root.appending(path: rel), encoding: .utf8),
+                  let r = AgentReport.parse(text, path: rel) else { continue }
+            out.append(r)
+        }
+        let began = Dictionary(out.map { ($0.path, Agenda.instant($0.created) ?? .distantPast) }, uniquingKeysWith: { a, _ in a })
+        out.sort { a, b in
+            let da = began[a.path] ?? .distantPast, db = began[b.path] ?? .distantPast
+            return da != db ? da > db : a.path > b.path
+        }
+        reportCache[day] = out
+        return out
+    }
+
+    /// agentDays are the days with agent reports, newest first.
+    var agentDays: [String] {
+        guard let ix = index else { return [] }
+        return Agenda.agentDays(ix.dirs, folder: ix.folders.agents)
+    }
+
+    /// journalPath is where the journal of a day is, whether or not it exists.
+    func journalPath(_ day: String) -> String {
+        "\(index?.folders.daily ?? "daily")/\(day.prefix(4))/\(day).md"
+    }
+
+    /// log is the ## Log of a day's journal.
+    func log(of day: String) -> [LogLine] {
+        guard journalDays.contains(day), let root,
+              let text = try? String(contentsOf: root.appending(path: journalPath(day)), encoding: .utf8) else { return [] }
+        return Agenda.log(text)
+    }
+
+    var today: String { index?.day ?? "" }
 
     // MARK: Writing
 

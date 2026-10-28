@@ -460,14 +460,8 @@ func titleOf(p string) string { return render.Title(readHead(p), p) }
 
 // created is the time in a note's frontmatter created key; zero when there is none.
 func created(head []byte) time.Time {
-	front, _ := render.SplitFrontmatter(head)
-	for _, l := range strings.Split(string(front), "\n") {
-		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "created:"); ok {
-			t, _ := time.Parse(time.RFC3339, strings.Trim(strings.TrimSpace(v), `"'`))
-			return t
-		}
-	}
-	return time.Time{}
+	t, _ := time.Parse(time.RFC3339, render.Field(head, "created"))
+	return t
 }
 
 func (b *browser) selected() (entry, bool) {
