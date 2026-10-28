@@ -21,7 +21,7 @@ P8=${NT_ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_$KEY.p8}
 [ -n "$TEAM" ] || { echo "mac-release.sh: no NT_TEAM_ID in app/macos/Local.xcconfig" >&2; exit 1; }
 [ -n "$KEY" ] && [ -n "$ISSUER" ] || { echo "mac-release.sh: no NT_ASC_KEY_ID or NT_ASC_ISSUER_ID in app/macos/Local.xcconfig" >&2; exit 1; }
 [ -f "$P8" ] || { echo "mac-release.sh: no API key at $P8" >&2; exit 1; }
-ID=$(security find-identity -v -p codesigning | sed -n "s/.*\"\(Developer ID Application: .* ($TEAM)\)\".*/\1/p" | head -1)
+ID=$(security find-identity -v -p codesigning | sed -n "s/.*\"\(Developer ID Application: .* ($TEAM)\)\".*/\1/p" | awk 'NR == 1')
 [ -n "$ID" ] || { echo "mac-release.sh: no Developer ID Application certificate for team $TEAM in the keychain (Xcode › Settings › Accounts › Manage Certificates)" >&2; exit 1; }
 
 OUT=$MAC/build/release
@@ -80,8 +80,15 @@ notarize "$dmg"
 xcrun stapler staple -q "$dmg"
 
 echo "6/6 checking as Gatekeeper does"
-spctl --assess --type execute -vv "$OUT/nt.app" 2>&1 | grep -q "source=Notarized Developer ID" || { spctl --assess --type execute -vv "$OUT/nt.app"; exit 1; }
-spctl --assess --type open --context context:primary-signature -vv "$dmg" 2>&1 | grep -q "source=Notarized Developer ID" || { spctl --assess --type open --context context:primary-signature -vv "$dmg"; exit 1; }
+# spctl's answer is read whole before it is searched: grep -q stopping at the first match would
+# cut spctl off mid-write, and pipefail would take that for a failure
+gatekeeper() {
+  local out
+  out=$(spctl --assess -vv "$@" 2>&1) || true
+  grep -q "source=Notarized Developer ID" <<<"$out" || { echo "$out" >&2; echo "mac-release.sh: Gatekeeper does not take ${*: -1} as notarized" >&2; exit 1; }
+}
+gatekeeper --type execute "$OUT/nt.app"
+gatekeeper --type open --context context:primary-signature "$dmg"
 xcrun stapler validate -q "$OUT/nt.app"
 xcrun stapler validate -q "$dmg"
 echo "notarized: $dmg"
