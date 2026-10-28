@@ -4,6 +4,14 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.4.2 (2026-10-28)
+
+- **`nt doctor` finds hooks that cannot run.** When the nt that the agent hooks (Claude Code's
+  or Copilot CLI's) or the background sync job run is gone, as when `~/.local/bin/nt` is removed
+  for Homebrew's, the hooks failed without a word and no session got a report. `nt doctor` now
+  says so and how to fix it: `nt install --hooks`, `nt install --sync`. It also reports Copilot
+  CLI's hooks, not only Claude Code's.
+
 ## 0.4.1 (2026-10-28)
 
 Agent reports from two machines read apart, without noise.

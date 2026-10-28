@@ -103,7 +103,7 @@ Decisions taken with the user (2026-10-26):
 - Every command takes `--json`.
 - The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
-**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill.
+**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill, and fails when the nt a hook runs, or the sync job runs, is no longer there (a hook that cannot run fails without a word); `nt install --hooks` and `--sync` write the `nt` on PATH, which survives Homebrew upgrades.
 
 ## 4. CLI and TUI (simplicity first)
 

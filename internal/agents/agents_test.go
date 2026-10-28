@@ -323,8 +323,8 @@ func TestClaudeHooks(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("install: %v, %v", changed, err)
 	}
-	if got := ClaudeHooked(p); strings.Join(got, " ") != "SessionEnd SessionStart Stop" {
-		t.Fatalf("hooked events: %v", got)
+	if got, bins := ClaudeHooked(p); strings.Join(got, " ") != "SessionEnd SessionStart Stop" || len(bins) != 3 || bins[0] != "/Users/x/.local/bin/nt" {
+		t.Fatalf("hooked events: %v, binaries %v", got, bins)
 	}
 	b, _ := os.ReadFile(p)
 	for _, want := range []string{`"model": "opus"`, `/opt/flok hook claude`, `"matcher": "Bash"`, `"/Users/x/.local/bin/nt agent turn"`} {
@@ -353,6 +353,20 @@ func TestClaudeHooks(t *testing.T) {
 	}
 }
 
+func TestHookBinary(t *testing.T) {
+	for cmd, want := range map[string]string{
+		"/opt/homebrew/bin/nt agent turn":                 "/opt/homebrew/bin/nt",
+		"'/Users/a b/nt' agent start --agent copilot-cli": "/Users/a b/nt",
+		"'/Users/it'\\''s/nt' agent end":                  "/Users/it's/nt",
+		"nt agent turn":                                   "nt",
+		"/opt/flok hook claude":                           "",
+	} {
+		if got := hookBinary(cmd); got != want {
+			t.Errorf("hookBinary(%q) = %q, want %q", cmd, got, want)
+		}
+	}
+}
+
 func TestCopilotHooks(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "hooks", "nt.json")
 	if changed, err := CopilotHooks(p, "/bin dir/nt", false); err != nil || !changed {
@@ -366,6 +380,9 @@ func TestCopilotHooks(t *testing.T) {
 	}
 	if changed, _ := CopilotHooks(p, "/bin dir/nt", false); changed {
 		t.Error("writing the same hooks changed the file")
+	}
+	if bins := CopilotHooked(p); len(bins) != 3 || bins[0] != "/bin dir/nt" {
+		t.Errorf("the hooks' binaries: %v", bins)
 	}
 	if changed, _ := CopilotHooks(p, "", true); !changed {
 		t.Error("remove did nothing")
