@@ -23,6 +23,10 @@ struct NtApp: App {
         }
         .defaultSize(width: 1180, height: 820)
         .commands {
+            CommandGroup(before: .sidebar) {
+                Button(workspace.sidebar ? "Hide Sidebar" : "Show Sidebar") { workspace.sidebar.toggle() }
+                    .keyboardShortcut("s", modifiers: [.command, .control])
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Today") { Task { await workspace.openToday() } }
                     .keyboardShortcut("t")

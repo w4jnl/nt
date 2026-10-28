@@ -15,7 +15,7 @@ struct ContentView: View {
             case .problem(let message):
                 ProblemView(message: message)
             case .ready:
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: sidebar) {
                     SidebarView()
                         .navigationSplitViewColumnWidth(min: 200, ideal: 248, max: 380)
                 } detail: {
@@ -29,6 +29,12 @@ struct ContentView: View {
                 PaletteView(mode: mode)
             }
         }
+    }
+}
+
+extension ContentView {
+    private var sidebar: Binding<NavigationSplitViewVisibility> {
+        Binding(get: { ws.sidebar ? .all : .detailOnly }, set: { ws.sidebar = $0 != .detailOnly })
     }
 }
 

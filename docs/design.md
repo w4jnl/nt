@@ -395,10 +395,12 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   `nt-asset:`, the repository's files, so a remote image in a note shows its alt text.
 
 **The window.** Two columns, quiet, in the manner of Typora.
-- The sidebar: the sync state as glyph and word at the top (a click syncs now), Open (⌘P),
-  Today, then the folders: the pinned ones in their order, a rule, the rest, then the notes at
-  the root. Notes newest first with their day in mono; journals by year; `assets/` hidden. Which
-  folders are open is kept on the Mac (UserDefaults), never in the repository.
+- The sidebar: Open (⌘P), Today, then the folders: the pinned ones in their order, a rule, the
+  rest, then the notes at the root. Notes newest first with their day in mono; journals by
+  year; `assets/` hidden. Which folders are open is kept on the Mac (UserDefaults), never in the
+  repository. The sync state is at its foot as glyph and word, and a click syncs now; it stays
+  out of the toolbar, which would draw it as a glass button. View › Hide Sidebar (⌃⌘S) or the
+  toolbar's button hides the sidebar.
 - The note: a centred column, 680 px. The toolbar says where the note is (folders › title) and
   searches. The word count sits at the bottom right, a message at the bottom left when something
   did not work.

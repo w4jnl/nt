@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// SidebarView is the left column: the sync state, Open, Today and the folders, pinned first.
+/// SidebarView is the left column: Open, Today and the folders, pinned first, with the sync state
+/// at its foot. The sync state stays out of the toolbar, which would draw it as a glass button
+/// and fold it into the overflow menu when the sidebar is hidden.
 struct SidebarView: View {
     @Environment(Workspace.self) private var ws
 
@@ -23,10 +25,11 @@ struct SidebarView: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 6)
         }
-        .toolbar {
-            ToolbarItem {
-                SyncBadgeView()
-            }
+        .safeAreaInset(edge: .bottom) {
+            SyncBadgeView()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
         }
     }
 }
@@ -109,6 +112,7 @@ struct NoteRow: View {
 /// SyncBadgeView is the sync state as glyph and word; a click syncs now.
 struct SyncBadgeView: View {
     @Environment(Workspace.self) private var ws
+    @State private var hover = false
     private static let spinner = ["◐", "◓", "◑", "◒"]
 
     var body: some View {
@@ -118,16 +122,22 @@ struct SyncBadgeView: View {
             Button {
                 Task { await ws.syncNow() }
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Text(ws.syncing ? Self.spinner[frame] : b.glyph)
+                        .font(.system(size: 10))
                         .foregroundStyle(Brand.tone(b.tone))
                     Text(b.word)
+                        .font(.system(size: 12))
                         .foregroundStyle(Brand.muted)
                 }
-                .font(.system(size: 12))
+                .padding(.horizontal, 6)
+                .frame(height: 24)
+                .background(hover ? Brand.sunk : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(b.detail.isEmpty ? "Sync now" : b.detail + ". Click to sync now.")
+            .onHover { hover = $0 }
+            .help(b.detail.isEmpty ? "Sync now  ⌥⌘S" : b.detail + ". Click to sync now  ⌥⌘S")
             .accessibilityLabel("Sync state: \(b.word). Sync now")
         }
     }

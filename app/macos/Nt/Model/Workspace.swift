@@ -54,6 +54,7 @@ final class Workspace {
     var status: SyncStatus?
     var syncing = false
     var palette: PaletteMode?
+    var sidebar = true // shown; the split view's toggle and View > Hide Sidebar change it
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
     var anchorRequest = (anchor: "", seq: 0)
