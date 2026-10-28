@@ -80,16 +80,28 @@ struct CalendarView: View {
                     cell(d, selected: d.date == day, due: dueOpen[d.date] ?? [])
                 }
             }
+            // the key says in words what a colour repeats: bold for a journal, a past date for overdue
             HStack(spacing: 18) {
-                Text("\(Text("21").foregroundStyle(Brand.ink).fontWeight(.medium))  a journal")
-                Text("•  todos due")
-                Text("\(Text("•").foregroundStyle(Brand.warn))  overdue")
+                Text("\(Text("Bold date").foregroundStyle(Brand.ink).fontWeight(.medium)): a journal")
+                HStack(spacing: 6) {
+                    dot(Brand.muted)
+                    Text("todo due")
+                }
+                HStack(spacing: 6) {
+                    dot(Brand.warn)
+                    Text("overdue (a past date)")
+                }
             }
             .font(.system(size: 12))
             .foregroundStyle(Brand.muted)
             .padding(.top, 18)
             .accessibilityHidden(true)
         }
+    }
+
+    /// dot is the `•` under a date with todos due, drawn large enough for its colour to show.
+    private func dot(_ color: Color) -> some View {
+        Circle().fill(color).frame(width: 5, height: 5)
     }
 
     private func stepButton(_ symbol: String, _ label: String, _ action: @escaping () -> Void) -> some View {
@@ -128,9 +140,8 @@ struct CalendarView: View {
                     .foregroundStyle(color)
                     .frame(width: 34, height: 34)
                     .background(selected ? Brand.accentSoft : .clear, in: Circle())
-                Text(due.isEmpty ? " " : "•")
-                    .font(.system(size: 14))
-                    .foregroundStyle(late ? Brand.warn : Brand.muted)
+                dot(late ? Brand.warn : Brand.muted)
+                    .opacity(due.isEmpty ? 0 : 1)
                     .frame(height: 8)
             }
             .frame(maxWidth: .infinity)
