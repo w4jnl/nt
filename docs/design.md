@@ -603,7 +603,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     note.
   - **A mic button**, beside the capture field and in the keyboard bar, dictates at the cursor.
   - **"Talk a note"** keeps listening: each pause adds a timestamped line to today's Log.
-  - **Language:** English, Nederlands and Čeština, chosen in a switch that remembers the last
+  - **Language:** English, Nederlands and Slovenčina, chosen in a switch that remembers the last
     one, since speech is not told its language by itself.
   - **The model:** Apple's `SpeechAnalyzer` with `SpeechTranscriber` where the device supports
     the language (`supportedLocales`), else `DictationTranscriber`, the keyboard's model, which
@@ -672,7 +672,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 4. **Voice:**
    - the mic in the capture sheet and the keyboard bar;
    - "Talk a note";
-   - the language switch (English, Dutch, Czech);
+   - the language switch (English, Dutch, Slovak);
    - `SpeechTranscriber` with `DictationTranscriber` as the fallback, checked on a device for all
      three languages.
 
