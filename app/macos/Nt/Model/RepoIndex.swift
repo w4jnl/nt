@@ -36,7 +36,7 @@ struct RepoIndex: Codable, Sendable, Equatable {
 struct TreeNode: Identifiable, Hashable, Sendable {
     let id: String // the repository path
     let name: String // a folder's name, or a note's title
-    let date: String // a dated note's day, short: "21 Oct"; "" otherwise
+    let date: String // a dated note's day, short: "21 Oct", or an agent report's host; "" otherwise
     var children: [TreeNode]? // nil for a note
 
     var isFolder: Bool { children != nil }
@@ -82,7 +82,18 @@ struct SidebarTree: Equatable, Sendable {
 
     nonisolated static func noteNode(_ n: RepoIndex.Note, ix: RepoIndex, thisYear: String) -> TreeNode {
         let journal = n.path.hasPrefix(ix.folders.daily + "/")
-        return TreeNode(id: n.path, name: n.title, date: journal ? "" : shortDate(n.path, thisYear: thisYear), children: nil)
+        let meta = journal ? "" : reportHost(n.path, agents: ix.folders.agents) ?? shortDate(n.path, thisYear: thisYear)
+        return TreeNode(id: n.path, name: n.title, date: meta, children: nil)
+    }
+
+    /// reportHost is the machine an agent report is from, the first part of its name,
+    /// <host>--<agent>--<project>--<sid8>.md, so one project's reports from two machines read
+    /// apart; nil for any other note.
+    nonisolated static func reportHost(_ path: String, agents: String) -> String? {
+        guard !agents.isEmpty, path.hasPrefix(agents + "/") else { return nil }
+        let name = (path as NSString).lastPathComponent
+        guard let m = name.wholeMatch(of: /([a-z0-9]+(?:-[a-z0-9]+)*)--[a-z0-9-]+--[a-z0-9-]+--[a-z0-9-]+\.md/) else { return nil }
+        return String(m.1)
     }
 
     /// shortDate is the day in a dated file name, "21 Oct", with the year when it is not this one.
