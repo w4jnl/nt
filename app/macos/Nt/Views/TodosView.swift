@@ -134,7 +134,7 @@ struct TodosView: View {
 
     private func row(_ t: Todo) -> some View {
         let done = isDone(t)
-        let isSelected = selected == t.id && !t.done
+        let isSelected = selected == t.id
         return HStack(spacing: 12) {
             Button {
                 tick(t)
@@ -147,8 +147,8 @@ struct TodosView: View {
                         glyph.scaleEffect(scale)
                     } keyframes: { _ in
                         KeyframeTrack {
-                            CubicKeyframe(1.45, duration: 0.11)
-                            SpringKeyframe(1.0, duration: 0.32, spring: .bouncy)
+                            CubicKeyframe(1.4, duration: 0.08)
+                            SpringKeyframe(1.0, duration: 0.24, spring: .bouncy)
                         }
                     }
             }
@@ -189,7 +189,7 @@ struct TodosView: View {
                 RoundedRectangle(cornerRadius: 2).fill(Brand.accent).frame(width: 3, height: 16)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: done)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: done)
         .matchedGeometryEffect(id: t.id, in: rows)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -221,7 +221,7 @@ struct TodosView: View {
         if let i = open.firstIndex(where: { $0.id == t.id }) {
             after[t.id] = open.dropFirst(i + 1).first { ticked[$0.id] == nil }?.id
         }
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.15)) {
             ticked[t.id] = now == t.done ? nil : now
         }
         let before = writes
@@ -231,7 +231,7 @@ struct TodosView: View {
         }
         settle?.cancel()
         settle = Task {
-            try? await Task.sleep(for: .milliseconds(1100))
+            try? await Task.sleep(for: .milliseconds(700))
             await writes?.value
             if !Task.isCancelled { land() }
         }
@@ -241,7 +241,7 @@ struct TodosView: View {
     /// left the open ones to the one that was below it.
     private func land() {
         if let s = selected, ticked[s] == true, let next = after[s] { selected = next }
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.45)) {
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
             frozen = nil
             ticked = [:]
         }
