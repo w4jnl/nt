@@ -185,6 +185,26 @@ t today  [ ] day  a append  n new  / search  ? help
 - `-d` logs in colour, mapped to the palette: DEBUG `ink-muted`, INFO `accent`, WARN `warn`,
   ERROR `alert`. Colour is off when stdout is not a terminal or `NO_COLOR` is set.
 
+## Mac app
+
+- **Type.** The system face for the text: SF Pro Text 16/26 for a note's body, SF Pro Display
+  semibold for its headings (28, 21, 17). JetBrains Mono, bundled from `fonts/`, for code, times,
+  dates, paths and keys. Sentence case, no uppercase labels, menus included.
+- **Colour.** The tokens in both themes, following the Mac's appearance: `ground` behind the
+  note, the system's sidebar beside it, `accent` for links, keys and the selection. Headings are
+  `ink`, not `accent` as in the terminal: a proportional face sets them apart by size, and accent
+  stays for what can be clicked.
+- **The text column.** 680 px wide and centred, 40 px inside its edges; the rest is ground.
+- **Markdown while editing.** Only on the line with the cursor, in `ink-faint`. A heading's `#`
+  hangs in the left margin so the text does not move.
+- **States.** Glyph and word, as everywhere. The sidebar's sync state is the terminal browser's
+  badge, and a click on it syncs.
+- **Selection.** The system's, tinted with `accent` (the asset catalogue's AccentColor). In Open,
+  the selected row is `accent-soft` with the family's accent bar at its left edge.
+- **No modals.** Open and Search are one floating field over the window; Escape closes it.
+- **Nothing remote.** A note's remote image shows its alt text; the app loads only its own files
+  and the repository's.
+
 ## Favicon, menu bar and app icon
 
 - `favicon.svg` is the teal tile with the white mark. `favicon-alert.svg` is an alert tile with
@@ -215,6 +235,7 @@ t today  [ ] day  a append  n new  / search  ? help
   `internal/render` builds the Glamour style from the same values.
 - The terminal tokens (`list-width`, `list-step`, `list-min`, `preview-min`, `preview-max`,
   `gutter`, `selection-bar`) are the layout rules above in numbers.
-- A later Mac or iOS app reads `tokens.json` for its colours and `fonts/` for the brand face,
-  and uses `nt-appicon.svg` for its icon. Its UI words use the system face, as vink's web UI
-  does.
+- The Mac app holds the colours twice, in `app/macos/Nt/Brand.swift` for its views and in
+  `app/macos/editor/src/editor.css` for the note; a Swift test and a node test compare each with
+  `tokens.json`. It bundles `fonts/` and draws its icon from `nt-appicon.svg`. Its UI words use the
+  system face, as vink's web UI does. The iOS app will do the same.

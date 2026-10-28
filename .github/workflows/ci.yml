@@ -33,3 +33,14 @@ jobs:
       - run: go test -race -timeout 120s ./...
       - run: make build
       - run: ./bin/nt version
+
+  # the Mac app's editor page: its live preview without a screen, and its colours against
+  # tokens.json (the app itself builds with make mac-test on a Mac with Xcode 26)
+  editor:
+    name: editor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: npm test
+        working-directory: app/macos/editor
+        run: npm ci --no-fund --no-audit && npm test

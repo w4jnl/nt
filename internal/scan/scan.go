@@ -17,8 +17,8 @@ import (
 
 // Note is one note in the index.
 type Note struct {
-	Path  string // repository path
-	Title string
+	Path  string `json:"path"` // repository path
+	Title string `json:"title"`
 }
 
 // Index is the repository's notes and links.
