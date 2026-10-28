@@ -104,6 +104,8 @@ ios-ssh-test: ios-project
 ios-device: ios-project
 	@udid=$(IOS_DEVICE); [ -n "$$udid" ] || udid=$$(xcrun devicectl list devices 2>/dev/null | grep -v simulated | grep -E ' connected | available \(paired\) ' | grep -oE '[0-9A-F]{8}-[0-9A-F]{16}' | head -1); \
 	[ -n "$$udid" ] || { echo "ios-device: no iPhone or iPad reachable: unlock it, on a cable or on the same Wi-Fi" >&2; exit 1; }; \
+	xcrun devicectl list devices 2>/dev/null | grep "$$udid" | grep -qE ' connected | available \(paired\) ' || { \
+	  echo "ios-device: $$udid is not reachable: wake and unlock it and connect it with a cable (Trust this computer); xcrun devicectl list devices shows it as connected once it is" >&2; exit 1; }; \
 	$(IOS_XCODEBUILD) -destination "id=$$udid" -allowProvisioningUpdates -allowProvisioningDeviceRegistration build -quiet && \
 	xcrun devicectl device install app --device "$$udid" build/DerivedData/Build/Products/Debug-iphoneos/nt.app >/dev/null && \
 	xcrun devicectl device process launch --terminate-existing --device "$$udid" nl.w4j.nt.ios >/dev/null && echo "ios-device: installed and launched on $$udid"
