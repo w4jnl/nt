@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/w4jnl/nt/internal/cli.Version=$(VERSION)
 
-.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release
+.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core
 
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/$(BIN) ./cmd/$(BIN)
@@ -62,6 +62,17 @@ mac-test: mac-project
 
 mac-run: mac-build
 	open $(MAC)/build/DerivedData/Build/Products/Debug/nt.app
+
+# nt for iPhone and iPad (app/ios, docs/design.md §9). ios-core builds the phone's nt, the
+# mobile package, into NtCore.xcframework with gomobile (go install
+# golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest).
+IOS := app/ios
+GOMOBILE ?= $(shell command -v gomobile || echo $(HOME)/go/bin/gomobile)
+
+ios-core:
+	@[ -x "$(GOMOBILE)" ] || { echo "gomobile: go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest" >&2; exit 1; }
+	mkdir -p $(IOS)/build
+	PATH="$(dir $(GOMOBILE)):$$PATH" $(GOMOBILE) bind -target=ios,iossimulator -iosversion=26.0 -ldflags '$(LDFLAGS)' -o $(IOS)/build/NtCore.xcframework ./mobile
 
 # nt for Mac for a release, V=0.5.1: signed with the Developer ID, notarized, stapled, and the
 # DMG that carries it, in app/macos/build/release (scripts/mac-release.sh; release.sh runs it).

@@ -48,6 +48,9 @@ type execGit struct {
 	env []string
 }
 
+// Exec is git itself in the repository at dir, as nt sync runs it.
+func Exec(dir string) Git { return newGit(dir) }
+
 func newGit(dir string) execGit {
 	env := append(os.Environ(), "LC_ALL=C", "GIT_TERMINAL_PROMPT=0", "GIT_EDITOR=true", "GIT_MERGE_AUTOEDIT=no")
 	g := execGit{dir: dir, env: env}
