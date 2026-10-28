@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/theme"
+	"github.com/w4jnl/nt/internal/todo"
 )
 
 // narrow reports a screen too small for both panes.
@@ -164,6 +166,12 @@ func (b *browser) previewPane(w, h int) string {
 		if b.cal != nil {
 			return "\n  " + b.st.Muted.Render("no journal on "+b.cal.day.Format("Monday 2 January 2006")) + "\n  " + b.st.Faint.Render("e starts one")
 		}
+		if e, ok := b.selected(); ok && e.view == "todos" {
+			return b.todoPreview(w, h)
+		}
+		if e, ok := b.selected(); ok && e.view == "calendar" && b.homeCal != nil {
+			return b.monthPane(b.homeCal, w, h, true)
+		}
 		if e, ok := b.selected(); ok && e.view != "" {
 			what, how := b.viewHint(e.view)
 			return "\n  " + b.st.Muted.Render(what) + "\n  " + b.st.Faint.Render(how)
@@ -179,6 +187,41 @@ func (b *browser) previewPane(w, h int) string {
 	return b.p.View()
 }
 
+// todoPreview is the open todos in the note's place while the home list's Todos is selected:
+// overdue first, each with the note it is in and when it is due, as many as fit.
+func (b *browser) todoPreview(w, h int) string {
+	what, how := b.viewHint("todos")
+	rows := []string{"", "  " + b.st.Muted.Render(what), ""}
+	var open []todo.Item
+	for _, it := range b.todoItems {
+		if !it.Done {
+			open = append(open, it)
+		}
+	}
+	room := max(1, h-len(rows)-2) // the hint under them, after a blank line
+	for i, it := range open {
+		if i == room-1 && len(open) > room {
+			rows = append(rows, "  "+b.st.Faint.Render("and "+strconv.Itoa(len(open)-i)+" more"))
+			break
+		}
+		rows = append(rows, " "+b.todoRow(it, false, w-2, b.todoFrom(it)))
+	}
+	if len(open) > 0 {
+		rows = append(rows, "", "  "+b.st.Faint.Render("enter opens the list: x checks one, d sets its due date, a adds one"))
+	} else if b.todoKnown {
+		rows = append(rows, "  "+b.st.Faint.Render(how))
+	}
+	return strings.Join(rows, "\n")
+}
+
+// todoFrom names the note a todo is in: a todo list by its path, any other note by its title.
+func (b *browser) todoFrom(it todo.Item) string {
+	if path.Base(it.Path) == todo.File || b.ix == nil {
+		return it.Path
+	}
+	return firstNonEmpty(b.ix.Title(it.Path), it.Path)
+}
+
 // viewHint is what the preview says for a view's row with no note to show: what is there, and
 // what enter does.
 func (b *browser) viewHint(view string) (what, how string) {
@@ -188,15 +231,13 @@ func (b *browser) viewHint(view string) (what, how string) {
 	case "todos":
 		switch {
 		case !b.todoKnown:
-			return "the todo list", "enter opens it"
+			return "reading the todos", ""
 		case b.todoOpen == 0:
 			return "no open todos", "enter opens the list, a adds one there"
 		case b.todoLate > 0:
 			return plural(b.todoOpen, "open todo") + " · " + strconv.Itoa(b.todoLate) + " late", "enter opens the list"
 		}
 		return plural(b.todoOpen, "open todo"), "enter opens the list"
-	case "calendar":
-		return b.v.Day(b.v.Now()).Format("January 2006"), "enter opens the calendar"
 	case "weekly":
 		return "no weekly digest yet", "nt config set weekly true on one machine writes them"
 	case "agents":
@@ -310,7 +351,7 @@ func (b *browser) pickerPane(w, h int) string {
 	for i := p.top; i < len(p.items) && len(rows) < h; i++ {
 		it := p.items[i]
 		if it.todo != nil {
-			rows = append(rows, b.todoRow(*it.todo, i == p.sel, w))
+			rows = append(rows, b.todoRow(*it.todo, i == p.sel, w, ""))
 			continue
 		}
 		rows = append(rows, pickRow(b.st, b.pal, it, i == p.sel, w))

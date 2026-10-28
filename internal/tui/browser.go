@@ -192,8 +192,10 @@ type browser struct {
 	todoSeq int
 	todoAt  *todo.Item // the todo the due prompt is for
 
-	todoOpen, todoLate int  // the open todos and the late ones, for the home list
-	todoKnown          bool // they have been counted
+	todoOpen, todoLate int         // the open todos and the late ones, for the home list
+	todoKnown          bool        // they have been counted
+	todoItems          []todo.Item // every todo, overdue first, as last read
+	homeCal            *calendar   // today's month, while the home list's Calendar is selected
 
 	moving string // the note or folder m or R was pressed on
 
@@ -365,9 +367,15 @@ func (b *browser) openView(view string) tea.Cmd {
 	return nil
 }
 
-// count notes how many todos are open and how many of those are late, for the home list.
+// count keeps the todos read for the home list: how many are open, how many of those are late,
+// and the todos themselves for its Todos and Calendar.
 func (b *browser) count(items []todo.Item) {
 	today := b.v.Day(b.v.Now())
+	b.todoItems = append([]todo.Item(nil), items...)
+	todo.Sort(b.todoItems)
+	if b.homeCal != nil {
+		b.homeCal.setTodos(b.todoItems)
+	}
 	b.todoOpen, b.todoLate, b.todoKnown = 0, 0, true
 	for _, it := range items {
 		if it.Done {
@@ -476,6 +484,10 @@ func (b *browser) loadNow() tea.Cmd {
 		return b.calShow()
 	}
 	e, ok := b.selected()
+	b.homeCal = nil
+	if ok && e.view == "calendar" {
+		b.homeCal = b.homeMonth()
+	}
 	if ok && e.view != "" {
 		if rel := b.viewNote(e.view); rel != "" {
 			return b.show(rel)
@@ -912,8 +924,13 @@ func (b *browser) poll() tea.Cmd {
 	if m := modTime(b.v.Abs(b.dir)); !m.Equal(b.dirMod) {
 		b.list()
 	}
-	if e, ok := b.selected(); ok && e.view != "" && b.pick == nil && b.cal == nil && b.viewNote(e.view) != b.showing {
-		cmds = append(cmds, b.loadNow()) // a journal or digest made since, by nt a or a sync
+	if e, ok := b.selected(); ok && e.view != "" && b.pick == nil && b.cal == nil {
+		switch {
+		case b.viewNote(e.view) != b.showing:
+			cmds = append(cmds, b.loadNow()) // a journal or digest made since, by nt a or a sync
+		case b.homeCal != nil:
+			b.readMonth(b.homeCal) // a journal written since
+		}
 	}
 	if b.cal != nil {
 		b.calRead()

@@ -55,8 +55,17 @@ func (b *browser) closeCalendar() tea.Cmd {
 
 // calRead notes which days of the shown month have a journal, and the selected day's agent
 // sessions: a few stat calls, so it runs on every move and every poll.
-func (b *browser) calRead() {
-	c := b.cal
+func (b *browser) calRead() { b.readMonth(b.cal) }
+
+// homeMonth is today's month as the home list's Calendar shows it, with the todos read last.
+func (b *browser) homeMonth() *calendar {
+	c := &calendar{day: b.v.Day(b.v.Now())}
+	b.readMonth(c)
+	c.setTodos(b.todoItems)
+	return c
+}
+
+func (b *browser) readMonth(c *calendar) {
 	c.journals = map[string]bool{}
 	first := time.Date(c.day.Year(), c.day.Month(), 1, 0, 0, 0, 0, c.day.Location())
 	for d := first; d.Month() == first.Month(); d = d.AddDate(0, 0, 1) {
@@ -86,9 +95,15 @@ func (b *browser) setCalTodos(msg calTodosMsg) {
 		return
 	}
 	b.count(msg.items)
-	todo.Sort(msg.items)
+	c.setTodos(msg.items)
+}
+
+// setTodos files the todos by the day they are due and the day they were done.
+func (c *calendar) setTodos(items []todo.Item) {
+	items = append([]todo.Item(nil), items...)
+	todo.Sort(items)
 	c.due, c.done = map[string][]todo.Item{}, map[string][]todo.Item{}
-	for _, it := range msg.items {
+	for _, it := range items {
 		if it.Due != "" {
 			c.due[it.Due] = append(c.due[it.Due], it)
 		}
@@ -218,8 +233,11 @@ func weekday(d time.Time) int { return (int(d.Weekday()) + 6) % 7 }
 
 // calendarPane draws the month and, under it, the selected day: its journal, its todos (due or
 // done that day) and its agent sessions.
-func (b *browser) calendarPane(w, h int) string {
-	c := b.cal
+func (b *browser) calendarPane(w, h int) string { return b.monthPane(b.cal, w, h, false) }
+
+// monthPane draws c's month and its selected day. On the home list (home) it stands in the
+// note's place, indented as a note is, and says what enter does there rather than here.
+func (b *browser) monthPane(c *calendar, w, h int, home bool) string {
 	today := b.v.Day(b.v.Now())
 	first := time.Date(c.day.Year(), c.day.Month(), 1, 0, 0, 0, 0, c.day.Location())
 	rows := []string{" " + b.st.Muted.Render(first.Format("January 2006")), b.st.Faint.Render("  mo  tu  we  th  fr  sa  su")}
@@ -267,9 +285,14 @@ func (b *browser) calendarPane(w, h int) string {
 		}
 	}
 	rows = append(rows, "", " "+b.st.Text.Render(day))
-	if c.journals[c.day.Format("2006-01-02")] {
+	switch has := c.journals[c.day.Format("2006-01-02")]; {
+	case home && has:
+		rows = append(rows, " "+b.st.Muted.Render("journal"))
+	case home:
+		rows = append(rows, " "+b.st.Faint.Render("no journal"))
+	case has:
 		rows = append(rows, " "+b.st.Muted.Render("journal · enter opens it"))
-	} else {
+	default:
 		rows = append(rows, " "+b.st.Faint.Render("no journal · e starts one"))
 	}
 	key := c.day.Format("2006-01-02")
@@ -284,6 +307,13 @@ func (b *browser) calendarPane(w, h int) string {
 	}
 	if c.sessions > 0 {
 		rows = append(rows, " "+b.st.Muted.Render(plural(c.sessions, "agent session")))
+	}
+	if home {
+		rows = append(rows, "", " "+b.st.Faint.Render("enter opens the calendar: h l a day, j k a week, [ ] a month"))
+		for i, r := range rows {
+			rows[i] = " " + r
+		}
+		rows = append([]string{""}, rows...)
 	}
 	if len(rows) > h {
 		rows = rows[:h]

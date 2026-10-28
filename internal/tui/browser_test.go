@@ -652,8 +652,29 @@ func TestHomeList(t *testing.T) {
 			t.Errorf("the list lacks %q:\n%s", want, screen)
 		}
 	}
+	// a view shows what it stands for: the open todos with their notes and dates, the month
+	press(b, "j")
+	pane := ansi.Strip(b.previewPane(80, 20))
+	for _, want := range []string{"2 open todos · 1 late", "○ Call the plumber  todo.md", "3d late", "○ Renew passport", "enter opens the list"} {
+		if !strings.Contains(pane, want) {
+			t.Errorf("Todos shows no %q:\n%s", want, pane)
+		}
+	}
+	if strings.Contains(pane, "Done already") {
+		t.Errorf("Todos shows a done todo:\n%s", pane)
+	}
+	press(b, "j")
+	pane = ansi.Strip(b.previewPane(80, 20))
+	for _, want := range []string{"October 2026", "mo  tu  we", "25•", "Wednesday 28 October · today", "journal", "enter opens the calendar"} {
+		if !strings.Contains(pane, want) {
+			t.Errorf("Calendar shows no %q:\n%s", want, pane)
+		}
+	}
+	if b.cal != nil || b.showing != "" {
+		t.Fatalf("selecting Calendar opened it, or shows %q", b.showing)
+	}
 	// j and k step over the rules; a view shows its note, or says what enter does
-	press(b, "jjj")
+	press(b, "j")
 	if b.showing != "weekly/2026/2026-W44.md" {
 		t.Fatalf("Weekly shows %q", b.showing)
 	}

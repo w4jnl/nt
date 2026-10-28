@@ -214,15 +214,15 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 	return nil
 }
 
-// todoRow draws a todo: ○ open or ✓ done, its text, and at the right edge when it is due (late
-// in warn, with the word) or when it was done.
-func (b *browser) todoRow(it todo.Item, selected bool, w int) string {
-	text, muted := b.st.Text, b.st.Muted
+// todoRow draws a todo: ○ open or ✓ done, its text, the note it is in (from, faint) when given,
+// and at the right edge when it is due (late in warn, with the word) or when it was done.
+func (b *browser) todoRow(it todo.Item, selected bool, w int, from string) string {
+	text, muted, faint := b.st.Text, b.st.Muted, b.st.Faint
 	warn, done := lipgloss.NewStyle().Foreground(b.pal.Warn), lipgloss.NewStyle().Foreground(b.pal.Color(theme.Done))
 	lead := " "
 	if selected {
 		bg := b.pal.Surface
-		text, muted, warn, done = text.Background(bg), muted.Background(bg), warn.Background(bg), done.Background(bg)
+		text, muted, faint, warn, done = text.Background(bg), muted.Background(bg), faint.Background(bg), warn.Background(bg), done.Background(bg)
 		lead = b.st.Bar.Render("▎")
 	}
 	mark := muted.Render(" ○ ")
@@ -238,6 +238,9 @@ func (b *browser) todoRow(it todo.Item, selected bool, w int) string {
 		right = text.Render("  ") + right + text.Render(" ")
 	}
 	left := lead + mark + text.Render(it.Text)
+	if from != "" {
+		left += faint.Render("  " + from)
+	}
 	if room := w - ansi.StringWidth(right); ansi.StringWidth(left) > room {
 		left = ansi.Truncate(left, max(0, room), "…")
 	}

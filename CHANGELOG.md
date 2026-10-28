@@ -10,9 +10,10 @@ A home in the browser, and nt as a viewer for any file.
 
 - **The browser starts at home.** The root of the left pane begins with Today, Todos, Calendar,
   Weekly and Agents, each with its key at the right, then the pinned folders with their numbers,
-  then the folders, a rule between the groups. Today is selected at the start and shows today's
-  journal; Weekly the newest weekly digest; Agents today's digest; Todos says how many are open
-  and late. Enter does what the key does. Inside a folder the list is as before.
+  then the folders, a rule between the groups. Selecting one shows it on the right: Today is
+  selected at the start and shows today's journal; Todos the open todos, overdue first, with
+  their notes and dates; Calendar this month; Weekly the newest weekly digest; Agents today's
+  digest. Enter does what the key does. Inside a folder the list is as before.
 - **`w`** goes to the newest weekly digest.
 - **`nt <file>`** shows a note, or any text file, on the whole screen, from anywhere: `nt
   README.md`, `nt ~/Downloads/spec.md`. Commands come first, and no command has a `.` or a `/`
