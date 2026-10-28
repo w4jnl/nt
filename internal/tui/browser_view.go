@@ -390,7 +390,7 @@ func pickRow(st theme.Styles, pal theme.Palette, it pickItem, selected bool, w i
 // helpText is every key, in the preview pane: two columns when the pane is wide enough.
 func (b *browser) helpText(w, h int) string {
 	groups := [][]string{
-		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "tab", "to the note and back", "g G", "top, bottom"},
+		{"move", "j k  ↑ ↓", "up and down", "enter →", "open a folder or note", "h ← ⌫", "up a folder", "~", "the root, from anywhere", "tab", "to the note and back", "g G", "top, bottom"},
 		{"go", "t", "today's journal", "[ ]", "the day before, after", "c", "the calendar", "w", "the newest weekly digest", "1–9", "pinned folders", "A", "today's agent reports", ",", "the settings"},
 		{"find", "/ ctrl-p", "search every note, find a title"},
 		{"todos", "x", "the todo list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "X", "the done ones", "e D", "edit, delete"},

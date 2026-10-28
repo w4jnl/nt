@@ -708,6 +708,17 @@ func TestHomeList(t *testing.T) {
 	if b.dir != "weekly/2026" {
 		t.Fatalf("w goes to %q", b.dir)
 	}
+	// ~ goes to the root from anywhere, on the top-level folder the browser was in; again, Today
+	b.openFolder("weekly/2026")
+	b.focus = onPreview
+	press(b, "~")
+	if e, _ := b.selected(); b.dir != "" || e.id() != "weekly" || b.focus != onList {
+		t.Fatalf("~ from weekly/2026: in %q on %q", b.dir, e.id())
+	}
+	press(b, "~")
+	if e, _ := b.selected(); e.id() != "view:today" || b.showing != "daily/2026/2026-10-28.md" {
+		t.Fatalf("~ at the root: on %q showing %q", e.id(), b.showing)
+	}
 	// the views and pins are no notes: D, m and R leave them alone
 	b.openFolder("")
 	press(b, "D")
@@ -721,5 +732,41 @@ func TestHomeList(t *testing.T) {
 	b.openFolder("tech")
 	if e, _ := b.selected(); e.view != "" || e.rule {
 		t.Fatalf("tech starts on %+v", e)
+	}
+}
+
+func TestDatesNewestFirst(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	for f, body := range map[string]string{
+		"agents/2025/2025-12-31/mbp--claude-code--old--00000001.md":        "---\ncreated: 2025-12-31T10:00:00+01:00\n---\n# old\n",
+		"agents/2026/2026-10-27/mbp--claude-code--infra--00000002.md":      "---\ncreated: 2026-10-27T09:00:00+01:00\n---\n# infra\n",
+		"agents/2026/2026-10-28/work--copilot-cli--vuln--00000003.md":      "---\ncreated: 2026-10-28T10:39:00+01:00\n---\n# vuln\n",
+		"agents/2026/2026-10-28/mbp--claude-code--flok--00000004.md":       "---\ncreated: 2026-10-28T08:15:00+01:00\n---\n# flok\n",
+		"agents/2026/2026-10-28/mbp--claude-code--notetaking--00000005.md": "---\ncreated: 2026-10-28T11:56:00+01:00\n---\n# noteTaking\n",
+		"agents/2026/2026-10-28/README.md":                                 "# Agents\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names := func(dir string) string {
+		var out []string
+		for _, e := range listFolder(b.v, dir) {
+			out = append(out, e.name)
+		}
+		return strings.Join(out, " ")
+	}
+	for dir, want := range map[string]string{
+		"agents":      "2026 2025",
+		"agents/2026": "2026-10-28 2026-10-27",
+		// the digest first, then the sessions by when they began, the latest first
+		"agents/2026/2026-10-28": "README.md mbp--claude-code--notetaking--00000005.md work--copilot-cli--vuln--00000003.md mbp--claude-code--flok--00000004.md",
+	} {
+		if got := names(dir); got != want {
+			t.Errorf("%s lists %s, want %s", dir, got, want)
+		}
 	}
 }

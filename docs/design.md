@@ -153,9 +153,12 @@ Decisions taken with the user (2026-10-26):
 
 **Home.** The root's list starts with the views, a row each with its key at the right: Today (`t`), Todos (`x`, with the open count and the late ones in `warn` with the word), Calendar (`c`), Weekly (`w`), Agents (`A`); then the pinned folders that exist, with their number; then the root's folders and notes. A rule in `line` follows each group and is never selected: `j` `k` and the wheel step over it, a click on it does nothing. Selecting a view shows what it stands for in the note's place, without writing anything: today's journal; the open todos, overdue first, each with its note (a todo list by its path, any other by its title) and its date in words, as many as fit; this month as the calendar draws it, with today's journal, todos and sessions; the newest weekly digest; today's agent digest. Where there is nothing (no journal yet, no digest) it says so, and what enter does. Enter does what the key does; `nt` starts on Today. `h` from a top-level folder comes back to it. Inside a folder the list is the folder's alone, so a long one is not pushed down; the keys work from anywhere. The todo count comes from `todo.Collect`, read in the background with the backlinks.
 
+**Order.** In every folder, the folders first, A to Z, then those named by a date (a year, a month, a day) newest first; then the notes, newest first by name, so dated ones by their date. In the agent reports a day's digest comes first, then its reports by when their session began (`created`), the latest first. `nt ls` lists folders in the same order.
+
 | Key | Action |
 |---|---|
 | `t` | Today |
+| `~` | The root, from any folder, on the top-level folder it was in; at the root, Today |
 | `[` `]` | Previous / next day |
 | `A` | Agents day folder, which opens on its digest |
 | `x` | The todo list (Todos, below) |

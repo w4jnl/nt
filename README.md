@@ -153,7 +153,7 @@ In the browser:
 
 | Key | Action |
 |---|---|
-| `j` `k`, `enter`, `h` | move, open a folder or note, up a folder |
+| `j` `k`, `enter`, `h`, `~` | move, open a folder or note, up a folder, to the root from anywhere |
 | `tab` | to the note and back; `j` `k` then scroll it |
 | `t`, `[` `]`, `c`, `w`, `A` | today's journal, the day before or after, the calendar, the newest weekly digest, today's agent reports |
 | `,` | the settings: enter changes one, `e` edits its file |

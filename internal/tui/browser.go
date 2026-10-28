@@ -104,6 +104,7 @@ type entry struct {
 	host      string // the machine an agent report is from: <host>--… in its name
 	title     string
 	journal   bool
+	started   time.Time // when an agent report's session began, its created
 
 	view string // today, todos, calendar, weekly or agents: a row of the home list
 	pin  bool   // a pinned folder in the home list
@@ -417,35 +418,56 @@ func listFolder(v *vault.Vault, dir string) []entry {
 		if !strings.HasSuffix(name, ".md") {
 			continue
 		}
-		e := entry{name: name, rel: rel, title: titleOf(v.Abs(rel))}
+		head := readHead(v.Abs(rel))
+		e := entry{name: name, rel: rel, title: render.Title(head, v.Abs(rel))}
 		if m := datePrefix.FindStringSubmatch(name); m != nil {
 			e.date = m[1]
 			e.journal = inDaily && name == m[1]+".md"
 		}
 		if m := reportHost.FindStringSubmatch(name); m != nil && inAgents {
 			e.host = m[1]
+			e.started = created(head)
 		}
 		notes = append(notes, e)
 	}
-	sort.Slice(dirs, func(i, j int) bool { return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name) })
+	sort.Slice(dirs, func(i, j int) bool { return vault.FolderBefore(dirs[i].name, dirs[j].name) })
 	sort.Slice(notes, func(i, j int) bool {
-		if inAgents && (notes[i].name == "README.md") != (notes[j].name == "README.md") {
-			return notes[i].name == "README.md" // the day's digest above its reports
+		a, b := notes[i], notes[j]
+		switch {
+		case inAgents && (a.name == "README.md") != (b.name == "README.md"):
+			return a.name == "README.md" // the day's digest above its reports
+		case !a.started.Equal(b.started):
+			return a.started.After(b.started) // the latest session first
 		}
-		return notes[i].name > notes[j].name
+		return a.name > b.name
 	})
 	return append(dirs, notes...)
 }
 
-func titleOf(p string) string {
+// readHead is the first 4 KB of a note: enough for its frontmatter and its title.
+func readHead(p string) []byte {
 	f, err := os.Open(p)
 	if err != nil {
-		return ""
+		return nil
 	}
 	defer f.Close()
 	head := make([]byte, 4096)
 	n, _ := f.Read(head)
-	return render.Title(head[:n], p)
+	return head[:n]
+}
+
+func titleOf(p string) string { return render.Title(readHead(p), p) }
+
+// created is the time in a note's frontmatter created key; zero when there is none.
+func created(head []byte) time.Time {
+	front, _ := render.SplitFrontmatter(head)
+	for _, l := range strings.Split(string(front), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "created:"); ok {
+			t, _ := time.Parse(time.RFC3339, strings.Trim(strings.TrimSpace(v), `"'`))
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func (b *browser) selected() (entry, bool) {
@@ -1017,6 +1039,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case "t":
 		return b.today()
+	case "~":
+		return b.goHome()
 	case "[", "]":
 		return b.day(map[string]int{"[": -1, "]": 1}[s])
 	case "A":
@@ -1252,6 +1276,24 @@ func (b *browser) day(step int) tea.Cmd {
 func (b *browser) journalRel(day string) string {
 	t, _ := time.ParseInLocation("2006-01-02", day, time.Local)
 	return b.v.JournalRel(t)
+}
+
+// goHome goes to the root, with the top-level folder the browser was in selected; at the root,
+// to Today.
+func (b *browser) goHome() tea.Cmd {
+	top, _, _ := strings.Cut(b.dir, "/")
+	b.focus, b.full = onList, false
+	b.layout()
+	b.dir, b.sel, b.top = "", 0, 0
+	b.list()
+	b.sel = 0
+	for i, e := range b.entries {
+		if top != "" && e.dir && !e.pin && e.rel == top {
+			b.sel = i
+		}
+	}
+	b.clampList()
+	return b.loadNow()
 }
 
 // today goes to today's journal, starting it when there is none.
