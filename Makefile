@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/w4jnl/nt/internal/cli.Version=$(VERSION)
 
-.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core
+.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core ios-libgit2 ios-project ios-build ios-test ios-ssh-test ios-device
 
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/$(BIN) ./cmd/$(BIN)
@@ -22,7 +22,7 @@ vet:
 	go vet ./...
 
 fmt:
-	gofmt -w ./cmd ./internal ./skills
+	gofmt -w ./cmd ./internal ./skills ./mobile
 
 # The brand SVGs and render pages come from one geometry (assets/brand/gen.py, needs fontTools
 # and brotli); render-hero.sh turns them into the PNGs (headless Chrome, rsvg-convert).
@@ -65,14 +65,48 @@ mac-run: mac-build
 
 # nt for iPhone and iPad (app/ios, docs/design.md §9). ios-core builds the phone's nt, the
 # mobile package, into NtCore.xcframework with gomobile (go install
-# golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest).
+# golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest); ios-libgit2
+# builds its git, libgit2 with ssh, into Git2.xcframework (scripts/ios-libgit2.sh, cmake).
+# ios-project builds either when it is missing. The simulator build and tests are signed ad hoc,
+# so the Keychain, which holds the phone's key, has the entitlement it asks for.
 IOS := app/ios
 GOMOBILE ?= $(shell command -v gomobile || echo $(HOME)/go/bin/gomobile)
+IOS_SIM ?= platform=iOS Simulator,name=iPhone 17
+IOS_XCODEBUILD = cd $(IOS) && xcodebuild -project Nt.xcodeproj -scheme Nt -configuration Debug -derivedDataPath build/DerivedData
 
 ios-core:
 	@[ -x "$(GOMOBILE)" ] || { echo "gomobile: go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest" >&2; exit 1; }
 	mkdir -p $(IOS)/build
 	PATH="$(dir $(GOMOBILE)):$$PATH" $(GOMOBILE) bind -target=ios,iossimulator -iosversion=26.0 -ldflags '$(LDFLAGS)' -o $(IOS)/build/NtCore.xcframework ./mobile
+
+ios-libgit2:
+	scripts/ios-libgit2.sh
+
+ios-project:
+	@[ -d $(IOS)/build/NtCore.xcframework ] || $(MAKE) ios-core
+	@[ -d $(IOS)/build/Git2.xcframework ] || $(MAKE) ios-libgit2
+	@[ -f $(IOS)/Local.xcconfig ] || printf 'NT_TEAM_ID =\n' > $(IOS)/Local.xcconfig
+	cd $(IOS) && xcodegen generate --quiet
+
+ios-build: ios-project
+	$(IOS_XCODEBUILD) -destination '$(IOS_SIM)' build CODE_SIGN_IDENTITY=- -quiet
+
+ios-test: ios-project
+	$(IOS_XCODEBUILD) -destination '$(IOS_SIM)' test CODE_SIGN_IDENTITY=- -collect-test-diagnostics never -quiet
+
+# The phone's ssh in the simulator, against a throwaway sshd on 127.0.0.1 (scripts/ios-ssh-test.sh).
+ios-ssh-test: ios-project
+	IOS_SIM='$(IOS_SIM)' scripts/ios-ssh-test.sh
+
+# Build, install and launch on the iPhone or iPad (unlocked; on a cable, or on Wi-Fi once
+# paired), signed with Local.xcconfig's team. The first device devicectl lists as reachable is
+# taken; IOS_DEVICE=<udid> picks one.
+ios-device: ios-project
+	@udid=$(IOS_DEVICE); [ -n "$$udid" ] || udid=$$(xcrun devicectl list devices 2>/dev/null | grep -v simulated | grep -E ' connected | available \(paired\) ' | grep -oE '[0-9A-F]{8}-[0-9A-F]{16}' | head -1); \
+	[ -n "$$udid" ] || { echo "ios-device: no iPhone or iPad reachable: unlock it, on a cable or on the same Wi-Fi" >&2; exit 1; }; \
+	$(IOS_XCODEBUILD) -destination "id=$$udid" -allowProvisioningUpdates -allowProvisioningDeviceRegistration build -quiet && \
+	xcrun devicectl device install app --device "$$udid" build/DerivedData/Build/Products/Debug-iphoneos/nt.app >/dev/null && \
+	xcrun devicectl device process launch --terminate-existing --device "$$udid" nl.w4j.nt.ios >/dev/null && echo "ios-device: installed and launched on $$udid"
 
 # nt for Mac for a release, V=0.5.1: signed with the Developer ID, notarized, stapled, and the
 # DMG that carries it, in app/macos/build/release (scripts/mac-release.sh; release.sh runs it).

@@ -1,0 +1,80 @@
+# nt for iPhone and iPad: the Xcode project is generated from this file (brew install xcodegen;
+# make ios-project). Local.xcconfig (gitignored) holds your team id, NT_TEAM_ID, which a device
+# build needs; the simulator needs none.
+#
+# nt itself is in the app: the mobile package built with gomobile into build/NtCore.xcframework
+# (make ios-core), and its git is libgit2 with ssh, built into build/Git2.xcframework (make
+# ios-libgit2). Neither is committed. docs/design.md §9 is the spec.
+name: Nt
+options:
+  bundleIdPrefix: nl.w4j
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: $(NT_TEAM_ID)
+    ENABLE_USER_SCRIPT_SANDBOXING: true
+targets:
+  Nt:
+    type: application
+    platform: iOS
+    sources:
+      - path: Nt
+      - path: ../macos/Nt/Model/SyncStatus.swift
+        group: Nt/Model
+    dependencies:
+      - framework: build/NtCore.xcframework
+        embed: false
+      - framework: build/Git2.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: nt
+        PRODUCT_MODULE_NAME: Nt
+        PRODUCT_BUNDLE_IDENTIFIER: nl.w4j.nt.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
+    info:
+      path: Nt/Info.plist
+      properties:
+        CFBundleDisplayName: nt
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+  NtTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: NtTests
+    dependencies:
+      - target: Nt
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.w4j.nt.ios.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/nt.app/nt
+        BUNDLE_LOADER: $(TEST_HOST)
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  Nt:
+    build:
+      targets:
+        Nt: all
+        NtTests: [test]
+    test:
+      targets:
+        - NtTests

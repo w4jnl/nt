@@ -41,12 +41,12 @@ type Git interface {
 	Files() (string, error)
 }
 
-// Result is what nt printed and how it ended: the command's stdout, its error message (what nt
-// prints after "nt: "), and its exit status.
+// Result is what nt printed and how it ended: the command's standard output, its error message
+// (what nt prints after "nt: "), and its exit status. (Not Stdout and Stderr: C keeps those names.)
 type Result struct {
-	Stdout []byte
-	Stderr string
-	Status int
+	Output  []byte
+	Message string
+	Status  int
 }
 
 // Core is nt for one repository on the phone.
@@ -65,16 +65,16 @@ func NewCore(config, state, repo string, git Git) *Core {
 	return &Core{runner: ops.Runner{Git: adapter{git}}}
 }
 
-// Run runs a command line given as a JSON array of strings, with stdin as its input.
-func (c *Core) Run(argsJSON string, stdin []byte) *Result {
+// Run runs a command line given as a JSON array of strings, with input as its standard input.
+func (c *Core) Run(argsJSON string, input []byte) *Result {
 	var args []string
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return &Result{Stderr: "the command line is no JSON array of strings: " + err.Error(), Status: 2}
+		return &Result{Message: "the command line is no JSON array of strings: " + err.Error(), Status: 2}
 	}
-	out, code, err := c.runner.Run(args, stdin)
-	r := &Result{Stdout: out, Status: code}
+	out, code, err := c.runner.Run(args, input)
+	r := &Result{Output: out, Status: code}
 	if err != nil {
-		r.Stderr = err.Error()
+		r.Message = err.Error()
 	}
 	return r
 }

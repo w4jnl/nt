@@ -28,7 +28,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: gofmt
-        run: test -z "$(gofmt -l ./cmd ./internal ./skills)" || { gofmt -l ./cmd ./internal ./skills; exit 1; }
+        run: test -z "$(gofmt -l ./cmd ./internal ./skills ./mobile)" || { gofmt -l ./cmd ./internal ./skills ./mobile; exit 1; }
       - run: go vet ./...
       - run: go test -race -timeout 120s ./...
       - run: make build

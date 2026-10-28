@@ -660,6 +660,17 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - `Git` is a Go interface the app implements in Swift.
 - **libgit2, libssh2 and mbedTLS** are built from pinned, checksummed sources by
   `scripts/ios-libgit2.sh` into an xcframework, not committed.
+- **The phone's git, `LibGit`,** is `mobile.Git` on libgit2.
+  - It merges through `.gitattributes`, so the journals' `merge=union` holds; it fast-forwards
+    when it can, and commits a clean merge itself, as `git merge` does.
+  - Commits are made by `<host> <<host>@nt.invalid>`, unless the clone's git config names
+    someone.
+  - The key reaches libssh2 in OpenSSH's own format: its mbedTLS reader of PEM cannot take a
+    key from memory.
+  - GitHub's host keys are pinned; another host is trusted the first time and refused if its key
+    changes. A refused key is tried once, and like an unreachable remote it is offline, as for
+    the command line.
+  - `make ios-ssh-test` checks it in the simulator against a throwaway sshd.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;

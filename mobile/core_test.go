@@ -120,12 +120,12 @@ func TestTheCoreSyncsThroughTheAppsGit(t *testing.T) {
 	write(base, "config.toml", "repo = \""+phone+"\"\nhost = \"iphone\"\n[sync]\nauto = false\n")
 	core := NewCore(config, filepath.Join(base, "state"), phone, viaExec{gitsync.Exec(phone)})
 	r := core.Run(`["sync","--json"]`, nil)
-	if r.Status != 0 && r.Stderr != "" {
-		t.Fatalf("sync: %d %s", r.Status, r.Stderr)
+	if r.Status != 0 && r.Message != "" {
+		t.Fatalf("sync: %d %s", r.Status, r.Message)
 	}
 	var st gitsync.Status
-	if err := json.Unmarshal(r.Stdout, &st); err != nil {
-		t.Fatalf("sync printed %q: %v", r.Stdout, err)
+	if err := json.Unmarshal(r.Output, &st); err != nil {
+		t.Fatalf("sync printed %q: %v", r.Output, err)
 	}
 	if st.State != "conflict" || len(st.NewConflicts) != 1 || !strings.HasPrefix(st.NewConflicts[0], "tech/nas.conflict-iphone-") {
 		t.Fatalf("status %+v", st)
@@ -139,8 +139,8 @@ func TestTheCoreSyncsThroughTheAppsGit(t *testing.T) {
 	}
 
 	// the other commands answer as nt does, and a broken command line says so
-	if r := core.Run(`["todo","add","--json","--","Renew the domain"]`, nil); r.Status != 0 || !strings.Contains(string(r.Stdout), `"text": "Renew the domain"`) {
-		t.Errorf("todo add: %d %s %s", r.Status, r.Stderr, r.Stdout)
+	if r := core.Run(`["todo","add","--json","--","Renew the domain"]`, nil); r.Status != 0 || !strings.Contains(string(r.Output), `"text": "Renew the domain"`) {
+		t.Errorf("todo add: %d %s %s", r.Status, r.Message, r.Output)
 	}
 	if r := core.Run(`not json`, nil); r.Status != 2 {
 		t.Errorf("a broken command line: %+v", r)
