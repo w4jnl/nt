@@ -40,6 +40,13 @@ private func index() throws -> RepoIndex {
         #expect(ix.back["homelab/2026-10-21-nas-setup.md"]?.count == 2)
     }
 
+    @Test func agentReportsShowTheirHost() {
+        #expect(SidebarTree.reportHost("agents/2026/2026-10-28/work--copilot-cli--vuln-remediation--43fbe292.md", agents: "agents") == "work")
+        #expect(SidebarTree.reportHost("agents/2026/2026-10-27/jaromac--claude-code--flok--f0ceca08.md", agents: "agents") == "jaromac")
+        #expect(SidebarTree.reportHost("agents/2026/2026-10-28/README.md", agents: "agents") == nil)
+        #expect(SidebarTree.reportHost("work/jaromac--claude-code--flok--f0ceca08.md", agents: "agents") == nil)
+    }
+
     @Test func treePinsFirstNewestFirstWithoutAssets() throws {
         let tree = SidebarTree.build(try index(), thisYear: "2026")
         #expect(tree.pinned.map(\.id) == ["homelab", "work"])

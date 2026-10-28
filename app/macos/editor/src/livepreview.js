@@ -5,6 +5,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType } from "@codemirror/view
 import { StateEffect, StateField } from "@codemirror/state";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { post } from "./bridge.js";
+import { paragraphAt } from "./edits.js";
 
 // setBroken names the link destinations, as written, that point at nothing (the app checks).
 export const setBroken = StateEffect.define();
@@ -12,15 +13,18 @@ export const setBroken = StateEffect.define();
 export const setFocus = StateEffect.define();
 // setBacklinks gives the notes that link to this one: [{path, title, folder}].
 export const setBacklinks = StateEffect.define();
+// setFocusMode turns focus mode on or off: the paragraph being written stays, the rest dims.
+export const setFocusMode = StateEffect.define();
 
 // noteField is what the preview knows besides the text: the note's repository path, its broken
-// links and the focus.
+// links, the focus and focus mode.
 export const noteField = StateField.define({
-  create: () => ({ path: "", broken: new Set(), focused: false }),
+  create: () => ({ path: "", broken: new Set(), focused: false, focusMode: false }),
   update(v, tr) {
     for (const e of tr.effects) {
       if (e.is(setBroken)) v = { ...v, broken: new Set(e.value) };
       else if (e.is(setFocus)) v = { ...v, focused: e.value };
+      else if (e.is(setFocusMode)) v = { ...v, focusMode: e.value };
     }
     return v;
   },
@@ -182,6 +186,7 @@ class TextWidget extends WidgetType {
   }
 }
 
+// CheckWidget is a task's checkbox; a click asks the app to tick it (it knows the day for done:).
 class CheckWidget extends WidgetType {
   constructor(checked) {
     super();
@@ -190,12 +195,16 @@ class CheckWidget extends WidgetType {
   eq(o) {
     return o.checked === this.checked;
   }
-  toDOM() {
+  toDOM(view) {
     const s = document.createElement("span");
     s.className = "cm-check" + (this.checked ? " cm-check-done" : "");
     s.textContent = this.checked ? "✓" : "○";
     s.setAttribute("role", "checkbox");
     s.setAttribute("aria-checked", String(this.checked));
+    s.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (!view.state.readOnly) post({ type: "toggle", line: view.state.doc.lineAt(view.posAtDOM(s)).number });
+    });
     return s;
   }
 }
@@ -231,6 +240,12 @@ class BacklinksWidget extends WidgetType {
   toDOM() {
     const d = document.createElement("div");
     d.className = "cm-backlinks";
+    // the widget keeps its events from the editor, so its links answer clicks themselves
+    d.addEventListener("mousedown", (e) => {
+      const a = e.target.closest("[data-open]");
+      e.preventDefault();
+      if (a) post({ type: "open", path: a.dataset.open });
+    });
     const h = document.createElement("div");
     h.className = "cm-backlinks-head";
     h.textContent = "Linked from";
@@ -562,12 +577,6 @@ export const backlinksField = StateField.define({
 // Command-click follows.
 const clicks = EditorView.domEventHandlers({
   mousedown(e, view) {
-    const back = e.target.closest?.("[data-open]");
-    if (back) {
-      e.preventDefault();
-      post({ type: "open", path: back.dataset.open });
-      return true;
-    }
     const fmw = e.target.closest?.(".cm-fm-summary");
     if (fmw) {
       e.preventDefault();
@@ -586,8 +595,45 @@ const clicks = EditorView.domEventHandlers({
   },
 });
 
+// Focus mode dims every line but the paragraph the cursor is in; with the cursor in the folded
+// frontmatter, nothing is being written yet and nothing dims.
+const dim = Decoration.line({ class: "cm-dim" });
+
+function dimmed(view) {
+  const { state } = view;
+  if (!state.field(noteField).focusMode) return Decoration.none;
+  const head = state.selection.main.head;
+  const fm = frontmatterRange(state.doc);
+  if (fm && head <= fm.to) return Decoration.none;
+  const [a, b] = paragraphAt(state.doc, head);
+  const out = [];
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to; ) {
+      const l = state.doc.lineAt(pos);
+      if (l.number < a || l.number > b) out.push(dim.range(l.from));
+      pos = l.to + 1;
+    }
+  }
+  return Decoration.set(out, true);
+}
+
+const focusPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = dimmed(view);
+    }
+    update(u) {
+      const turned = u.transactions.some((tr) => tr.effects.some((e) => e.is(setFocusMode)));
+      if (turned || u.docChanged || u.selectionSet || u.viewportChanged) this.decorations = dimmed(u.view);
+    }
+  },
+  { decorations: (p) => p.decorations },
+);
+
 export const livePreview = [
   previewPlugin,
+  focusPlugin,
+  EditorView.editorAttributes.compute([noteField], (s) => (s.field(noteField).focusMode ? { class: "cm-focusmode" } : {})),
   frontmatterField,
   backlinksField,
   clicks,

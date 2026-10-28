@@ -123,7 +123,7 @@ Decisions taken with the user (2026-10-26):
 | `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
 | `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
-| `nt paste <note> [--name words]` | Save the clipboard's image as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it |
+| `nt paste <note> [--name words] [--from file]` | Save the clipboard's image, or the image file `--from` names, as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it, the Mac app pastes and drops through it |
 | `nt config [get\|set\|edit]` | Every setting with its value, its file and what it does; `set <key> <value>` changes one line of the right file, checked; `edit [--repo]` opens the whole file (Settings, below) |
 | `nt sync`, `nt doctor` | Sync now; check the setup, and list the links in the notes that point at nothing (`--json` lists every one) |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
@@ -388,9 +388,26 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   that link to each, the day as nt counts it, the pins and where `status.json` is. FSEvents on the
   repository and on the state folder tell it when to read again.
 - Everything that writes goes through nt, with `--json`: `t`, `a`, `n`, `todo`, `paste`, `mv`,
-  `config set`, `sync`. Saving a note (step 2) keeps the rules of docs/format.md §10 as the nvim
-  plugin does: the repository lock, an atomic write, `.git/nt-edit` held while a note has unsaved
-  changes, `nt _editor kick` after.
+  `config set`, `sync`, and `_editor save` for the note's text.
+- **Saving** keeps the rules of docs/format.md §10 as the nvim plugin does.
+  - While the note has unsaved changes the app runs `nt _editor hold`, so `.git/nt-edit` is held
+    and sync commits but does not merge under them.
+  - A second after the typing stops, before another note opens, when the app goes to the
+    background and before it quits, the text goes to `nt _editor save <note> --base <sha256>` on
+    its input. nt writes it under the repository lock through a temp file, but only when the file
+    is still the one the editor read (the SHA-256 of its bytes).
+  - When another writer changed it since (`nt a`, a todo, a sync's merge, another editor), nt
+    writes nothing and hands the file back. The page lays that version under the person's
+    changes, line by line, and saves the result. When both changed the same line, the person's
+    text is saved with `--keep` and the other version kept beside it as a conflict copy (§3,
+    format), and the bottom line says so.
+  - Once everything is saved the hold goes; 30 s later, or when the person leaves the app,
+    `nt _editor kick` starts a sync. A note that changed on disk while unchanged in the app is laid
+    in place the same way, keeping the cursor.
+  - The editor's page lives as long as the app, so closing the window loses nothing. A save that
+    fails is retried; Quit waits for it and, when nt cannot save, stays open once.
+  - Digests, the day's (`type: digest`) and the week's (`type: weekly`), are read-only: nt writes
+    them again whenever their notes change. The bottom line says so.
 - Not sandboxed and not on the Mac App Store: it reaches the repository where it is, runs nt and
   takes flocks. It ships Developer ID signed and notarized, as a DMG and a Homebrew cask.
 - Nothing leaves the Mac. The editor page's content policy allows only the app's own files and
@@ -407,8 +424,14 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   searches. The word count sits at the bottom right, a message at the bottom left when something
   did not work.
 - Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
-  lines that match (`nt s`). Return opens the note, at the line for a text match. Search
-  (⇧⌘F) is the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
+  lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
+  exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
+  the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
+- New note (⌘N) is the same field for a title: `nt n` makes the note in the folder of the one on
+  screen (nt's default folder from a journal, an agent report, a digest or the root), links it
+  from today's journal and opens it with the cursor at its end.
+- Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
+  turned off, the sidebar comes back as it was.
 
 **The editor.** CodeMirror 6 in a WKWebView, as MarkEdit does it, with nt's live preview
 (`app/macos/editor/src/livepreview.js`). The note is its markdown, byte for byte, and reads as
@@ -421,13 +444,19 @@ rendered text.
   edited). A link to nothing is struck through in `ink-faint`, its target in the tooltip.
 - An image alone on its line is drawn from the repository, its alt text as the caption;
   elsewhere it shows its alt text, as in the terminal (§5).
-- Tasks are `○` and `✓`; a done one is muted; `due:` and `done:` in mono. A journal line's `HH:MM`
-  is mono too.
+- Tasks are `○` and `✓`; a done one is muted; `due:` and `done:` in mono. A click checks one,
+  adding `done:` with the day from `nt _editor day`, or opens it again, as §12 of the format and
+  the nvim plugin do. A journal line's `HH:MM` is mono too.
+- Editing is CodeMirror's: its own undo history (Edit › Undo goes to it), Return continuing a
+  list or a task, Tab indenting.
+- An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
+  `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
+  line of its own at the cursor or where it was dropped.
 - Code blocks are mono on `surface-sunk`, the language at the top right. Tables stay their source,
   in mono; a rendered table can come later.
 - "Linked from" follows the note, as in the terminal browser.
 - esbuild builds the page into one file, `Nt/Resources/editor/editor.js`, committed with its
-  `LICENSES.txt` (MIT, 20 packages), so building the app needs no Node. It is the app's one
+  `LICENSES.txt` (MIT, 21 packages), so building the app needs no Node. It is the app's one
   third-party component: pinned, and reviewed on update.
 
 **Steps**, each usable and each ending at a review gate:
@@ -435,7 +464,7 @@ rendered text.
 1. **The reader.** The project, the bundled nt, the sidebar, Today, the editor read-only in live
    preview, links, Linked from, Open and Search, the sync state. Done.
 2. **Writing.** Editing with autosave under the rules above, a new note (⌘N), tasks checked in
-   the text, images pasted and dropped (`nt paste --from <file>`), focus mode (⇧⌘L).
+   the text, images pasted and dropped (`nt paste --from <file>`), focus mode (⇧⌘L). Done.
 3. **The views.** Todos, Calendar, Weekly, Agents.
 4. **Menu bar and capture.** The menu bar item (the template mark, its alert variant while sync
    needs you), a global hotkey (⌥⌘Space) that adds one line to today or a todo, and Settings:
@@ -534,9 +563,17 @@ open, in the background and on push; an App Intent "append to today".
   - The glamour style JSON loads in `glow -s`.
 - **Mac app.**
   - `make mac-test`: Swift Testing on the index, the sidebar's tree, the sync badge, Open's
-    matching, links, and `Brand` against `tokens.json`.
+    matching, links, and `Brand` against `tokens.json`. WritingTests drive the real editor page
+    offscreen with the bundled nt on a scratch repository: a change is saved while
+    `.git/nt-edit` is held and the hold goes after; a line added on disk is merged with the
+    typing; the same line changed on disk becomes a conflict copy; opening another note, Undo
+    and Quit save first; a pasted image lands in `assets/`; a digest stays read-only.
   - `make mac-editor`: `node --test` on the live preview without a screen (what is hidden,
-    replaced and styled for a state), and `editor.css` against `tokens.json`.
+    replaced and styled for a state), on writing (the line diff, laying a version from disk
+    under unsaved changes, ticking a task), and `editor.css` against `tokens.json`.
+  - `go test` on `nt _editor save` (the compared write, the conflict copy) and
+    `nt paste --from`.
   - Screenshots of each view in both themes on `assets/demo/scene.sh`'s notes; the app takes
-    `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTPalette open|text` and `-NTQuery <text>`.
+    `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTPalette open|text|new` and
+    `-NTQuery <text>`.
 - **Manual.** In Ghostty + tmux, go through `nt` → `t a n e / i`, once with a dark terminal background and once with a light one. Then check on github.com that links, images, the README hero and the agents `README.md` digest render.
