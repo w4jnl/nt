@@ -452,7 +452,10 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - **Todos** is the terminal browser's todo list: every open todo, overdue first, with its date in
   words (`3d late` in `warn`, `fri`) and the note it is in, then the done ones under Done. A
   field adds one to the root's `todo.md` (`due:fri` in the text sets its date). A click on `○`
-  checks it; arrows move, space checks, `d` sets the due date in place, Return or a double click
+  checks it: the glyph turns at once with a small pop and the text fades, and the row stays in
+  its place until the ticks settle, about a second after the last, so a slip can be taken back;
+  then it moves to Done, or back up to the open ones (no movement with Reduce Motion). The
+  selection goes on to the next open todo; arrows move, space checks, `d` sets the due date in place, Return or a double click
   opens the note at the todo. Everything goes through `nt todo … --json`, which gives each
   todo's `when` and `late`, so the app words dates as the browser does.
 - **Calendar** is the month, Monday first, beside the day chosen in it. A day with a journal is

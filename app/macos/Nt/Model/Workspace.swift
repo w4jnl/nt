@@ -315,7 +315,12 @@ final class Workspace {
 
     /// toggle checks a todo, adding done:, or opens it again, through nt.
     func toggle(_ t: Todo) async {
-        await todo([t.done ? "undo" : "done", t.id])
+        await setDone(t, !t.done)
+    }
+
+    /// setDone checks a todo (done) or opens it again, through nt.
+    func setDone(_ t: Todo, _ done: Bool) async {
+        await todo([done ? "done" : "undo", t.id])
     }
 
     /// setDue sets a todo's due date from words: fri, +3d, 2026-11-03; none clears it.
