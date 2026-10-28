@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -30,7 +31,7 @@ var Kinds = map[string]struct{ Claude, Copilot string }{
 // ParseEvent reads a hook payload in Claude Code's shape (snake_case: session_id,
 // last_assistant_message) or Copilot CLI's (camelCase: sessionId). agent names the agent when
 // the caller knows; else the shape tells. ok is false for an event that belongs to no report: a
-// subagent's, or one without a session.
+// subagent's, one without a session, or a throwaway session's in a temporary folder.
 func ParseEvent(kind string, payload []byte, agent string) (Event, bool, error) {
 	if _, known := Kinds[kind]; !known {
 		return Event{}, false, fmt.Errorf("%q is not start, turn or end", kind)
@@ -67,7 +68,37 @@ func ParseEvent(kind string, payload []byte, agent string) (Event, bool, error) 
 	if ev.Cwd == "" {
 		ev.Cwd, _ = os.Getwd()
 	}
+	if Temporary(ev.Cwd) && os.Getenv("NT_REPORT_TEMP") == "" {
+		return Event{}, false, nil
+	}
 	return ev, ev.Session != "", nil
+}
+
+// Temporary says whether dir is in a temporary folder (/tmp, /var/tmp, $TMPDIR), where a
+// session is a throwaway: a script's `claude -p` in a scratch folder, a test. Such sessions get
+// no report; NT_REPORT_TEMP=1 reports them all the same.
+func Temporary(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	paths := []string{filepath.Clean(dir)}
+	if r, err := filepath.EvalSymlinks(dir); err == nil {
+		paths = append(paths, r)
+	}
+	for _, root := range []string{os.TempDir(), "/tmp", "/var/tmp"} {
+		roots := []string{filepath.Clean(root)}
+		if r, err := filepath.EvalSymlinks(root); err == nil {
+			roots = append(roots, r)
+		}
+		for _, p := range paths {
+			for _, r := range roots {
+				if r != "/" && (p == r || strings.HasPrefix(p, r+string(filepath.Separator))) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // logLine is what a turn adds to ## Log: the first line of the agent's message with text in it,

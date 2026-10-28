@@ -83,9 +83,10 @@ Decisions taken with the user (2026-10-26):
 **`nt agent start|turn|end`** (`internal/agents`). Reads a hook payload on stdin, in either the Claude (snake_case) or Copilot (camelCase) shape.
 - Fast and deterministic; always exits 0 and prints nothing. Failures go to `agent.log` in the state folder.
 - Claude Code: `SessionStart` → start, `Stop` → turn, `SessionEnd` → end; a subagent's events (`agent_id`) are skipped. Copilot CLI: `sessionStart`, `agentStop`, `sessionEnd`, with `--agent copilot-cli` because its payloads do not name the agent.
+- A session in a temporary folder (`/tmp`, `/var/tmp`, `$TMPDIR`) gets no report: it is a throwaway, such as a script's `claude -p` probe in a scratch folder. `NT_REPORT_TEMP=1` reports it all the same; the end-to-end suites set it, since they run in a temp directory.
 - The hooks run in order, not in the background (`async`): each takes milliseconds, and a session's events then reach its report in the order they happened. Every write is under the repository lock.
 - The report path is fixed by the date of the session's **first** event. A `sid → path` map lives in the state dir, so sessions that cross midnight stay in one file.
-- `turn` updates `updated` (the max) and adds one `## Log` line of at most 200 characters, taken from `last_assistant_message`.
+- `turn` updates `updated` (the max) and adds one `## Log` line of at most 200 characters, taken from `last_assistant_message`, or `turn ended` without one. A line that would repeat the last one, its minute included, is not added: Copilot CLI sends several `agentStop`s for one turn.
 - `end` sets `ended`, which is final, the final `git_head`, and a status from the outcome (docs/format.md §6). A late Stop can't flip the status back. It also starts a sync, so the report goes out at once.
 
 **`nt agent write [--status s] [--summary text] [--session ID]`.** The agent's own rich report (Done / Decisions / Open), read from stdin. Without `--session` it fills the latest report whose session started in the working folder or one above it; with none, it starts one, so an agent without hooks can report too.
@@ -102,7 +103,7 @@ Decisions taken with the user (2026-10-26):
 - Every command takes `--json`.
 - The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
-**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill.
+**flok later.** `flok hook` calls `nt agent …`. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill, and fails when the nt a hook runs, or the sync job runs, is no longer there (a hook that cannot run fails without a word); `nt install --hooks` and `--sync` write the `nt` on PATH, which survives Homebrew upgrades.
 
 ## 4. CLI and TUI (simplicity first)
 
@@ -140,6 +141,7 @@ Decisions taken with the user (2026-10-26):
 ```
 ┌ folder browser (dated names sort themselves) ┐┌ preview: glamour v2, frontmatter stripped ┐
 │ daily/ agents/ tech/ …  ▸ notes, newest first ││ … rendered note …                          │
+│ (an agent report: its host, faint, then title)││                                            │
 │                                               ││ Linked from: [3 notes]  Images: [2]        │
 └───────────────────────────────────────────────┘└────────────────────────────────────────────┘
  ✓ synced · ↑2 · ⚠ 1 conflict        t today  [ ] day  a append  n new  / search  ? help

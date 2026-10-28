@@ -3,6 +3,7 @@ package agents
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -62,6 +63,38 @@ func TestParseEvent(t *testing.T) {
 	}
 	if _, _, err := ParseEvent("stop", nil, ""); err == nil {
 		t.Error("an unknown kind is not an error")
+	}
+}
+
+func TestTemporary(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	cases := map[string]bool{
+		"/tmp":                       true,
+		"/tmp/probe":                 true,
+		"/var/tmp/scratch":           true,
+		os.TempDir():                 true,
+		filepath.Join(t.TempDir()):   true,
+		"/tmpfiles/project":          false,
+		filepath.Join(home, "notes"): false,
+		"/Volumes/work/git/vuln":     false,
+		"":                           false,
+	}
+	if runtime.GOOS == "darwin" {
+		cases["/private/tmp/claude-501/x"] = true // /tmp is /private/tmp, as a session's cwd says
+	}
+	for dir, want := range cases {
+		if got := Temporary(dir); got != want {
+			t.Errorf("Temporary(%q) = %v, want %v", dir, got, want)
+		}
+	}
+	// a session in a temporary folder gets no report, unless NT_REPORT_TEMP asks for one
+	payload := []byte(`{"session_id":"s1","cwd":"/tmp/probe"}`)
+	if _, ok, _ := ParseEvent("start", payload, ""); ok {
+		t.Error("a throwaway session in /tmp is reported")
+	}
+	t.Setenv("NT_REPORT_TEMP", "1")
+	if _, ok, _ := ParseEvent("start", payload, ""); !ok {
+		t.Error("NT_REPORT_TEMP=1 does not report a session in /tmp")
 	}
 }
 
@@ -157,6 +190,14 @@ func TestEndStatus(t *testing.T) {
 	rel, _ := Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd, Reason: "end_turn"}, at("2026-10-26 09:30"))
 	if log := read(t, v, rel).Section("Log"); !strings.Contains(log, "- 09:30 turn ended") {
 		t.Errorf("a turn without text leaves no line in the log:\n%s", log)
+	}
+	// Copilot CLI sends several agentStops for one turn: the same line in the same minute is
+	// written once, and a later turn gets its own
+	for _, when := range []string{"2026-10-26 09:30", "2026-10-26 09:30", "2026-10-26 09:31"} {
+		_, _ = Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd}, at(when))
+	}
+	if log := read(t, v, rel).Section("Log"); strings.Count(log, "09:30 turn ended") != 1 || strings.Count(log, "09:31 turn ended") != 1 {
+		t.Errorf("repeated turns are not folded into one line a minute:\n%s", log)
 	}
 	if got := end("worked", "complete"); got != "done" {
 		t.Errorf("a session whose turns had no text ended %s, want done", got)
@@ -282,8 +323,8 @@ func TestClaudeHooks(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("install: %v, %v", changed, err)
 	}
-	if got := ClaudeHooked(p); strings.Join(got, " ") != "SessionEnd SessionStart Stop" {
-		t.Fatalf("hooked events: %v", got)
+	if got, bins := ClaudeHooked(p); strings.Join(got, " ") != "SessionEnd SessionStart Stop" || len(bins) != 3 || bins[0] != "/Users/x/.local/bin/nt" {
+		t.Fatalf("hooked events: %v, binaries %v", got, bins)
 	}
 	b, _ := os.ReadFile(p)
 	for _, want := range []string{`"model": "opus"`, `/opt/flok hook claude`, `"matcher": "Bash"`, `"/Users/x/.local/bin/nt agent turn"`} {
@@ -312,6 +353,20 @@ func TestClaudeHooks(t *testing.T) {
 	}
 }
 
+func TestHookBinary(t *testing.T) {
+	for cmd, want := range map[string]string{
+		"/opt/homebrew/bin/nt agent turn":                 "/opt/homebrew/bin/nt",
+		"'/Users/a b/nt' agent start --agent copilot-cli": "/Users/a b/nt",
+		"'/Users/it'\\''s/nt' agent end":                  "/Users/it's/nt",
+		"nt agent turn":                                   "nt",
+		"/opt/flok hook claude":                           "",
+	} {
+		if got := hookBinary(cmd); got != want {
+			t.Errorf("hookBinary(%q) = %q, want %q", cmd, got, want)
+		}
+	}
+}
+
 func TestCopilotHooks(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "hooks", "nt.json")
 	if changed, err := CopilotHooks(p, "/bin dir/nt", false); err != nil || !changed {
@@ -325,6 +380,9 @@ func TestCopilotHooks(t *testing.T) {
 	}
 	if changed, _ := CopilotHooks(p, "/bin dir/nt", false); changed {
 		t.Error("writing the same hooks changed the file")
+	}
+	if bins := CopilotHooked(p); len(bins) != 3 || bins[0] != "/bin dir/nt" {
+		t.Errorf("the hooks' binaries: %v", bins)
 	}
 	if changed, _ := CopilotHooks(p, "", true); !changed {
 		t.Error("remove did nothing")

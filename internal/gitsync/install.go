@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -59,6 +60,38 @@ func (t Timer) Loaded() bool {
 		return exec.Command("launchctl", "print", "gui/"+strconv.Itoa(os.Getuid())+"/"+Label).Run() == nil
 	}
 	return exec.Command("systemctl", "--user", "is-enabled", "--quiet", "nt-sync.timer").Run() == nil
+}
+
+// InstalledBin is the binary the installed job runs, read from its file; "" when there is none.
+func (t Timer) InstalledBin() string {
+	if runtime.GOOS == "darwin" {
+		b, _ := os.ReadFile(t.Path())
+		return plistBin(string(b))
+	}
+	b, _ := os.ReadFile(strings.TrimSuffix(t.Path(), ".timer") + ".service")
+	return serviceBin(string(b))
+}
+
+var (
+	plistArgs  = regexp.MustCompile(`<key>ProgramArguments</key>\s*<array>\s*<string>([^<]*)</string>`)
+	execStart  = regexp.MustCompile(`(?m)^ExecStart=(?:"([^"]*)"|(\S+))`)
+	xmlUnquote = strings.NewReplacer("&lt;", "<", "&gt;", ">", "&quot;", `"`, "&apos;", "'", "&amp;", "&")
+)
+
+// plistBin is the program of a launchd job: the first of its ProgramArguments.
+func plistBin(plist string) string {
+	if m := plistArgs.FindStringSubmatch(plist); m != nil {
+		return xmlUnquote.Replace(m[1])
+	}
+	return ""
+}
+
+// serviceBin is the program a systemd service's ExecStart runs.
+func serviceBin(service string) string {
+	if m := execStart.FindStringSubmatch(service); m != nil {
+		return m[1] + m[2]
+	}
+	return ""
 }
 
 // env is what the job runs with: a PATH that finds git, rg and the nt binary, and git that

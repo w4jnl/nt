@@ -44,6 +44,9 @@ printf '{"sessionId":"7c1d0e2a","cwd":"%s","reason":"error"}' "$P" | A agent end
 C=$(find "$T/a/agents" -name '*--copilot-cli--*7c1d0e2a.md')
 expect "a Copilot session gets its report" 'status: abandoned' "$(cat "$C" 2>/dev/null)"
 
+printf '{"session_id":"9a0b1c2d","cwd":"/tmp/probe"}' | NT_REPORT_TEMP= A agent start
+expect "a throwaway session in /tmp gets no report" '^$' "$(find "$T/a/agents" -name '*9a0b1c2d*')"
+
 rc=0; printf 'not json' | A agent turn || rc=$?
 expect "a broken payload still exits 0" '^0$' "$rc"
 expect "and is noted in agent.log" 'not JSON' "$(cat "$T/a.state/agent.log")"
