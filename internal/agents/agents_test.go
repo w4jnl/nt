@@ -65,6 +65,35 @@ func TestParseEvent(t *testing.T) {
 	}
 }
 
+func TestTemporary(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	for dir, want := range map[string]bool{
+		"/tmp":                       true,
+		"/tmp/probe":                 true,
+		"/private/tmp/claude-501/x":  true,
+		"/var/tmp/scratch":           true,
+		os.TempDir():                 true,
+		filepath.Join(t.TempDir()):   true,
+		"/tmpfiles/project":          false,
+		filepath.Join(home, "notes"): false,
+		"/Volumes/work/git/vuln":     false,
+		"":                           false,
+	} {
+		if got := Temporary(dir); got != want {
+			t.Errorf("Temporary(%q) = %v, want %v", dir, got, want)
+		}
+	}
+	// a session in a temporary folder gets no report, unless NT_REPORT_TEMP asks for one
+	payload := []byte(`{"session_id":"s1","cwd":"/tmp/probe"}`)
+	if _, ok, _ := ParseEvent("start", payload, ""); ok {
+		t.Error("a throwaway session in /tmp is reported")
+	}
+	t.Setenv("NT_REPORT_TEMP", "1")
+	if _, ok, _ := ParseEvent("start", payload, ""); !ok {
+		t.Error("NT_REPORT_TEMP=1 does not report a session in /tmp")
+	}
+}
+
 func TestLogLine(t *testing.T) {
 	long := strings.Repeat("word ", 60)
 	for in, want := range map[string]string{
@@ -157,6 +186,14 @@ func TestEndStatus(t *testing.T) {
 	rel, _ := Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd, Reason: "end_turn"}, at("2026-10-26 09:30"))
 	if log := read(t, v, rel).Section("Log"); !strings.Contains(log, "- 09:30 turn ended") {
 		t.Errorf("a turn without text leaves no line in the log:\n%s", log)
+	}
+	// Copilot CLI sends several agentStops for one turn: the same line in the same minute is
+	// written once, and a later turn gets its own
+	for _, when := range []string{"2026-10-26 09:30", "2026-10-26 09:30", "2026-10-26 09:31"} {
+		_, _ = Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd}, at(when))
+	}
+	if log := read(t, v, rel).Section("Log"); strings.Count(log, "09:30 turn ended") != 1 || strings.Count(log, "09:31 turn ended") != 1 {
+		t.Errorf("repeated turns are not folded into one line a minute:\n%s", log)
 	}
 	if got := end("worked", "complete"); got != "done" {
 		t.Errorf("a session whose turns had no text ended %s, want done", got)

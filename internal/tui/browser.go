@@ -100,6 +100,7 @@ type entry struct {
 	name, rel string
 	dir       bool
 	date      string // YYYY-MM-DD from the file name
+	host      string // the machine an agent report is from: <host>--… in its name
 	title     string
 	journal   bool
 }
@@ -280,6 +281,9 @@ func (b *browser) list() {
 
 var datePrefix = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})`)
 
+// reportHost is the host of an agent report's name, <host>--<agent>--<project>--<sid8>.md.
+var reportHost = regexp.MustCompile(`^([a-z0-9]+(?:-[a-z0-9]+)*)--[a-z0-9-]+--[a-z0-9-]+--[a-z0-9-]+\.md$`)
+
 func listFolder(v *vault.Vault, dir string) []entry {
 	des, err := os.ReadDir(v.Abs(dir))
 	if err != nil {
@@ -287,6 +291,7 @@ func listFolder(v *vault.Vault, dir string) []entry {
 	}
 	var dirs, notes []entry
 	inDaily := dir == v.Cfg.Folders.Daily || strings.HasPrefix(dir, v.Cfg.Folders.Daily+"/")
+	inAgents := dir == v.Cfg.Folders.Agents || strings.HasPrefix(dir, v.Cfg.Folders.Agents+"/")
 	for _, d := range des {
 		name := d.Name()
 		if strings.HasPrefix(name, ".") {
@@ -306,6 +311,9 @@ func listFolder(v *vault.Vault, dir string) []entry {
 		if m := datePrefix.FindStringSubmatch(name); m != nil {
 			e.date = m[1]
 			e.journal = inDaily && name == m[1]+".md"
+		}
+		if m := reportHost.FindStringSubmatch(name); m != nil && inAgents {
+			e.host = m[1]
 		}
 		notes = append(notes, e)
 	}

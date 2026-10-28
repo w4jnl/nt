@@ -160,6 +160,8 @@ type: daily
   - The path is fixed by the date of the session's first event and never changes. A session that runs past midnight stays in its first day's folder.
   - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`).
   - A writer that finds no report for the session (no hooks, or hooks added mid-session) starts one.
+  - A session in a temporary folder (`/tmp`, `/var/tmp`, the system's temp folder) gets no report: it is a throwaway, such as a script's `claude -p` in a scratch folder.
+- **The host comes first in the name** (§3), so two machines never write the same file, also for the same project, agent and day. Clients show a report's host beside its title, which is the project's, so the reports of one project from two machines read apart.
 
 **Frontmatter.** All keys are flat. Times are RFC 3339 with offset.
 
@@ -202,7 +204,7 @@ type: daily
 ```
 
 - `## Done`, `## Decisions` and `## Open` belong to the agent: `nt agent write` replaces them.
-- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). Secrets and full transcripts do not belong in a report.
+- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). A line that would repeat the log's last line, its minute included, is not added. Secrets and full transcripts do not belong in a report.
 
 ## 7. Digest
 

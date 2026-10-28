@@ -573,3 +573,44 @@ func TestSettings(t *testing.T) {
 		t.Error("esc does not close the settings")
 	}
 }
+
+func TestAgentReportsShowTheirHost(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	day := "agents/2026/2026-10-28"
+	for name, body := range map[string]string{
+		"work--copilot-cli--vuln-remediation--43fbe292.md": "# vuln-remediation\n",
+		"jaromac--claude-code--flok--f0ceca08.md":          "# flok\n",
+		"work--claude-code--flok--1a2b3c4d.md":             "# flok\n",
+		"README.md":                                        "# Agents\n",
+	} {
+		p := b.v.Abs(day + "/" + name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hosts := map[string]string{}
+	for _, e := range listFolder(b.v, day) {
+		hosts[e.name] = e.host
+	}
+	if hosts["work--copilot-cli--vuln-remediation--43fbe292.md"] != "work" || hosts["jaromac--claude-code--flok--f0ceca08.md"] != "jaromac" || hosts["README.md"] != "" {
+		t.Fatalf("hosts %v", hosts)
+	}
+	// the same project from two machines reads apart
+	var rows []string
+	for _, e := range listFolder(b.v, day) {
+		rows = append(rows, ansi.Strip(b.row(e, false, 60)))
+	}
+	all := strings.Join(rows, "\n")
+	for _, want := range []string{" jaromac flok", " work flok", " work vuln-remediation"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("no row %q in\n%s", want, all)
+		}
+	}
+	// outside the agents folder a name like that is just a note
+	if e := listFolder(b.v, "tech"); len(e) > 0 && e[0].host != "" {
+		t.Errorf("a note outside the agents folder got a host: %+v", e[0])
+	}
+}

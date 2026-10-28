@@ -9,6 +9,8 @@ BIN=$R/bin/nt
 go build -C "$R" -o "$BIN" ./cmd/nt
 T=$(mktemp -d)
 cd "$T"
+# the suites' agent sessions run in $T, a temporary folder, whose sessions nt does not report
+export NT_REPORT_TEMP=1
 S() { tmux -L nt-e2e -f /dev/null "$@"; }
 O() { tmux -L nt-e2e-outer -f /dev/null "$@"; }   # a second server around S, as flok's outer tmux
 cleanup() { O kill-server 2>/dev/null || true; S kill-server 2>/dev/null || true; rm -rf "$T"; }

@@ -75,6 +75,12 @@ func (r *Report) Log(line string) {
 	}
 }
 
+// LastLog is the last line of ## Log, or "".
+func (r *Report) LastLog() string {
+	log := r.text["Log"]
+	return log[strings.LastIndex(log, "\n")+1:]
+}
+
 // LogLines is how many lines ## Log has.
 func (r *Report) LogLines() int {
 	if r.text["Log"] == "" {
