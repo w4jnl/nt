@@ -3,6 +3,7 @@ package agents
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -67,10 +68,9 @@ func TestParseEvent(t *testing.T) {
 
 func TestTemporary(t *testing.T) {
 	home, _ := os.UserHomeDir()
-	for dir, want := range map[string]bool{
+	cases := map[string]bool{
 		"/tmp":                       true,
 		"/tmp/probe":                 true,
-		"/private/tmp/claude-501/x":  true,
 		"/var/tmp/scratch":           true,
 		os.TempDir():                 true,
 		filepath.Join(t.TempDir()):   true,
@@ -78,7 +78,11 @@ func TestTemporary(t *testing.T) {
 		filepath.Join(home, "notes"): false,
 		"/Volumes/work/git/vuln":     false,
 		"":                           false,
-	} {
+	}
+	if runtime.GOOS == "darwin" {
+		cases["/private/tmp/claude-501/x"] = true // /tmp is /private/tmp, as a session's cwd says
+	}
+	for dir, want := range cases {
 		if got := Temporary(dir); got != want {
 			t.Errorf("Temporary(%q) = %v, want %v", dir, got, want)
 		}
