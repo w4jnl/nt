@@ -31,8 +31,9 @@ Simulator builds are signed ad hoc, so the Keychain works there.
 
 TestFlight needs the app's record in App Store Connect once (Apps › New App, iOS, bundle id
 `nl.w4j.nt.ios`); `make ios-testflight` then archives a Release build, exports it with
-`ExportOptions.plist` (Xcode raises the build number) and uploads it. App Store Connect asks
-about encryption for each build: the app uses ssh (libssh2 and mbedTLS) to reach the repository.
+`ExportOptions.plist` (Xcode raises the build number) and uploads it. Export compliance is in
+the Info.plist (`ITSAppUsesNonExemptEncryption`, NO), as declared in App Store Connect: standard
+encryption algorithms (ssh through libssh2 and mbedTLS), not on the App Store in France.
 
 ## The first run
 

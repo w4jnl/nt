@@ -63,6 +63,10 @@ targets:
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [nl.w4j.nt.ios.sync]
         NSCameraUsageDescription: Take a photo for the note you are writing; it is saved beside the note.
+        # export compliance, as declared in App Store Connect (2026-10-28): standard encryption
+        # algorithms (ssh through libssh2 and mbedTLS), not on the App Store in France, which App
+        # Store Connect records as no non-exempt encryption; so builds no longer ask
+        ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
   NtTests:
