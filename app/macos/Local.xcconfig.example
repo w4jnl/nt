@@ -2,3 +2,7 @@
 // signs a build for other Macs (Xcode → Settings → Accounts, or Membership in the developer
 // account); empty, the app is signed to run on this Mac only.
 NT_TEAM_ID =
+// For a release (scripts/mac-release.sh): the App Store Connect API key that notarizes, a team
+// key with the Developer role; its .p8 goes in ~/.appstoreconnect/private_keys/AuthKey_<id>.p8.
+NT_ASC_KEY_ID =
+NT_ASC_ISSUER_ID =

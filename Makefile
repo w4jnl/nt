@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/w4jnl/nt/internal/cli.Version=$(VERSION)
 
-.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run
+.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release
 
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/$(BIN) ./cmd/$(BIN)
@@ -62,3 +62,9 @@ mac-test: mac-project
 
 mac-run: mac-build
 	open $(MAC)/build/DerivedData/Build/Products/Debug/nt.app
+
+# nt for Mac for a release, V=0.5.1: signed with the Developer ID, notarized, stapled, and the
+# DMG that carries it, in app/macos/build/release (scripts/mac-release.sh; release.sh runs it).
+mac-release:
+	@[ -n "$(V)" ] || { echo "make mac-release V=<version>, e.g. V=0.5.1" >&2; exit 2; }
+	scripts/mac-release.sh $(V)

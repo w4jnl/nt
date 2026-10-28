@@ -4,6 +4,27 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.5.1 (2026-10-28)
+
+nt for Mac, the first release: `brew install --cask w4jnl/tap/nt-app`, or the DMG below. It
+needs macOS 26 and a notes repository nt set up; it ships on its own, with its own nt inside.
+
+- **The note in live preview,** as Typora shows it: a line's markdown only while the cursor is
+  on it, images drawn in place, links that follow, tasks you tick with a click. What you write
+  is saved through nt as the nvim plugin saves it, never under a sync's merge.
+- **The sidebar:** Today, Todos, Calendar, Weekly and Agents, the pinned folders, every folder,
+  and the sync state at its foot. ⌘P opens a note by its title, ⇧⌘F searches the text, ⌘N makes
+  one, ⇧⌘L is focus mode.
+- **The views:** every todo, open then done, checked with a click; the month with its journals
+  and the todos due; the weekly digest; the agent sessions of the last two weeks from every
+  machine.
+- **The menu bar and capture:** nt's mark in the menu bar, and ⌥⌘Space from anywhere opens a
+  field that adds a line to today, or with Shift-Return a todo. macOS keeps ⌥⌘Space for the
+  Finder search window until it is turned off; Settings › App says so, or records another key.
+- **Settings:** nt's own, this Mac's and every machine's, and the app's: the capture shortcut
+  and the text size.
+- Signed with a Developer ID and notarized by Apple, so it opens without a warning.
+
 ## 0.5.0 (2026-10-28)
 
 A home in the browser, and nt as a viewer for any file.
