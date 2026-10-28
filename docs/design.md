@@ -571,6 +571,132 @@ rendered text.
   last, the open folders); give them their own suite. `-NTOpen` can lose to today's journal
   opening after it; open it after today.
 
+## 9. iOS app (phase 7)
+nt on iPhone and iPad, one app: the Mac app without the menu bar. It is a third client of the
+repository and keeps its rules: the files are the truth, git is the sync, and the only network is
+git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFxEaHFJY9yLA96KZwWVd
+(private).
+
+**Decided (2026-10-28).**
+- **Real git on the phone.**
+  - The phone keeps a full clone and syncs it with libgit2 over ssh.
+  - The key is made on the phone (ECDSA P-256, CryptoKit; the private half stays in the
+    Keychain) and is added to the notes repository on GitHub as a deploy key with write access.
+  - GitHub's host keys are pinned.
+  - go-git cannot merge (it fast-forwards only), so it does not replace `git merge`.
+- **nt's own Go code inside the app**, compiled with gomobile, so the phone writes exactly as
+  the command line does: the iOS form of the Mac app bundling its `nt`.
+- **The first version:** reading, capture, todos and editing.
+- **Devices:** iPhone and iPad.
+
+**The screens.**
+- **Layout.** On iPad, the sidebar beside the note (`NavigationSplitView`); on iPhone, one stack
+  from the home list.
+- **The home list,** as the Mac sidebar:
+  - Today, Todos with the open and late counts, Calendar, Weekly, Agents;
+  - the pinned folders, then the folders;
+  - search;
+  - the sync state at the foot, as glyph and word; a tap syncs.
+- **The note** is the Mac app's editor page in a `WKWebView`.
+  - It has a narrower column and margins under 600 pt.
+  - A bar above the keyboard: a task, a heading, a link, a photo, undo, redo, done.
+  - A tap follows a link. On the line being edited the link shows an "open" chip in place of
+    the Mac's Command-click.
+- **Views:** Todos, Calendar, Weekly and Agents, shared with the Mac app.
+- **Capture:**
+  - a + button opens a sheet: Return adds the line to today, and a switch makes it a todo
+    (`due:fri` sets its date);
+  - App Intents "Add to today" and "New todo" for Shortcuts, Siri, Spotlight and the Action
+    button.
+- **The first run:**
+  1. The repository address and the device's name (the host in commits and reports).
+  2. The phone's key, with Copy and where to paste it on GitHub.
+  3. Clone.
+- **Settings:** the device's name, the repository and its key, the shared settings of
+  `.nt/config.toml`, and the text size.
+- **Voice**, on the phone and offline.
+  - **Free with the keyboard:** its microphone works in the capture sheet and, once tested, in the
+    note.
+  - **A mic button**, beside the capture field and in the keyboard bar, dictates at the cursor.
+  - **"Talk a note"** keeps listening: each pause adds a timestamped line to today's Log.
+  - **Language:** English, Nederlands and Slovenčina, chosen in a switch that remembers the last
+    one, since speech is not told its language by itself.
+  - **The model:** Apple's `SpeechAnalyzer` with `SpeechTranscriber` where the device supports
+    the language (`supportedLocales`), else `DictationTranscriber`, the keyboard's model, which
+    covers all three.
+  - **Only the words are kept,** never the sound: audio would only grow the repository.
+
+**Sync.**
+- **When:** on opening, 30 s after the last save, when the app goes to the background (with a
+  background task to finish), and in background app refresh when iOS allows.
+- **No sync on push:** that needs a server that turns GitHub's webhooks into pushes, and nt runs
+  none.
+- **Conflicts** follow §2: the remote version stays, the local one becomes a conflict copy.
+- **No digests:** the phone never compiles them (`digest` and `weekly` are off).
+
+**How it is built.**
+- **`internal/ops`.** The operations the apps call, returning the structs the CLI prints with
+  `--json`: today, append, new, todos, index, save, day, search, config, paste. The CLI's
+  commands keep only their parsing and printing, so the JSON is one by construction.
+- **gitsync behind a `Git` interface.**
+  - About 15 plumbing calls, with typed errors:
+    - branch, remote, ref;
+    - status, stage, staged names;
+    - commit with an optional merge parent;
+    - fetch, push;
+    - merge with conflicts;
+    - conflict stages, read blob, checkout stage;
+    - count, tracked files.
+  - The CLI's `exec` wrapper is one implementation, libgit2 on iOS the other.
+  - The policy stays in Go: the commit message, conflict copies, the digest rule, the journals'
+    log sort.
+  - Journals merge with `merge=union` from `.gitattributes`, which libgit2 honours.
+- **Search without `rg`:** a pure-Go search with the same matches, used where `rg` is missing.
+- **`mobile`, the gomobile package.**
+  - `Run` takes the same command lines the Mac app runs and answers with the same stdout, stderr
+    and status, so the Swift `NT` keeps its shape: a `Process` on the Mac, the in-process core on
+    iOS.
+  - The edit hold is a pair of calls.
+  - `Git` is a Go interface the app implements in Swift.
+- **libgit2, libssh2 and mbedTLS** are built from pinned, checksummed sources by
+  `scripts/ios-libgit2.sh` into an xcframework, not committed.
+- **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
+  (`#if os`) cover:
+  - Brand on UIKit;
+  - the web view's wrapper;
+  - opening URLs;
+  - the watcher: on iOS the app reindexes after each write and sync, since nothing else writes
+    the clone.
+- **The clone lives in the app's Application Support,** not iCloud or a shared container.
+
+**Steps**, each ending at a review gate:
+0. **Design:** the mockups above, and this section.
+1. **The core and git on the phone:**
+   - `internal/ops`, the `Git` interface (the CLI and every e2e suite unchanged), the Go search;
+   - `mobile` and `make ios-core`;
+   - `make ios-libgit2` and its Swift `Git`;
+   - a bare app that makes the key, clones the real notes and syncs both ways with the Mac, on a
+     real iPhone.
+2. **The reader:**
+   - `app/shared/` with the Mac app still passing;
+   - the home list, notes in live preview, search, the views, the iPad split view, the sync state.
+3. **Writing:**
+   - editing through the core (compare-and-swap, the hold, conflict copies) and the keyboard bar;
+   - photos (`paste --from`), ticking todos, the capture sheet;
+   - sync on open, after saving, on leaving and in background refresh;
+   - Settings and the first run.
+4. **Voice:**
+   - the mic in the capture sheet and the keyboard bar;
+   - "Talk a note";
+   - the language switch (English, Dutch, Slovak);
+   - `SpeechTranscriber` with `DictationTranscriber` as the fallback, checked on a device for all
+     three languages.
+
+   The Mac app can take the same later, on macOS 26.
+5. **Shortcuts and Siri:** the App Intents.
+6. **Shipping:** TestFlight with `make ios-testflight`, as flok's app; the App Store later, if
+   wanted.
+
 ---
 
 ## Phases (each ends in something usable)
@@ -628,8 +754,9 @@ rendered text.
 `brew install --cask w4jnl/tap/nt-app`, or the notarized DMG. What could follow is under §8,
 Later.
 
-**7. iOS app** (moved after the Mac app, 2026-10-27): swift-libgit2 or the GitHub API; sync on
-open, in the background and on push; an App Intent "append to today".
+**7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
+phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
+Step 0, the design, is at its gate.
 
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.
