@@ -2,10 +2,10 @@
 
 The notes repository on the phone: a full clone, synced with git over ssh, written by nt's own
 Go code running inside the app. A third client of the same repository; docs/design.md §9 is the
-spec, and phase 7 lists its steps. Steps 1 to 3 are in: the first run makes the phone's key and
+spec, and phase 7 lists its steps. Steps 1 to 5 are in: the first run makes the phone's key and
 clones the notes; then the home list (Today, Todos, Calendar, Weekly, Agents, the pinned folders
 and the folders, search, the sync state), notes in live preview that are written as on the Mac,
-the views, the capture sheet and Settings. Voice and Shortcuts are steps 4 and 5.
+the views, the capture sheet and Settings, voice, and Shortcuts and Siri.
 
 ## Build
 
@@ -65,14 +65,21 @@ task lets it finish), when you come back to it, and in background refresh when i
 
 The keyboard bar's mic dictates at the cursor: each piece goes in once the model has settled it,
 the words it may still change shown faintly there; a tap again, or letting the keyboard go,
-stops it, and holding it chooses the language, whose code shows under it. The mic in the
-capture sheet talks a note instead: it listens until stopped, and each pause adds what was said as a line to today's Log
-(`nt a`). The language, English, Nederlands or Slovenčina, is remembered on the device. Apple's
-SpeechAnalyzer does the work on the device: SpeechTranscriber for English, DictationTranscriber,
-the keyboard's model, for Dutch and Slovak; iOS downloads a language's model the first time it
-is used. Only the words are kept, never the sound. The simulator has no speech models, so
-`make ios-voice` runs the same Listener on the Mac, on a sentence in each language that `say`
-speaks.
+stops it, and holding it chooses the language, whose code shows under it. The mic in the capture
+sheet talks a note instead: it listens until stopped, and each pause adds what was said as a
+line to today's Log (`nt a`). The language, English, Nederlands or Slovenčina, is remembered on
+the device. Apple's SpeechAnalyzer does the work on the device: SpeechTranscriber for English,
+DictationTranscriber, the keyboard's model, for Dutch and Slovak; iOS downloads a language's
+model the first time it is used. Only the words are kept, never the sound. The simulator has no
+speech models, so `make ios-voice` runs the same Listener on the Mac, on a sentence in each
+language that `say` speaks.
+
+## Shortcuts and Siri
+
+Two App Intents, "Add to today" and "New todo", take a line (Siri asks for it; `due:fri` sets a
+todo's date) and write it as the capture sheet does, in the app's process without opening it.
+App Shortcuts offer both to Siri ("New todo in nt"), Spotlight and the Action button with
+nothing to set up. With the app off screen the phone syncs at once, in a background task.
 
 ## The screens
 
@@ -98,9 +105,10 @@ Nt/Views/            the first run; the home list and search; the two layouts (t
                      stack with its folder and note screens, the iPad's split view); the
                      keyboard bar and photos; the capture sheet; Settings and the key; the mark
 Nt/Voice/            speech to words (Listener, Mic), dictation at the cursor, Talk a note
+Nt/Shortcuts.swift   the App Intents, Add to today and New todo, and their App Shortcuts
 NtTests/             Swift Testing: LibGit against repositories on disk with nt's sync deciding,
                      the key's formats, ssh against a test sshd (make ios-ssh-test), where a
-                     pause ends a spoken line
+                     pause ends a spoken line, a Shortcut's line and todo through the phone's nt
 ```
 
 `../shared` is compiled in with the Mac app: Brand, the model (Workspace, NT, RepoIndex, Capture,

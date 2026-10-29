@@ -97,9 +97,7 @@ struct CaptureSheet: View {
     private func add() {
         Task {
             guard await capture.submit(alternate: false) else { return }
-            if let a = capture.added {
-                ws.say("Added to \(a.place) · \(a.section)" + (a.detail.isEmpty ? "" : ", \(a.detail)"))
-            }
+            if let a = capture.added { ws.say(a.said) }
             dismiss()
         }
     }

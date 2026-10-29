@@ -646,7 +646,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 
 **Sync.**
 - **When:** on opening, 30 s after the last save, when the app goes to the background (with a
-  background task to finish), and in background app refresh when iOS allows.
+  background task to finish), at once after a Shortcut with the app off screen, and in
+  background app refresh when iOS allows.
 - **No sync on push:** that needs a server that turns GitHub's webhooks into pushes, and nt runs
   none.
 - **Conflicts** follow §2: the remote version stays, the local one becomes a conflict copy.
@@ -713,6 +714,16 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     the left Delete, a full swipe the first of them (a delete still asks). On the iPhone a new note opens on a
     screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not
     tapped for), and a screen follows what it shows when it moves, or closes when it is deleted.
+- **Shortcuts and Siri (step 5).**
+  - App Intents "Add to today" and "New todo" take the text (Siri asks for it; `due:fri` sets a
+    todo's date). They run in the app's process without opening it: nt starts on the clone if
+    the app has not (`AppDependencyManager` hands them the app's `Phone`), the text goes in as
+    the capture sheet's does, and the answer is the sheet's line ("Added to todo.md · Inbox, due
+    tomorrow").
+  - Off screen the phone syncs at once, in a background task; on screen half a minute later, as
+    after a save. Opening the app syncs too, also when a Shortcut started nt.
+  - App Shortcuts offer both to Siri ("New todo in nt"), Spotlight and the Action button, with
+    nothing to set up; `INAlternativeAppNames` tells Siri the name is said "en tee".
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;
@@ -809,7 +820,7 @@ Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
-Steps 0 to 3 done; step 4, voice, is at its gate.
+Steps 0 to 4 done; step 5, Shortcuts and Siri, is at its gate.
 
 **8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
 every client, with no new view and no format change; the details are settled at a design gate

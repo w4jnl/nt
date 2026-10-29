@@ -18,6 +18,9 @@ final class Capture {
         let place: String // Tuesday 28 October, todo.md
         let detail: String // at 11:42; due fri
         let section: String // Log, Inbox
+
+        /// said is the line the phone says it with: the capture sheet's flash, a Shortcut's answer.
+        var said: String { "Added to \(place) · \(section)" + (detail.isEmpty ? "" : ", \(detail)") }
     }
 
     var mode = Mode.today

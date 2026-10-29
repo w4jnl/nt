@@ -65,6 +65,10 @@ targets:
         NSCameraUsageDescription: Take a photo for the note you are writing; it is saved beside the note.
         NSMicrophoneUsageDescription: Dictate into a note, or talk a note into today's journal. The words are made on this device; the sound is never kept.
         NSSpeechRecognitionUsageDescription: Your speech is turned into words on this device, for the note you dictate. The sound is never kept.
+        # the name as Siri hears it in a Shortcut's phrase ("New todo in nt"): two letters
+        INAlternativeAppNames:
+          - INAlternativeAppName: N T
+            INAlternativeAppNamePronunciationHint: en tee
         # export compliance, as declared in App Store Connect (2026-10-28): standard encryption
         # algorithms (ssh through libssh2 and mbedTLS), not on the App Store in France, which App
         # Store Connect records as no non-exempt encryption; so builds no longer ask

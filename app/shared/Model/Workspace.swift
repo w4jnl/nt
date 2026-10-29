@@ -665,13 +665,15 @@ final class Workspace {
     }
 
     /// settle saves the note and syncs what was saved: the person left the app. The phone syncs
-    /// whether or not anything was written, to leave the clone as the remote has it.
+    /// whether or not anything was written, to leave the clone as the remote has it, also with no
+    /// note open, as after a Shortcut with the app off screen.
     func settle() async {
+        #if os(macOS)
         guard let editor else { return }
         await editor.save()
-        #if os(macOS)
         editor.kick()
         #else
+        await editor?.save()
         syncSoon?.cancel()
         while syncing { try? await Task.sleep(for: .milliseconds(200)) }
         await syncNow()
