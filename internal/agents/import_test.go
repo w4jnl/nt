@@ -142,9 +142,12 @@ func TestImportStatusAndHost(t *testing.T) {
 		name, reason string
 		turns        int
 		want         string
-	}{{"error", "error", 3, "failed"}, {"no turn", "", 0, "abandoned"}, {"cleared", "clear", 2, "done"}} {
+		log          []Turn
+	}{{"error", "error", 3, "failed", nil}, {"no turn", "", 0, "abandoned", nil}, {"cleared", "clear", 2, "done", nil},
+		{"closed in its first turn", "exit", 1, "abandoned", []Turn{{Started: "2026-10-28T23:11:00+01:00"}}},
+		{"one turn ended", "exit", 1, "done", []Turn{{Started: "2026-10-28T23:11:00+01:00", Ended: "2026-10-28T23:12:00+01:00"}}}} {
 		rec := Record{Version: 1, Agent: "copilot-cli", Session: "s-" + c.name, Host: "macmini", Cwd: "/Users/jaro/work/api",
-			Created: "2026-10-28T23:10:00+01:00", Ended: "2026-10-29T00:20:00+01:00", EndReason: c.reason, Turns: c.turns}
+			Created: "2026-10-28T23:10:00+01:00", Ended: "2026-10-29T00:20:00+01:00", EndReason: c.reason, Turns: c.turns, Log: c.log}
 		rel, _, err := Import(v, state, rec, at("2026-10-29 00:21"))
 		if err != nil {
 			t.Fatal(err)

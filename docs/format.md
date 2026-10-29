@@ -193,7 +193,7 @@ type: daily
 | `waited_minutes` | number | optional, the minutes it waited on background work |
 
 - The hooks set `in-progress` at the start. At the end a report still `in-progress` becomes `abandoned` when it never finished a turn, `failed` when the session ended on an error, else `done`; a status the agent wrote stays.
-- From flok's records: `blocked` while the session waits on a person, else `in-progress`; at the end as above, `abandoned` when it took no turn.
+- From flok's records: `blocked` while the session waits on a person, else `in-progress`; at the end as above, `abandoned` when no turn ended.
 - Once `ended` is set, nothing sets `in-progress` again; a late turn still adds its log line.
 
 **Body.**

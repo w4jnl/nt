@@ -37,7 +37,7 @@ type Record struct {
 	Created   string `json:"created"`
 	Updated   string `json:"updated"`
 	Ended     string `json:"ended"`
-	EndReason string `json:"end_reason"` // "", error, clear, logout, other
+	EndReason string `json:"end_reason"` // absent while it runs; error, clear, logout, exit, other
 	State     string `json:"state"`      // working, blocked, waiting, idle, done
 	Turns     int    `json:"turns"`
 	Tools     int    `json:"tools"`
@@ -163,7 +163,7 @@ func newImported(v *vault.Vault, rec Record, host, project string, created time.
 
 // importStatus is the status the record gives, when the agent wrote none of its own: blocked
 // while it waits on a person, else in progress; at the end failed on an error, abandoned when no
-// turn was taken, else done.
+// turn ended (a session closed in its first turn), else done.
 func importStatus(rec Record, ended bool) string {
 	switch {
 	case !ended && rec.State == "blocked":
@@ -172,10 +172,24 @@ func importStatus(rec Record, ended bool) string {
 		return "in-progress"
 	case rec.EndReason == "error":
 		return "failed"
-	case rec.Turns == 0:
+	case !turnEnded(rec):
 		return "abandoned"
 	}
 	return "done"
+}
+
+// turnEnded says whether any turn of the session ended: one flok no longer sends did, since
+// only the oldest are dropped and turns counts every turn opened.
+func turnEnded(rec Record) bool {
+	if rec.Turns > len(rec.Log) {
+		return true
+	}
+	for _, t := range rec.Log {
+		if t.Ended != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // minutes is seconds as whole minutes for the frontmatter, at least 1 when there were any; ""
