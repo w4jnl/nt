@@ -263,7 +263,7 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 		if b.pick != nil {
 			folder, due = b.pick.folder, b.pick.day
 		} else if b.tv != nil {
-			folder = b.tv.folder
+			folder = b.tv.addTo()
 		}
 		it, err := todo.Add(b.v, folder, text, due, b.v.Now())
 		if err != nil {

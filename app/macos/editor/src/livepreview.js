@@ -118,9 +118,9 @@ export function frontmatterRange(doc) {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-// frontmatterSummary is the one line a folded frontmatter shows: the long date and the tags. A
-// journal shows nothing: its heading is the date.
-export function frontmatterSummary(text) {
+// frontmatterParts are what the folded frontmatter shows: the long date and the tags. A journal
+// shows nothing: its heading is the date.
+export function frontmatterParts(text) {
   const keys = {};
   let list = null;
   for (const line of text.split("\n").slice(1, -1)) {
@@ -140,17 +140,34 @@ export function frontmatterSummary(text) {
       keys[kv[1]] = v.slice(1, -1).split(",").map((s) => unquote(s.trim())).filter(Boolean);
     } else keys[kv[1]] = unquote(v);
   }
-  if (keys.type === "daily") return "";
-  const parts = [];
+  if (keys.type === "daily") return { daily: true, date: "", tags: [] };
+  let date = "";
   const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(keys.date ?? "");
   if (d) {
     const day = new Date(Date.UTC(+d[1], +d[2] - 1, +d[3]));
-    parts.push(`${DAYS[day.getUTCDay()]} ${+d[3]} ${MONTHS[+d[2] - 1]} ${d[1]}`);
+    date = `${DAYS[day.getUTCDay()]} ${+d[3]} ${MONTHS[+d[2] - 1]} ${d[1]}`;
   }
   const tags = Array.isArray(keys.tags) ? keys.tags : keys.tags ? [keys.tags] : [];
+  return { daily: false, date, tags };
+}
+
+// frontmatterSummary is that line as text.
+export function frontmatterSummary(text) {
+  return frontmatterSummaryOf(frontmatterParts(text));
+}
+
+function frontmatterSummaryOf({ daily, date, tags }) {
+  if (daily) return "";
+  const parts = [];
+  if (date) parts.push(date);
   if (tags.length) parts.push(tags.join(", "));
   if (!parts.length) return "properties";
   return parts.join(" · ");
+}
+
+// tagSearch is the search a tag in that line runs: #tag, lowercase, as nt compares tags.
+export function tagSearch(tag) {
+  return "#" + tag.trim().replace(/^#/, "").replace(/\/+$/, "").toLowerCase();
 }
 
 function unquote(s) {
@@ -257,10 +274,13 @@ class OpenChip extends WidgetType {
 
 const chip = (href) => Decoration.widget({ widget: new OpenChip(href), side: 1 });
 
+// FrontmatterWidget is the folded frontmatter's line; each tag in it is its own span, which a
+// click turns into a search for the tag.
 class FrontmatterWidget extends WidgetType {
-  constructor(summary) {
+  constructor(parts) {
     super();
-    this.summary = summary;
+    this.parts = parts;
+    this.summary = frontmatterSummaryOf(parts);
   }
   eq(o) {
     return o.summary === this.summary;
@@ -268,8 +288,22 @@ class FrontmatterWidget extends WidgetType {
   toDOM() {
     const d = document.createElement("div");
     d.className = this.summary ? "cm-fm-summary" : "cm-fm-none";
-    d.textContent = this.summary;
     d.title = "Click to show the frontmatter";
+    const { date, tags } = this.parts;
+    if (!tags.length) {
+      d.textContent = this.summary;
+      return d;
+    }
+    if (date) d.append(date + " · ");
+    tags.forEach((t, i) => {
+      if (i > 0) d.append(", ");
+      const s = document.createElement("span");
+      s.className = "cm-fm-tag";
+      s.dataset.tag = t;
+      s.textContent = t;
+      s.title = "Search for " + tagSearch(t);
+      d.append(s);
+    });
     return d;
   }
   ignoreEvent() {
@@ -594,8 +628,8 @@ function frontmatterDecorations(state) {
     for (let n = 1; n <= r.lines; n++) out.push(line("cm-fm").range(state.doc.line(n).from));
     return Decoration.set(out);
   }
-  const summary = frontmatterSummary(state.doc.sliceString(r.from, r.to));
-  return Decoration.set([Decoration.replace({ widget: new FrontmatterWidget(summary), block: true }).range(r.from, r.to)]);
+  const parts = frontmatterParts(state.doc.sliceString(r.from, r.to));
+  return Decoration.set([Decoration.replace({ widget: new FrontmatterWidget(parts), block: true }).range(r.from, r.to)]);
 }
 
 export const frontmatterField = StateField.define({
@@ -624,9 +658,16 @@ export const backlinksField = StateField.define({
 });
 
 // A click on a rendered link follows it; on the line being edited it places the cursor, and
-// Command-click follows.
+// Command-click follows. A click on a tag in the folded frontmatter searches for it; elsewhere
+// on that line it opens the frontmatter.
 const clicks = EditorView.domEventHandlers({
   mousedown(e, view) {
+    const tag = e.target.closest?.(".cm-fm-tag");
+    if (tag) {
+      e.preventDefault();
+      post({ type: "tag", query: tagSearch(tag.dataset.tag) });
+      return true;
+    }
     const fmw = e.target.closest?.(".cm-fm-summary");
     if (fmw) {
       e.preventDefault();

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// TodosView is every todo in the notes, as the terminal browser's todo list shows them: the open
 /// ones overdue first with their dates in words, a field that adds one to todo.md, and the done
-/// ones below. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
+/// ones below. "from every note" in the summary is a menu that keeps to one top-level folder's
+/// todos, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
 /// Return opens the note at the todo.
 ///
 /// A tick shows at once: the glyph turns, with a small pop, and the text fades. The row stays
@@ -16,6 +17,7 @@ struct TodosView: View {
     @State private var editingDue: String?
     @State private var dueText = ""
     @State private var showDone = true
+    @State private var scope = "" // the top-level folder whose todos show; "" is every note
     @State private var frozen: [Todo]? // the list as it stood at the first tick, while the ticks settle
     @State private var ticked: [String: Bool] = [:] // a todo just ticked → the state it was given
     @State private var after: [String: String] = [:] // a todo just ticked → the open one below it
@@ -39,8 +41,11 @@ struct TodosView: View {
     enum Field: Hashable { case add, list, due }
 
     /// shown is the list on screen: as it stood at the first tick while ticks settle, so a row
-    /// just ticked stays in its place, else as nt lists it.
-    private var shown: [Todo] { frozen ?? ws.todos }
+    /// just ticked stays in its place, else as nt lists it; in the scope.
+    private var shown: [Todo] {
+        let all = frozen ?? ws.todos
+        return scope.isEmpty ? all : all.filter { $0.folder == scope }
+    }
 
     private func isDone(_ t: Todo) -> Bool { ticked[t.id] ?? t.done }
 
@@ -111,10 +116,45 @@ struct TodosView: View {
             l.foregroundColor = Brand.warn
             s += l
         }
-        s += AttributedString(" · from every note")
-        return Text(s)
-            .font(.system(size: 13))
-            .foregroundStyle(Brand.muted)
+        s += AttributedString(" · ")
+        return HStack(spacing: 0) {
+            Text(s)
+            scopeMenu
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(Brand.muted)
+    }
+
+    /// scopeMenu is "from every note", or the folder kept to, as a menu of every note and the
+    /// top-level folders with open todos.
+    private var scopeMenu: some View {
+        let all = frozen ?? ws.todos
+        return Menu {
+            Picker("Todos from", selection: $scope) {
+                Text("every note · \(all.filter { !$0.done }.count) open").tag("")
+                ForEach(Todo.scopes(all, keep: scope), id: \.folder) { s in
+                    Text("\(s.folder) · \(s.open) open").tag(s.folder)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 3) {
+                Text(scope.isEmpty ? "from every note" : "from \(scope)")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        #if os(macOS)
+        .menuStyle(.borderlessButton)
+        #else
+        .buttonStyle(.plain)
+        #endif
+        .fixedSize()
+        .onChange(of: scope) { selected = nil }
+        .help("Keep to one folder's todos")
+        .accessibilityLabel(scope.isEmpty ? "Todos from every note" : "Todos from \(scope)")
     }
 
     private var addField: some View {
@@ -130,7 +170,7 @@ struct TodosView: View {
                 .focused($focus, equals: .add)
                 .onSubmit(add)
                 .accessibilityLabel("New todo")
-            Text("↵ todo.md")
+            Text(scope.isEmpty ? "↵ todo.md" : "↵ \(scope)/todo.md")
                 .font(Brand.mono(11))
                 .foregroundStyle(Brand.muted)
         }
@@ -278,7 +318,7 @@ struct TodosView: View {
         guard !text.isEmpty else { return }
         Task {
             await settled()
-            if await ws.addTodo(text) { newText = "" }
+            if await ws.addTodo(text, in: scope) { newText = "" }
         }
     }
 

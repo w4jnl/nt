@@ -17,6 +17,15 @@ struct AgendaTests {
         #expect(old.todos[0].when == "" && !old.todos[0].late)
     }
 
+    @Test func todosKeepToATopLevelFolder() throws {
+        let json = #"{"todos": [{"rel": "todo.md", "line": 1, "done": false, "text": "a"}, {"rel": "work/q3/plan.md", "line": 2, "done": false, "text": "b"}, {"rel": "homelab/todo.md", "line": 3, "done": false, "text": "c"}, {"rel": "work/todo.md", "line": 4, "done": false, "text": "d"}, {"rel": "Archive/x.md", "line": 5, "done": true, "text": "e"}]}"#
+        let todos = try JSONDecoder().decode(Todo.List.self, from: Data(json.utf8)).todos
+        #expect(todos.map(\.folder) == ["", "work", "homelab", "work", "Archive"])
+        let scopes = Todo.scopes(todos)
+        #expect(scopes.map(\.folder) == ["homelab", "work"] && scopes.map(\.open) == [1, 2], "the folders with open todos, A to Z")
+        #expect(Todo.scopes(todos, keep: "Archive").map(\.folder) == ["Archive", "homelab", "work"], "the scope in use stays")
+    }
+
     @Test func reportsReadTheirFrontmatter() {
         let text = """
         ---
@@ -139,6 +148,8 @@ struct TodoActionTests {
 
         #expect(await ws.addTodo("Renew the domain due:2026-11-06"))
         #expect(read("todo.md").contains("- [ ] Renew the domain due:2026-11-06"))
+        #expect(await ws.addTodo("Order a spare disk", in: "homelab"))
+        #expect(read("homelab/todo.md").contains("- [ ] Order a spare disk"))
         let domain = try #require(ws.todos.first { $0.text == "Renew the domain" })
         await ws.setDue(domain, "none")
         #expect(read("todo.md").contains("- [ ] Renew the domain\n"))

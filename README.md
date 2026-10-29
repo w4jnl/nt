@@ -139,7 +139,7 @@ Every command that prints data takes `--json`.
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "Title" [folder]` | a new dated note, linked from today's journal |
-| `nt f` / `nt s <query>` | find a note with fzf; search the text (with rg when installed) |
+| `nt f` / `nt s <query>` | find a note with fzf; search the text (with rg when installed); `nt s '#docker'` the notes tagged docker |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
@@ -164,10 +164,10 @@ In the browser:
 | `t`, `[` `]`, `c`, `w`, `A` | today's journal, the day before or after, the calendar, the newest weekly digest, today's agent reports |
 | `,` | the settings: enter changes one, `e` edits its file |
 | `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
-| `/`, `ctrl-p` | search every note, find a note by its title |
+| `/`, `ctrl-p` | search every note (`#tag` keeps to tagged notes), find a note by its title |
 | `f`, `b` | follow a link by its letters (a click works too), back to the note before |
 | `l`, `o`, `i` | the note's links, its outline, its images full size |
-| `x` | the todos beside the folders, open then done: `x` check, `d` due date, `a` add, `X` fold Done, enter its note |
+| `x` | the todos beside the folders, open then done: `x` check, `d` due date, `a` add, `f` one folder's, `X` fold Done, enter its note |
 | `a`, `n`, `N` | add a line to today, a new note here, a new folder here |
 | `e`, `v`, `y` | edit in `$EDITOR`, read in glow, copy the selection or the path |
 | `m`, `R`, `D` | move, rename, delete (after asking) |

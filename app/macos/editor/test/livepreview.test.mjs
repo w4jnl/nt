@@ -11,6 +11,8 @@ import {
   buildDecorations,
   frontmatterField,
   frontmatterSummary,
+  frontmatterParts,
+  tagSearch,
   headingAt,
   linkDests,
   noteField,
@@ -125,6 +127,13 @@ test("frontmatter summaries", () => {
   assert.equal(frontmatterSummary("---\ntitle: Monday\ndate: 2026-10-26\ntype: daily\n---"), "");
   assert.equal(frontmatterSummary("---\ntags:\n  - work\n  - 'q4'\n---"), "work, q4");
   assert.equal(frontmatterSummary("---\nagent: claude-code\n---"), "properties");
+  assert.deepEqual(frontmatterParts("---\ndate: 2026-10-21\ntags: [homelab, Work/Q3]\n---"), { daily: false, date: "Wednesday 21 October 2026", tags: ["homelab", "Work/Q3"] });
+});
+
+test("a tag in the frontmatter searches as nt compares tags", () => {
+  assert.equal(tagSearch("homelab"), "#homelab");
+  assert.equal(tagSearch("Work/Q3/"), "#work/q3");
+  assert.equal(tagSearch("#nas"), "#nas");
 });
 
 test("links resolve against the note's folder", () => {

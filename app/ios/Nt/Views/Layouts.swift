@@ -58,6 +58,7 @@ struct StackLayout: View {
             ws.navigate = { path, anchor, line, end in r.path.append(.note(path, anchor: anchor, line: line, end: end)) }
             ws.relocated = { from, to in r.path = r.path.map { $0.moved(from, to) } }
             ws.removed = { path in r.path.removeAll { $0.names(path) } }
+            ws.home = { r.path.removeAll() }
             // for screenshots, as Workspace.start does on the iPad: -NTView todos, calendar,
             // weekly, agents or settings shows a view, -NTFolder <path> a folder, -NTOpen <path>
             // a note
@@ -144,9 +145,10 @@ struct NoteScreen: View {
 
 struct SplitLayout: View {
     @Environment(Workspace.self) private var ws
+    @State private var columns = NavigationSplitViewVisibility.automatic
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             HomeList(stacked: false)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 400)
         } detail: {
@@ -160,7 +162,13 @@ struct SplitLayout: View {
                 }
             }
         }
-        .onAppear { ws.navigate = nil }
+        .onAppear {
+            ws.navigate = nil
+            ws.home = nil
+        }
+        .onChange(of: ws.searchAsked) {
+            if ws.searchAsked != nil { columns = .all } // the sidebar, with the search a tag asked for
+        }
         .task { if ws.note == nil { await ws.openToday() } }
     }
 }

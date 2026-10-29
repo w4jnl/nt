@@ -1,20 +1,24 @@
 package tui
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/w4jnl/nt/internal/scan"
 	"github.com/w4jnl/nt/internal/todo"
+	"github.com/w4jnl/nt/internal/vault"
 )
 
 // The todos in the note's pane (docs/design.md §4, Todos), as the Mac app's Todos view shows
 // them: the open ones, overdue first, then the done ones under Done. The home list's Todos row
 // shows them there; enter, or x from anywhere, gives them the keys, the folder list staying as
 // it was. j and k move, x checks, d sets the due date, a adds one, e edits the line, D deletes
-// it, enter opens its note at it, X folds Done, esc goes back. A tick holds as in the todo list.
+// it, enter opens its note at it, X folds Done, f keeps to one top-level folder's todos, esc goes
+// back. A tick holds as in the todo list.
 
 // todoView is the todos in the note's pane while they have the keys.
 type todoView struct {
@@ -25,6 +29,7 @@ type todoView struct {
 	fold    bool            // Done is folded
 	held    map[string]bool // a todo ticked since the list was read → the list it stays in, done or not
 	folder  string          // whose todo.md a todo added here goes to; "" is the root's
+	scope   string          // the top-level folder whose todos show; "" is every note
 	clicked bool            // the last click selected a row; a second one opens its note
 	full    bool            // the pane was given the whole screen for it (narrow screens)
 }
@@ -37,9 +42,12 @@ func (tv *todoView) done(it todo.Item) bool {
 	return it.Done
 }
 
-// lists are the open todos and the done ones.
+// lists are the open todos and the done ones, in the scope.
 func (tv *todoView) lists() (open, done []todo.Item) {
 	for _, it := range tv.items {
+		if tv.scope != "" && topFolder(it.Path) != tv.scope {
+			continue
+		}
 		if tv.done(it) {
 			done = append(done, it)
 		} else {
@@ -56,6 +64,77 @@ func (tv *todoView) rows() []todo.Item {
 		return open
 	}
 	return append(open, done...)
+}
+
+// addTo is the folder whose todo.md a todo added here goes to: the scope's, when there is one.
+func (tv *todoView) addTo() string {
+	if tv.scope != "" {
+		return tv.scope
+	}
+	return tv.folder
+}
+
+// topFolder is the top-level folder of a repository path, "" for a file at the root.
+func topFolder(rel string) string {
+	if i := strings.IndexByte(rel, '/'); i > 0 {
+		return rel[:i]
+	}
+	return ""
+}
+
+// scopes are what the todos can keep to: every note, then each top-level folder with open
+// todos, with how many, in nt's folder order; the scope in use stays even with none left.
+func (tv *todoView) scopes() []pickItem {
+	all, per := 0, map[string]int{}
+	for _, it := range tv.items {
+		if !tv.done(it) {
+			all++
+			if f := topFolder(it.Path); f != "" {
+				per[f]++
+			}
+		}
+	}
+	if _, ok := per[tv.scope]; !ok && tv.scope != "" {
+		per[tv.scope] = 0
+	}
+	folders := make([]string, 0, len(per))
+	for f := range per {
+		folders = append(folders, f)
+	}
+	sort.Slice(folders, func(i, j int) bool { return vault.FolderBefore(folders[i], folders[j]) })
+	items := []pickItem{{label: "every note", hint: strconv.Itoa(all) + " open", kind: "scope"}}
+	for _, f := range folders {
+		items = append(items, pickItem{label: f + "/", hint: strconv.Itoa(per[f]) + " open", kind: "scope", target: f})
+	}
+	return items
+}
+
+// scopeTargets fills the scope picker with the scopes whose names match what is typed.
+func (b *browser) scopeTargets() tea.Cmd {
+	p, tv := b.pick, b.tv
+	if p == nil || tv == nil {
+		return nil
+	}
+	q := strings.TrimSpace(b.input.Value())
+	p.items, p.sel, p.top = nil, 0, 0
+	for _, it := range tv.scopes() {
+		if _, ok := scan.Match(q, it.label); ok {
+			if it.target == tv.scope {
+				p.sel = len(p.items)
+			}
+			p.items = append(p.items, it)
+		}
+	}
+	if q != "" {
+		p.sel = 0
+	}
+	return nil
+}
+
+// setScope keeps the todos to a top-level folder's, or "" every note's.
+func (b *browser) setScope(folder string) {
+	tv := b.tv
+	tv.scope, tv.sel, tv.top = folder, 0, 0
 }
 
 func (tv *todoView) selected() *todo.Item {
@@ -143,8 +222,12 @@ func (b *browser) todoViewKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 				tv.sel = i
 			}
 		}
+	case "f":
+		b.pick = &picker{title: "todos from"}
+		b.prompt("scope", "todos from: ")
+		return b.scopeTargets(), true
 	case "a":
-		list, err := todo.ListIn(b.v, tv.folder)
+		list, err := todo.ListIn(b.v, tv.addTo())
 		if err != nil {
 			b.say(err.Error(), true)
 			return nil, true
@@ -294,6 +377,9 @@ func (b *browser) todoSummary(tv *todoView) string {
 	s := b.st.Muted.Render(plural(len(open), "open todo"))
 	if late > 0 {
 		s += b.st.Muted.Render(" · ") + lipgloss.NewStyle().Foreground(b.pal.Warn).Render(strconv.Itoa(late)+" late")
+	}
+	if tv.scope != "" {
+		s += b.st.Muted.Render(" · from " + tv.scope + "/")
 	}
 	return s
 }

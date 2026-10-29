@@ -92,6 +92,7 @@ final class Workspace {
     var status: SyncStatus?
     var syncing = false
     var palette: PaletteMode?
+    var searchAsked: String? // a search a note asked for, a tag in its frontmatter, for the search field to take
     var sidebar = true // shown; the split view's toggle and View > Hide Sidebar change it
     var focusMode = false
     var todos: [Todo] = [] // every todo, open ones overdue first, as nt todo --all lists them
@@ -131,6 +132,8 @@ final class Workspace {
     /// rename or a delete: a screen follows its note or folder, or goes with it.
     @ObservationIgnored var relocated: ((_ from: String, _ to: String) -> Void)?
     @ObservationIgnored var removed: ((_ path: String) -> Void)?
+    /// home closes the iPhone's screens down to the home list.
+    @ObservationIgnored var home: (() -> Void)?
 
     @ObservationIgnored let nt: NT?
     @ObservationIgnored private(set) var editor: NoteEditor?
@@ -417,9 +420,22 @@ final class Workspace {
         await todo(["due", t.id, when])
     }
 
-    /// addTodo adds a todo to the root's todo.md; due:fri in the text sets its due date.
-    func addTodo(_ text: String) async -> Bool {
-        await todo(["add", "--", text])
+    /// find searches for what a note asked, a tag in its frontmatter (#homelab): in the palette
+    /// on the Mac, in the home list's search on iPhone and iPad, the iPhone's screens closed down
+    /// to it.
+    func find(_ query: String) {
+        searchAsked = query
+        #if os(macOS)
+        palette = .text
+        #else
+        home?()
+        #endif
+    }
+
+    /// addTodo adds a todo to the root's todo.md, or a folder's; due:fri in the text sets its
+    /// due date.
+    func addTodo(_ text: String, in folder: String = "") async -> Bool {
+        await todo(["add"] + (folder.isEmpty ? [] : ["--in", folder]) + ["--", text])
     }
 
     #if !os(macOS)

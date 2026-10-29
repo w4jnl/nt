@@ -115,7 +115,7 @@ Decisions taken with the user (2026-10-26):
 | `nt a "text"` / `pbpaste \| nt a` | Append a timestamped line to today |
 | `nt n "title" [folder]` | New dated note in the folder, or in `default_folder` |
 | `nt f` | `rg --files \| fzf --preview 'nt _preview {}'` (nt's own style), then open the pick in `$EDITOR` |
-| `nt s <query>` | Search with `rg` |
+| `nt s <query>` | Search with `rg` (or nt's own search without it); `'#tag'` words keep to the notes with those tags |
 | `nt ls <folder>` | List notes in a folder |
 | `nt mv <note\|folder> <to> [--dry-run]` | Move a note or a folder; every link to it and in it is fixed, and the images only it uses go along (Folders, below) |
 | `nt rename <note\|folder> <new>` | A note's new title and the file name that goes with it, its date kept; a folder's new name |
@@ -169,7 +169,7 @@ Decisions taken with the user (2026-10-26):
 | `1`–`9` | Pinned folders, so preselected subfolders are one key away |
 | `a` | One-line append (text input) |
 | `n` | Title prompt, then a note in the current folder, opened in nvim |
-| `/` | Live `rg --json` search |
+| `/` | Live `rg --json` search; `#tag` keeps to the notes with that tag |
 | `ctrl-p` | Fuzzy title search |
 | `e` | Open in nvim at the current line via `tea.ExecProcess`; reload on return. fsnotify also reloads live. |
 | `l` | Link picker; then follow the link |
@@ -202,7 +202,7 @@ Decisions taken with the user (2026-10-26):
 **Todos** (`internal/todo`, docs/format.md §12). A todo is a task line, `- [ ] text due:YYYY-MM-DD`, in any note; `nt todo add` and the browser add new ones to `## Inbox` in a `todo.md`: the root's, or a folder's (`--in work`, or the folder the browser is in). Like the backlinks they are read from the files each time, with no index: `todo.Collect` walks the notes (leaving out agent reports, conflict copies and hidden folders) and a change rewrites one line under the repository lock, only when the line is still as it was read.
 - **Order:** open todos by due date, the overdue first, then the undated ones (the todo lists in file order, the root's first, then other notes newest first); done ones by their `done:` date, latest first.
 - **Dates in words:** `2d late` (in `warn`, so it reads without colour too), `today`, `tomorrow`, a weekday within the week, else `3 nov`. Input takes `YYYY-MM-DD`, `today`, `tomorrow`, `mon`…`sun` (the next one), `+3d`, `+2w`, `+1m`, and `none` to clear.
-- **The browser's todos** (`x`, or the home list's Todos) are in the note's pane, the folder list staying as it was, as the Mac app's Todos view shows them: a line with how many are open and late, the open todos, then `▾ Done` and the done ones; each row `○` open or `✓` done in `done`, its text, the note it is in (a todo list by its path, any other by its title) in `ink-faint`, and the date at the right edge. Selecting the home list's Todos shows them there; enter, or `x` from anywhere, gives them the keys: `j` `k` move, `x`/space check or uncheck (the row stays in its list with its glyph turned until the ticks settle, 0.7 s after the last, so another `x` takes it back; then the list is read again and the selection is on the row that took its place, as in the Mac app), `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), `e` edit the note at the todo, enter open the note at it, `X` fold or unfold Done, `D` delete the line after asking, `r` read again, esc back to the list. A click selects a todo, a click on its glyph checks it, a second click opens its note. On a narrow screen they take the whole screen. A day's todos in the calendar (`x` there) stay a picker in the list pane.
+- **The browser's todos** (`x`, or the home list's Todos) are in the note's pane, the folder list staying as it was, as the Mac app's Todos view shows them: a line with how many are open and late, the open todos, then `▾ Done` and the done ones; each row `○` open or `✓` done in `done`, its text, the note it is in (a todo list by its path, any other by its title) in `ink-faint`, and the date at the right edge. Selecting the home list's Todos shows them there; enter, or `x` from anywhere, gives them the keys: `j` `k` move, `x`/space check or uncheck (the row stays in its list with its glyph turned until the ticks settle, 0.7 s after the last, so another `x` takes it back; then the list is read again and the selection is on the row that took its place, as in the Mac app), `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), or of the folder kept to, `f` keep to one top-level folder's todos (a picker of every note and the folders with open todos, with their counts; the summary says `from <folder>/`), `e` edit the note at the todo, enter open the note at it, `X` fold or unfold Done, `D` delete the line after asking, `r` read again, esc back to the list. A click selects a todo, a click on its glyph checks it, a second click opens its note. On a narrow screen they take the whole screen. A day's todos in the calendar (`x` there) stay a picker in the list pane.
 - **nvim:** `<leader>tx` checks or unchecks the todo on the cursor line in the buffer, with the day from `nt _editor day`.
 - **The calendar** (`c`) shows a month in the list pane, Monday first, 7 days of 4 columns (`list-min`). A day with a journal is in `ink`, one without in `ink-faint`, today in `accent`; `•` after a day with open todos due, in `warn` when that day has passed. Under the month, the selected day: its date, whether it has a journal, its todos (due or done that day) and its agent sessions. The preview shows the day's journal, or says it has none. Keys: `h` `l` day, `j` `k` week, `[` `]` month, `t` today, enter goes to the journal in the list, `e` edits it (starting it when missing), `x` the todo list of that day (a todo added there is due that day), `tab` to the journal, esc back; a click selects a day, a second click opens it. Journals and agent sessions are read with a few stat calls on every move and poll, the todos with `todo.Collect` in the background. It writes nothing but a journal `e` starts.
 
@@ -823,19 +823,33 @@ phone and nt's Go code inside the app; reading, capture, todos and editing, on i
 Done: steps 0 to 5, and step 6 as far as TestFlight (`make ios-testflight`); the App Store
 later, if wanted.
 
-**8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
-every client, with no new view and no format change; the details are settled at a design gate
-when it starts.
+**8. Tags and todos by folder** (planned 2026-10-29, after the iOS app; designed and built the
+same day, at its gate). Two small additions to every client, with no new view and no format
+change.
 - **Tags as a search filter.** The tags are the ones docs/format.md §4 already defines: the
-  frontmatter's `tags` and inline `#tag` words outside code. `#docker` in a search (`nt s`, the
-  browser's search, the Mac app's ⌘P, the iOS search) finds the notes tagged docker, and with
-  words, the tagged notes that have them; `#work` also finds `work/q3`. A tag in the apps'
-  folded frontmatter line runs that search. Not built: a tags list in the sidebar or the home
-  list, a tag tree, renaming or merging tags, tag colours, completion.
-- **Todos by folder.** The Todos view in the browser, the Mac app and the iOS app gets a scope
-  over its list: All, then each top-level folder that has todos, as `nt todo <folder>` already
-  does. The order stays by due date. Todos get no category of their own: the folder of the
-  `todo.md` or note a todo is in is its place.
+  frontmatter's `tags` (a flow list, a block list or one value) and inline `#tag` words outside
+  code (`mdparse.Tags`).
+  - `search.Search`, which `nt s`, the browser's `/`, the Mac app's ⌘P and ⇧⌘F and the iOS
+    search all go through, takes the `#tag` words out of a query and keeps to the notes with
+    every one of those tags, or one under it: `#work` also finds `work/q3`.
+  - A tag alone gives one line per note, the line that tags it, newest first by the date in
+    its path; with words, their lines in those notes. The JSON stays `[{path, line, text}]`, so
+    the clients show it as any search. In a shell the tag is quoted: `nt s '#docker'`.
+  - A tag in the apps' folded frontmatter line is in `accent`; a click or tap searches for it:
+    the palette on the Mac, the home list's search on iPhone (its screens closed down to it)
+    and iPad (the sidebar shown). The rest of the line still opens the frontmatter.
+  - Not built: a tags list in the sidebar or the home list, a tag tree, renaming or merging
+    tags, tag colours, completion, styled or tappable `#tags` in the text.
+- **Todos by folder.** The Todos view keeps to every note or one top-level folder, as `nt todo
+  <folder>` does; the order stays by due date. The root's `todo.md` is under every note only.
+  - The browser: `f` opens a picker of every note and the top-level folders with open todos,
+    with how many; the summary says `from <folder>/`.
+  - The Mac and iOS apps: "from every note" in the summary is a menu of the same.
+  - A todo added while a folder is kept to goes to that folder's `todo.md` (`nt todo add
+    --in`), and the add field says so. The choice is not remembered: the view starts at every
+    note, and nothing about it is written to the notes.
+  - Todos get no category of their own: the folder of the `todo.md` or note a todo is in is its
+    place.
 
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.

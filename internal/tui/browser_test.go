@@ -318,6 +318,73 @@ func TestTodoList(t *testing.T) {
 	}
 }
 
+// TestTodoScope: f keeps the todos to one top-level folder's, chosen from every note and the
+// folders with open todos; a todo added there goes to that folder's todo.md.
+func TestTodoScope(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	for f, body := range map[string]string{
+		"todo.md":                 "# Todo\n\n## Inbox\n\n- [ ] Renew passport\n",
+		"homelab/todo.md":         "# Todo\n\n## Inbox\n\n- [ ] Replace the fan\n",
+		"work/2026-10-20-q3.md":   "# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
+		"work/team/2026-10-21.md": "# Team\n\n- [ ] Plan the offsite\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows := func() (out []string) {
+		for _, it := range b.tv.rows() {
+			out = append(out, it.Text)
+		}
+		return out
+	}
+	labels := func() (out []string) {
+		for _, it := range b.pick.items {
+			out = append(out, it.label+" "+it.hint)
+		}
+		return out
+	}
+	press(b, "x")
+	if len(rows()) != 5 {
+		t.Fatalf("every note's todos: %v", rows())
+	}
+	press(b, "f")
+	if b.pick == nil || strings.Join(labels(), ", ") != "every note 4 open, homelab/ 1 open, work/ 2 open" {
+		t.Fatalf("f does not offer every note and the folders with open todos: %v", b.pick)
+	}
+	press(b, "wo")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.pick != nil || b.tv.scope != "work" || strings.Join(rows(), ", ") != "Send the report, Plan the offsite, Book the room" {
+		t.Fatalf("the work scope: %q %v", b.tv.scope, rows())
+	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "2 open todos · from work/") {
+		t.Fatalf("the summary does not say the scope:\n%s", screen)
+	}
+	press(b, "a")
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/todo.md:") {
+		t.Errorf("a in the work scope does not add to work/todo.md: %s", f)
+	}
+	press(b, "Call the venue")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if list, _ := os.ReadFile(b.v.Abs("work/todo.md")); !strings.Contains(string(list), "- [ ] Call the venue") || len(rows()) != 4 {
+		t.Fatalf("the todo added in the scope:\n%s\n%v", list, rows())
+	}
+	press(b, "f")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.pick != nil || b.tv == nil || b.tv.scope != "work" {
+		t.Fatal("esc in the scope picker changes the scope or closes the todos")
+	}
+	press(b, "f")
+	press(b, "every")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.tv.scope != "" || len(rows()) != 6 {
+		t.Fatalf("every note again: %q %v", b.tv.scope, rows())
+	}
+}
+
 func TestFolders(t *testing.T) {
 	b := testBrowser(t, 200, t.TempDir())
 	for f, body := range map[string]string{
