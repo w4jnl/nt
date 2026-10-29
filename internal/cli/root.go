@@ -37,7 +37,7 @@ notes
   a <text>             add a timestamped line to today's journal (or pipe the text in)
   n <title> [folder]   a new dated note in folder, linked from today's journal
   f                    find a note with fzf and open it
-  s <query>            search the notes with rg
+  s <query>            search the notes; '#tag' keeps to the notes with that tag
   ls [folder]          the folders and notes in a folder, newest first
   view <file>          show one note rendered, any other text as written; f follows a link, b goes
                        back [--theme auto|dark|light] [--images auto|on|off]

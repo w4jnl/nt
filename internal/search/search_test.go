@@ -63,3 +63,74 @@ func TestGoFindsWhatRgFinds(t *testing.T) {
 		t.Error("a query that is no regular expression is not refused")
 	}
 }
+
+// TestTagsKeepASearchToTheirNotes: #tag words keep to the notes with every one of the tags, or
+// one under them; alone, one line per note, newest first; with words, their lines in those
+// notes, with rg and in Go alike.
+func TestTagsKeepASearchToTheirNotes(t *testing.T) {
+	root := t.TempDir()
+	for p, body := range map[string]string{
+		"homelab/2026-10-22-nas.md": "---\ntags: [homelab, docker]\n---\n# NAS\n\nrestic backs it up at 02:00\n",
+		"homelab/2026-10-25-net.md": "# Network\n\nThe VLANs. #homelab/net\nrestic is not here\n",
+		"daily/2026/2026-10-28.md":  "# Day\n\n- 09:00 moved the nas to #Docker compose\n",
+		"work/q3.md":                "---\ntags:\n  - work/q3\n---\nrestic for work\n",
+		"work/plain.md":             "restic, untagged\n",
+		"homelab/.nt-tmp-1.md":      "#homelab in a temp file\n",
+		".hidden/2026-10-29-x.md":   "#homelab in a hidden folder\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, p)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, p), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := func(ms []Match) string {
+		var out []string
+		for _, m := range ms {
+			out = append(out, m.Path+":"+strconv.Itoa(m.Line))
+		}
+		return strings.Join(out, " ")
+	}
+	sorted := func(ms []Match) string {
+		s := strings.Fields(in(ms))
+		sort.Strings(s)
+		return strings.Join(s, " ")
+	}
+	if tags, words := Split("#Docker  restic #work/  2026"); strings.Join(tags, ",") != "docker,work" || words != "restic 2026" {
+		t.Errorf("Split = %q %q", tags, words)
+	}
+	if tags, words := Split("#12 C# #"); len(tags) != 0 || words != "#12 C# #" {
+		t.Errorf("Split keeps what is no tag as words: %q %q", tags, words)
+	}
+	ctx := context.Background()
+	for q, want := range map[string]string{
+		"#homelab":         "homelab/2026-10-25-net.md:3 homelab/2026-10-22-nas.md:2",
+		"#docker":          "daily/2026/2026-10-28.md:3 homelab/2026-10-22-nas.md:2",
+		"#homelab #docker": "homelab/2026-10-22-nas.md:2",
+		"#work":            "work/q3.md:3",
+		"#nothing":         "",
+	} {
+		got, err := Search(ctx, root, q)
+		if err != nil || in(got) != want {
+			t.Errorf("Search(%q) = %v %q, want %q", q, err, in(got), want)
+		}
+	}
+	got, _ := Search(ctx, root, "#docker")
+	if len(got) == 0 || got[0].Text != "- 09:00 moved the nas to #Docker compose" || len(got[0].Spans) != 1 || got[0].Text[got[0].Spans[0][0]:got[0].Spans[0][1]] != "Docker" {
+		t.Errorf("a tag's line is the one that tags the note, with the tag marked: %+v", got)
+	}
+	// with words: their lines in the tagged notes, in Go and with rg
+	want := "homelab/2026-10-22-nas.md:6 homelab/2026-10-25-net.md:4"
+	if got, err := goSearch(ctx, root, "restic", []string{"homelab/2026-10-22-nas.md", "homelab/2026-10-25-net.md"}); err != nil || sorted(got) != want {
+		t.Errorf("Go in the tagged notes = %v %q, want %q", err, sorted(got), want)
+	}
+	if _, err := exec.LookPath("rg"); err == nil {
+		if got, err := rg(ctx, root, "restic", []string{"homelab/2026-10-22-nas.md", "homelab/2026-10-25-net.md"}); err != nil || sorted(got) != want {
+			t.Errorf("rg in the tagged notes = %v %q, want %q", err, sorted(got), want)
+		}
+	}
+	if got, err := Search(ctx, root, "#homelab restic"); err != nil || sorted(got) != want {
+		t.Errorf("Search(#homelab restic) = %v %q, want %q", err, sorted(got), want)
+	}
+}

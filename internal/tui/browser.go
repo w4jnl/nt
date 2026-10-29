@@ -1397,7 +1397,7 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 		kind := b.inputKind
 		b.closeInput()
 		b.moving = ""
-		if kind == "search" || kind == "find" || kind == "move" {
+		if kind == "search" || kind == "find" || kind == "move" || kind == "scope" {
 			return b.closePick()
 		}
 		return nil
@@ -1447,6 +1447,12 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 				return b.moveInto(p.items[p.sel])
 			}
 			return b.moveNowhere(text)
+		case "scope":
+			if p := b.pick; p != nil && p.sel < len(p.items) && b.tv != nil {
+				b.setScope(p.items[p.sel].target)
+			}
+			b.pick = nil
+			return nil
 		case "rename":
 			return b.rename(text)
 		case "setting":
@@ -1473,6 +1479,8 @@ func (b *browser) inputChanged() tea.Cmd {
 		return b.findTitles()
 	case "move":
 		return b.moveTargets()
+	case "scope":
+		return b.scopeTargets()
 	}
 	return nil
 }

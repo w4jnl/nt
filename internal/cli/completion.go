@@ -32,7 +32,7 @@ var commands = []command{
 	{[]string{"a", "add"}, "add a timestamped line to today's journal", []flag{jsonFlag}, nil},
 	{[]string{"n", "new"}, "a new dated note, linked from today's journal", []flag{jsonFlag}, []string{"", "folder"}},
 	{[]string{"f", "find"}, "find a note with fzf and open it", nil, nil},
-	{[]string{"s", "search"}, "search the notes with rg", []flag{jsonFlag}, nil},
+	{[]string{"s", "search"}, "search the notes; #tag keeps to tagged notes", []flag{jsonFlag}, nil},
 	{[]string{"ls"}, "the folders and notes in a folder", []flag{jsonFlag}, []string{"folder"}},
 	{[]string{"view"}, "show one note rendered", []flag{{"--theme", "light or dark", "(auto dark light)"}, {"--images", "draw images", "(auto on off)"}}, []string{"note"}},
 	{[]string{"paste"}, "save the clipboard's image beside a note", []flag{{"--name", "what the image shows", "name"}, {"--from", "an image file instead of the clipboard", "file"}, jsonFlag}, []string{"note"}},

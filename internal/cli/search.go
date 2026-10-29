@@ -17,8 +17,8 @@ import (
 	"github.com/w4jnl/nt/internal/search"
 )
 
-// nt s <query>: search the notes with rg (smart case, markdown files). Exits 1 when nothing
-// matches, as rg and grep do.
+// nt s <query>: search the notes with rg (smart case, markdown files); '#tag' words keep to the
+// notes with those tags. Exits 1 when nothing matches, as rg and grep do.
 func runSearch(args []string) int {
 	args, asJSON := takeBool(args, "--json")
 	words, err := positional("s", args)
