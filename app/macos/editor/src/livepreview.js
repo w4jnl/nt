@@ -17,9 +17,9 @@ export const setBacklinks = StateEffect.define();
 export const setFocusMode = StateEffect.define();
 
 // noteField is what the preview knows besides the text: the note's repository path, its broken
-// links, the focus and focus mode.
+// links, the focus and focus mode, and whether the screen is touched rather than clicked.
 export const noteField = StateField.define({
-  create: () => ({ path: "", broken: new Set(), focused: false, focusMode: false }),
+  create: () => ({ path: "", broken: new Set(), focused: false, focusMode: false, touch: false }),
   update(v, tr) {
     for (const e of tr.effects) {
       if (e.is(setBroken)) v = { ...v, broken: new Set(e.value) };
@@ -209,6 +209,36 @@ class CheckWidget extends WidgetType {
   }
 }
 
+// OpenChip follows a link from the line being edited on a touch screen, where a tap on the link
+// places the cursor and there is no Command-click.
+class OpenChip extends WidgetType {
+  constructor(href) {
+    super();
+    this.href = href;
+  }
+  eq(o) {
+    return o.href === this.href;
+  }
+  toDOM() {
+    const s = document.createElement("span");
+    s.className = "cm-open";
+    s.textContent = "open ↗";
+    s.setAttribute("role", "button");
+    s.setAttribute("aria-label", "Open the link");
+    // the widget keeps its events from the editor, so it answers the tap itself
+    s.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      post({ type: "open", href: this.href });
+    });
+    return s;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+const chip = (href) => Decoration.widget({ widget: new OpenChip(href), side: 1 });
+
 class FrontmatterWidget extends WidgetType {
   constructor(summary) {
     super();
@@ -281,7 +311,7 @@ const META = /\b(?:due|done):\d{4}-\d{2}-\d{2}\b/g;
 // buildDecorations is the preview of the whole note for its state: what is hidden, replaced or
 // styled. It reads only the state, so the tests run it without a screen.
 export function buildDecorations(state) {
-  const { path, broken } = state.field(noteField);
+  const { path, broken, touch } = state.field(noteField);
   const active = activeLines(state);
   const doc = state.doc;
   const fm = frontmatterRange(doc);
@@ -352,6 +382,7 @@ export function buildDecorations(state) {
           if (parent === "Link" || parent === "Image" || parent === "LinkReference") return;
           const href = doc.sliceString(from, to);
           add(mark("cm-link", { "data-href": href, title: href }), from, to);
+          if (touch && isActive(from)) add(chip(href), to);
           return;
         }
         case "Autolink": {
@@ -424,6 +455,7 @@ export function buildDecorations(state) {
     if (isActive(n.from, n.to)) {
       add(mark(cls, attrs), textFrom, textTo);
       add(mark("cm-url"), url.from, url.to);
+      if (touch) add(chip(dest), n.to);
       return false;
     }
     add(hide, n.from, textFrom);

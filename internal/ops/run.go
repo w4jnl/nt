@@ -7,6 +7,7 @@ import (
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/gitsync"
+	"github.com/w4jnl/nt/internal/move"
 )
 
 // Runner answers the command lines an app runs nt with, in the process: what nt prints, and its
@@ -130,6 +131,64 @@ func (r Runner) run(cmd string, args []string, stdin []byte) ([]byte, int, error
 		}
 		s, err := Settings()
 		return answer(SettingList{Settings: s}, err)
+	case "mv", "rename":
+		args, dry := Flag(args, "--dry-run")
+		pos, err := Positional(cmd, args)
+		if err != nil {
+			return nil, 2, err
+		}
+		if cmd == "mv" && len(pos) != 2 || cmd == "rename" && len(pos) < 2 {
+			return nil, 2, fmt.Errorf("%s: name what moves and where: nt mv <note|folder> <to>, nt rename <note|folder> <new>", cmd)
+		}
+		v, _, err := Open()
+		if err != nil {
+			return nil, 1, err
+		}
+		var p *move.Plan
+		if cmd == "mv" {
+			p, err = move.Move(v, Source(v, pos[0]), pos[1], dry)
+		} else {
+			p, err = move.Rename(v, Source(v, pos[0]), strings.Join(pos[1:], " "), dry)
+		}
+		if err != nil {
+			return nil, 2, fmt.Errorf("%s: %w", cmd, err) // nt's folder commands end with 2 when they refuse
+		}
+		return answer(p, nil)
+	case "mkdir":
+		pos, err := Positional("mkdir", args)
+		if err != nil {
+			return nil, 2, err
+		}
+		if len(pos) != 1 {
+			return nil, 2, errors.New("mkdir: use nt mkdir <folder>, a path from the root of the notes")
+		}
+		v, _, err := Open()
+		if err != nil {
+			return nil, 1, err
+		}
+		rel, err := move.Mkdir(v, pos[0])
+		if err != nil {
+			return nil, 2, fmt.Errorf("mkdir: %w", err)
+		}
+		return answer(map[string]any{"path": v.Abs(rel), "rel": rel}, nil)
+	case "rm":
+		args, dry := Flag(args, "--dry-run")
+		pos, err := Positional("rm", args)
+		if err != nil {
+			return nil, 2, err
+		}
+		if len(pos) != 1 {
+			return nil, 2, errors.New("rm: use nt rm <note|folder>")
+		}
+		v, _, err := Open()
+		if err != nil {
+			return nil, 1, err
+		}
+		r, err := Remove(v, Source(v, pos[0]), dry)
+		if err != nil {
+			return nil, 2, fmt.Errorf("rm: %w", err)
+		}
+		return answer(r, nil)
 	case "paste":
 		args, name, _, err := Value(args, "--name")
 		if err != nil {

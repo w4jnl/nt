@@ -2,10 +2,10 @@
 
 The notes repository on the phone: a full clone, synced with git over ssh, written by nt's own
 Go code running inside the app. A third client of the same repository; docs/design.md §9 is the
-spec, and phase 7 lists its steps. Steps 1 and 2 are in: the first run makes the phone's key and
+spec, and phase 7 lists its steps. Steps 1 to 3 are in: the first run makes the phone's key and
 clones the notes; then the home list (Today, Todos, Calendar, Weekly, Agents, the pinned folders
-and the folders, search, the sync state), notes in live preview, and the views, as on the Mac.
-Notes are read-only until step 3, writing; voice and Shortcuts are steps 4 and 5.
+and the folders, search, the sync state), notes in live preview that are written as on the Mac,
+the views, the capture sheet and Settings. Voice and Shortcuts are steps 4 and 5.
 
 ## Build
 
@@ -18,6 +18,7 @@ make ios-build      # the core and libgit2 when missing, the project, a simulato
 make ios-test       # the Swift tests in the simulator
 make ios-ssh-test   # ssh with the phone's key, against a throwaway sshd on 127.0.0.1
 make ios-device     # build, install and launch on a connected iPhone or iPad
+make ios-testflight # archive and upload to App Store Connect, for TestFlight
 make ios-core       # rebuild nt for the phone after a change to the Go code
 ```
 
@@ -25,8 +26,14 @@ make ios-core       # rebuild nt for the phone after a change to the Go code
 `make ios-libgit2` (`scripts/ios-libgit2.sh`) builds libgit2 1.9 with ssh through libssh2 on
 mbedTLS, from source tarballs whose SHA-256 it checks, into `build/Git2.xcframework`. Neither is
 committed. `make ios-project` writes an empty `Local.xcconfig`; put your team id in it
-(`Local.xcconfig.example`) for a device build. Simulator builds are signed ad hoc, so the
-Keychain works there.
+(`Local.xcconfig.example`) for a device build, and an App Store Connect API key for TestFlight.
+Simulator builds are signed ad hoc, so the Keychain works there.
+
+TestFlight needs the app's record in App Store Connect once (Apps › New App, iOS, bundle id
+`nl.w4j.nt.ios`); `make ios-testflight` then archives a Release build, exports it with
+`ExportOptions.plist` (Xcode raises the build number) and uploads it. Export compliance is in
+the Info.plist (`ITSAppUsesNonExemptEncryption`, NO), as declared in App Store Connect: standard
+encryption algorithms (ssh through libssh2 and mbedTLS), not on the App Store in France.
 
 ## The first run
 
@@ -41,13 +48,26 @@ Keychain works there.
 The clone, nt's config and its state live in the app's Application Support. Commits from the
 phone are made by `<host> <<host>@nt.invalid>`, unless the clone's git config names someone.
 
+## Writing and sync
+
+A note is written in place, and saved through nt as on the Mac (`nt _editor save`): a second
+after the typing stops, a save that lands only on the version it was read from, the edit hold
+while unsaved, a conflict copy when both changed the same line. The bar above the keyboard has a
+task box, a heading, a link, a photo (from the library or the camera, saved beside the note as a
+JPEG), undo, redo and done. The pencil at the foot of the home list adds a line to today, or a
+todo. + on the home list and in a folder makes a note or a folder there; a long press on a row,
+or a note's ⋯, renames, moves or deletes it (nt rename, mv and rm, which keep the links); a
+swipe to the right moves or renames, to the left deletes, as in Mail. The phone syncs when it opens, half a minute after it wrote, when you leave it (a background
+task lets it finish), when you come back to it, and in background refresh when iOS allows.
+
 ## The screens
 
 On an iPhone, one stack: the home list, then a folder, a note or a view, each a screen of its
 own. A link followed in a note is a new screen, so Back returns; the one web view moves to the
 screen on top. On an iPad, or in a window as wide, the sidebar beside the note, as on the Mac.
 Pull the list down, or tap the sync state, to sync. For screenshots, `-NTView todos|calendar|
-weekly|agents`, `-NTFolder <path>` and `-NTOpen <path>` open a screen at launch.
+weekly|agents|settings`, `-NTFolder <path>` and `-NTOpen <path>` open a screen at launch, and
+`-NTCapture today` the capture sheet.
 
 ## Layout
 
@@ -61,13 +81,14 @@ Nt/Git/LibGit.swift  the repository's plumbing on libgit2, as nt's sync asks for
 Nt/Git/Remote.swift  ssh: the key libgit2 signs in with, and the host keys it trusts
 Nt/Git/DeployKey.swift  the phone's key: CryptoKit, the Keychain, OpenSSH's formats
 Nt/Views/            the first run; the home list and search; the two layouts (the iPhone's
-                     stack with its folder and note screens, the iPad's split view)
+                     stack with its folder and note screens, the iPad's split view); the
+                     keyboard bar and photos; the capture sheet; Settings and the key; the mark
 NtTests/             Swift Testing: LibGit against repositories on disk with nt's sync deciding,
                      the key's formats, ssh against a test sshd (make ios-ssh-test)
 ```
 
-`../shared` is compiled in with the Mac app: Brand, the model (Workspace, NT, RepoIndex, …), the
-editor's web view and the Todos, Calendar and Agents views. The editor page is the Mac app's
+`../shared` is compiled in with the Mac app: Brand, the model (Workspace, NT, RepoIndex, Capture,
+…), the editor's web view and the Todos, Calendar and Agents views. The editor page is the Mac app's
 (`app/macos/Nt/Resources/editor`, `make mac-editor`), with the design system's fonts.
 
 ## Third-party code

@@ -25,6 +25,35 @@ final class Workspace {
         case weekly
         case agents
         case note(String)
+        case folder(String) // a folder in the sidebar: where a new note goes; the note stays
+    }
+
+    /// Ask is a question put to the person before nt writes: a name for a new note or folder,
+    /// or a new name; the folder to move to; whether to delete.
+    enum Ask: Identifiable, Equatable {
+        case newNote(String) // in this folder; "" is nt's default folder
+        case newFolder(String) // in this folder; "" is the root
+        case rename(String)
+        case move(String)
+        case delete(String)
+
+        var id: String { "\(self)" }
+    }
+
+    /// Removal is what nt rm deletes, or would: nt rm --json.
+    struct Removal: Decodable, Equatable, Sendable {
+        let rel: String
+        let folder: Bool
+        var title: String?
+        var images: [String]?
+        let links: Int
+    }
+
+    /// Plan is what a move or a rename did: nt mv --json, nt rename --json.
+    struct Plan: Decodable, Equatable, Sendable {
+        let from: String
+        let to: String
+        let folder: Bool
     }
 
     enum PaletteMode: Equatable {
@@ -70,6 +99,9 @@ final class Workspace {
     var calendarDay = "" // the day the calendar shows; "" for today
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
+    var editing = false // the note has the keyboard: the iPhone and iPad show the keyboard bar
+    var undoable = false // the note has something to undo, or to redo, for the keyboard bar
+    var redoable = false
     var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedFolders") ?? []) {
         didSet { UserDefaults.standard.set(Array(expanded), forKey: "expandedFolders") }
     }
@@ -85,13 +117,19 @@ final class Workspace {
     var active = true // the app is in front; the menu bar's alert mark blinks only while it is not
     var settings: [ConfigSetting] = [] // nt config, for Settings
     var settingsProblem = ""
+    var ask: Ask? // a question before nt writes, shown by Asking
     #if !os(macOS)
     var preview: URL? // a file a link points at, shown with Quick Look
+    var picking = false // the keyboard bar asked for a photo
     #endif
 
     /// navigate shows a note the person asked for on the iPhone: a screen of its own on the
     /// stack, so Back returns. Unset, on the Mac and the iPad, the note opens in place.
-    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int) -> Void)?
+    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int, _ end: Bool) -> Void)?
+    /// relocated and removed keep the iPhone's screens on what they showed after a move, a
+    /// rename or a delete: a screen follows its note or folder, or goes with it.
+    @ObservationIgnored var relocated: ((_ from: String, _ to: String) -> Void)?
+    @ObservationIgnored var removed: ((_ path: String) -> Void)?
 
     @ObservationIgnored let nt: NT?
     @ObservationIgnored private(set) var editor: NoteEditor?
@@ -104,6 +142,9 @@ final class Workspace {
     @ObservationIgnored private var reportCache: [String: [AgentReport]] = [:]
     @ObservationIgnored private var quitting = false
     @ObservationIgnored private var opening = 0 // counts opens, so the last one asked for wins
+    #if !os(macOS)
+    @ObservationIgnored private var syncSoon: Task<Void, Never>?
+    #endif
 
     #if os(macOS)
     init(nt: NT? = NT.locate()) {
@@ -196,6 +237,7 @@ final class Workspace {
         case .today: Task { await openToday() }
         case .weekly: Task { await openWeekly() }
         case .note(let path): show(path)
+        case .folder: selection = sel
         case .todos, .calendar, .agents:
             Task {
                 await editor?.save()
@@ -254,7 +296,7 @@ final class Workspace {
 
     /// go shows a note the person asked for: a link followed, a todo's note, a day's journal.
     func go(_ path: String, anchor: String = "", line: Int = 0) {
-        if let navigate { navigate(path, anchor, line) } else { show(path, anchor: anchor, line: line) }
+        if let navigate { navigate(path, anchor, line, false) } else { show(path, anchor: anchor, line: line) }
     }
 
     func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) async {
@@ -276,7 +318,7 @@ final class Workspace {
             say("\(path) cannot be read: is it still there?")
             return
         }
-        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text) || !Self.writes, backlinks: backlinks(path))
+        let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
         selection = selectionFor(path)
@@ -285,14 +327,6 @@ final class Workspace {
             expanded.insert(dir)
         }
     }
-
-    /// writes says whether the app writes notes: the iOS app reads them until it can write them
-    /// (docs/design.md §9, step 3).
-    #if os(macOS)
-    nonisolated static let writes = true
-    #else
-    nonisolated static let writes = false
-    #endif
 
     /// readOnly says whether a note is a digest, the day's or the week's, which nt writes again
     /// whenever it changes, so an edit would not last.
@@ -387,6 +421,22 @@ final class Workspace {
         await todo(["add", "--", text])
     }
 
+    #if !os(macOS)
+    /// wrote: nt wrote to the clone (a todo ticked or added, a line captured). The app reads the
+    /// notes again, the note on screen too, and half a minute later a sync follows, as after a
+    /// save; the Mac has its watcher and nt's sync timer for this.
+    func wrote() async {
+        if let nt { try? await reindex(nt) }
+        await reloadIfChanged()
+        syncSoon?.cancel()
+        syncSoon = Task {
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
+            await syncNow()
+        }
+    }
+    #endif
+
     @discardableResult
     private func todo(_ args: [String]) async -> Bool {
         guard let nt else { return false }
@@ -396,6 +446,9 @@ final class Workspace {
             let out = try await nt.run(["todo"] + args + ["--json"])
             ok = out.status == 0
             if !ok { say(NTError.message(out.stderr)) }
+            #if !os(macOS)
+            if ok { await wrote() }
+            #endif
         } catch {
             say(error.localizedDescription)
         }
@@ -447,9 +500,11 @@ final class Workspace {
 
     // MARK: Writing
 
-    /// newFolder is where ⌘N puts a note: the folder of the note on screen, unless that is the
-    /// journals', the agents' or the weekly folder or the root; then nt's default folder ("").
+    /// newFolder is where ⌘N puts a note: the folder selected in the sidebar, else the folder of
+    /// the note on screen, unless that is the journals', the agents' or the weekly folder or the
+    /// root; then nt's default folder ("").
     var newFolder: String {
+        if case .folder(let f) = selection { return f }
         guard let n = note, let ix = index else { return "" }
         return Self.newFolder(for: n.path, folders: ix.folders)
     }
@@ -469,11 +524,130 @@ final class Workspace {
             var args = ["n", "--json", "--", title.trimmingCharacters(in: .whitespaces)]
             if !folder.isEmpty { args.append(folder) }
             let c = try await nt.json(Created.self, args)
-            try? await reindex(nt)
-            await open(c.rel, end: true)
+            await afterWrite()
+            if let navigate { navigate(c.rel, "", 0, true) } else { await open(c.rel, end: true) }
         } catch {
             say(error.localizedDescription)
         }
+    }
+
+    // MARK: Notes and folders
+
+    /// fixed says whether nt keeps path where it is: the journals, the agents' reports and the
+    /// weekly digests, and their folders (docs/format.md §13).
+    func fixed(_ path: String) -> Bool {
+        guard let f = index?.folders else { return true }
+        return [f.daily, f.agents, f.weekly].contains { !$0.isEmpty && (path == $0 || path.hasPrefix($0 + "/")) }
+    }
+
+    /// deletable says whether path may be deleted: anything but the root and the journals', the
+    /// agents' and the weekly folder themselves.
+    func deletable(_ path: String) -> Bool {
+        guard let f = index?.folders, !path.isEmpty else { return false }
+        return ![f.daily, f.agents, f.weekly].contains(path)
+    }
+
+    /// makeFolder makes a folder in parent ("" the root) with nt mkdir, and selects it.
+    @discardableResult
+    func makeFolder(_ name: String, in parent: String) async -> Bool {
+        let n = name.trimmingCharacters(in: .whitespaces)
+        guard let nt, !n.isEmpty else { return false }
+        struct Made: Decodable { let rel: String }
+        do {
+            let m = try await nt.json(Made.self, ["mkdir", "--json", parent.isEmpty ? n : parent + "/" + n])
+            await afterWrite()
+            if !parent.isEmpty { expanded.insert(parent) }
+            if navigate == nil { selection = .folder(m.rel) }
+            return true
+        } catch {
+            say(error.localizedDescription)
+            return false
+        }
+    }
+
+    /// rename gives a note a new title, and the file name that goes with it, or a folder a new
+    /// name, with nt rename, which fixes the links to it.
+    @discardableResult
+    func rename(_ path: String, to name: String) async -> Bool {
+        await relocate(["rename", "--json", "--", path, name.trimmingCharacters(in: .whitespaces)])
+    }
+
+    /// move moves a note or a folder into folder ("" the root) with nt mv, which fixes the links.
+    @discardableResult
+    func move(_ path: String, to folder: String) async -> Bool {
+        await relocate(["mv", "--json", "--", path, folder.isEmpty ? "/" : folder + "/"])
+    }
+
+    private func relocate(_ args: [String]) async -> Bool {
+        guard let nt else { return false }
+        guard await editor?.save() ?? true else {
+            say("\(title(note?.path ?? "")) is not saved, so nothing moves")
+            return false
+        }
+        do {
+            let p = try await nt.json(Plan.self, args)
+            func new(_ q: String) -> String {
+                q == p.from ? p.to : q.hasPrefix(p.from + "/") ? p.to + q.dropFirst(p.from.count) : q
+            }
+            await afterWrite()
+            expanded = Set(expanded.map(new))
+            recent = recent.map(new)
+            if case .folder(let f) = selection { selection = .folder(new(f)) }
+            relocated?(p.from, p.to)
+            if let n = note, new(n.path) != n.path { await open(new(n.path), reload: true) }
+            return true
+        } catch {
+            say(error.localizedDescription)
+            return false
+        }
+    }
+
+    /// removal is what deleting path takes with it, and how many notes link to it, for the
+    /// question before it.
+    func removal(_ path: String) async -> Removal? {
+        guard let nt else { return nil }
+        do {
+            return try await nt.json(Removal.self, ["rm", "--dry-run", "--json", "--", path])
+        } catch {
+            say(error.localizedDescription)
+            return nil
+        }
+    }
+
+    /// remove deletes a note, with the images only it uses, or an empty folder, with nt rm; git
+    /// keeps them.
+    @discardableResult
+    func remove(_ path: String) async -> Bool {
+        guard let nt else { return false }
+        guard await editor?.save() ?? true else {
+            say("\(title(note?.path ?? "")) is not saved, so nothing is deleted")
+            return false
+        }
+        do {
+            let r = try await nt.json(Removal.self, ["rm", "--json", "--", path])
+            await afterWrite()
+            removed?(path)
+            if selection == .folder(path) || selection == .note(path) { selection = nil }
+            if let n = note, n.path == path || n.path.hasPrefix(path + "/") {
+                note = nil
+                if navigate == nil { await openToday() }
+            }
+            say("Deleted " + (r.title ?? r.rel))
+            return true
+        } catch {
+            say(error.localizedDescription)
+            return false
+        }
+    }
+
+    /// afterWrite reads the notes again after nt wrote: the Mac's watcher would, a moment later;
+    /// the phone also syncs half a minute later.
+    private func afterWrite() async {
+        #if os(macOS)
+        if let nt { try? await reindex(nt) }
+        #else
+        await wrote()
+        #endif
     }
 
     /// toggleFocus turns focus mode on or off: the sidebar goes and the other paragraphs dim.
@@ -489,11 +663,18 @@ final class Workspace {
         if focusMode { editor?.focus() }
     }
 
-    /// settle saves the note and syncs what was saved: the person left the app.
+    /// settle saves the note and syncs what was saved: the person left the app. The phone syncs
+    /// whether or not anything was written, to leave the clone as the remote has it.
     func settle() async {
         guard let editor else { return }
         await editor.save()
+        #if os(macOS)
         editor.kick()
+        #else
+        syncSoon?.cancel()
+        while syncing { try? await Task.sleep(for: .milliseconds(200)) }
+        await syncNow()
+        #endif
     }
 
     /// finish saves the note before the app quits, and says whether it may. When nt cannot save

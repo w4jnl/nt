@@ -5,9 +5,27 @@ import SwiftUI
 
 /// Route is a screen on the iPhone's stack.
 enum Route: Hashable {
-    case todos, calendar, weekly, agents
+    case todos, calendar, weekly, agents, settings
     case folder(String)
-    case note(String, anchor: String = "", line: Int = 0)
+    case note(String, anchor: String = "", line: Int = 0, end: Bool = false) // end: a new note, the cursor at its end
+
+    /// moved is the route after from moved to to: a note or folder in what moved follows it.
+    func moved(_ from: String, _ to: String) -> Route {
+        func new(_ p: String) -> String { p == from ? to : p.hasPrefix(from + "/") ? to + p.dropFirst(from.count) : p }
+        switch self {
+        case .note(let p, let a, let l, let e): return .note(new(p), anchor: a, line: l, end: e)
+        case .folder(let p): return .folder(new(p))
+        default: return self
+        }
+    }
+
+    /// names says whether the route shows path or something in it.
+    func names(_ path: String) -> Bool {
+        switch self {
+        case .note(let p, _, _, _), .folder(let p): return p == path || p.hasPrefix(path + "/")
+        default: return false
+        }
+    }
 }
 
 @MainActor @Observable
@@ -29,21 +47,26 @@ struct StackLayout: View {
                     case .calendar: CalendarView()
                     case .weekly: WeeklyEmptyView()
                     case .agents: AgentsView()
+                    case .settings: SettingsScreen()
                     case .folder(let id): FolderScreen(id: id)
-                    case .note(let path, let anchor, let line): NoteScreen(path: path, anchor: anchor, line: line)
+                    case .note(let path, let anchor, let line, let end): NoteScreen(path: path, anchor: anchor, line: line, end: end)
                     }
                 }
         }
         .onAppear {
             let r = router
-            ws.navigate = { path, anchor, line in r.path.append(.note(path, anchor: anchor, line: line)) }
+            ws.navigate = { path, anchor, line, end in r.path.append(.note(path, anchor: anchor, line: line, end: end)) }
+            ws.relocated = { from, to in r.path = r.path.map { $0.moved(from, to) } }
+            ws.removed = { path in r.path.removeAll { $0.names(path) } }
             // for screenshots, as Workspace.start does on the iPad: -NTView todos, calendar,
-            // weekly or agents shows a view, -NTFolder <path> a folder, -NTOpen <path> a note
+            // weekly, agents or settings shows a view, -NTFolder <path> a folder, -NTOpen <path>
+            // a note
             let d = UserDefaults.standard
             switch d.string(forKey: "NTView") {
             case "todos": r.path.append(.todos)
             case "calendar": r.path.append(.calendar)
             case "agents": r.path.append(.agents)
+            case "settings": r.path.append(.settings)
             case "weekly": r.path.append(ws.weeklyPath.map { .note($0) } ?? .weekly)
             default: break
             }
@@ -62,17 +85,30 @@ struct FolderScreen: View {
         let node = ws.tree.find(id)
         List {
             ForEach(node?.children ?? []) { child in
-                if child.isFolder {
-                    NavigationLink(value: Route.folder(child.id)) { FolderLabel(node: child) }
-                } else {
-                    NavigationLink(value: Route.note(child.id)) { NoteRow(node: child) }
+                Group {
+                    if child.isFolder {
+                        NavigationLink(value: Route.folder(child.id)) { FolderLabel(node: child) }
+                    } else {
+                        NavigationLink(value: Route.note(child.id)) { NoteRow(node: child) }
+                    }
                 }
+                .itemActions(child.id, folder: child.isFolder)
             }
             .listRowBackground(Brand.surface)
         }
         .scrollContentBackground(.hidden)
         .background(Brand.ground)
         .navigationTitle(node?.name ?? (id as NSString).lastPathComponent)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    ItemMenu(path: id, folder: true)
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("New note, new folder, and more")
+            }
+        }
     }
 }
 
@@ -83,6 +119,8 @@ struct NoteScreen: View {
     let path: String
     let anchor: String
     let line: Int
+    var end = false
+    @State private var opened = false
 
     var body: some View {
         Group {
@@ -94,7 +132,13 @@ struct NoteScreen: View {
         .background(Brand.ground)
         .navigationTitle(ws.title(path))
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: path) { await ws.open(path, anchor: anchor, line: line) }
+        .toolbar { NoteMenu(path: path) }
+        .modifier(PhotoPicking())
+        .task(id: path) {
+            // a new note opens with the cursor at its end, the first time only
+            await ws.open(path, anchor: anchor, line: line, end: end && !opened)
+            opened = true
+        }
     }
 }
 
@@ -136,6 +180,8 @@ struct NoteDetail: View {
         .navigationTitle(ws.note.map { ws.title($0.path) } ?? "")
         .navigationSubtitle(ws.note.map { SidebarTree.ancestors($0.path).map { ($0 as NSString).lastPathComponent }.joined(separator: " › ") } ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { if let n = ws.note { NoteMenu(path: n.path) } }
+        .modifier(PhotoPicking())
     }
 }
 
@@ -150,5 +196,21 @@ extension SidebarTree {
             return nil
         }
         return search(pinned + rest + rootNotes)
+    }
+}
+
+/// NoteMenu is the note's ⋯: rename, move and delete.
+struct NoteMenu: ToolbarContent {
+    let path: String
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                ItemMenu(path: path, folder: false)
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .accessibilityLabel("Rename, move or delete the note")
+        }
     }
 }

@@ -30,6 +30,7 @@ struct ContentView: View {
             }
         }
         .background(Brand.ground)
+        .modifier(Asking())
         .overlay {
             if let mode = ws.palette {
                 PaletteView(mode: mode)

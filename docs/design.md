@@ -120,6 +120,7 @@ Decisions taken with the user (2026-10-26):
 | `nt mv <note\|folder> <to> [--dry-run]` | Move a note or a folder; every link to it and in it is fixed, and the images only it uses go along (Folders, below) |
 | `nt rename <note\|folder> <new>` | A note's new title and the file name that goes with it, its date kept; a folder's new name |
 | `nt mkdir <folder>` | A new folder, with a `.gitkeep` so git keeps it while it is empty |
+| `nt rm <note\|folder> [--dry-run]` | Delete a note, with the images no other note uses and its line in the journal of its day, or an empty folder, as the browser's `D` does; `--json` says what goes and how many notes link to it |
 | `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
 | `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
@@ -460,9 +461,17 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
   the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
-- New note (⌘N) is the same field for a title: `nt n` makes the note in the folder of the one on
-  screen (nt's default folder from a journal, an agent report, a digest or the root), links it
-  from today's journal and opens it with the cursor at its end.
+- New note (⌘N) is the same field for a title: `nt n` makes the note in the folder selected in
+  the sidebar, else in the folder of the one on screen (nt's default folder from a journal, an
+  agent report, a digest or the root), links it from today's journal and opens it with the
+  cursor at its end.
+- **Notes and folders** (added 2026-10-28). A folder in the sidebar selects, as the place for
+  ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, Rename…,
+  Move… and Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note… and
+  New Folder… at the root. They ask first, in an alert or a sheet of folders (a name that is no
+  folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
+  a delete says what goes with it and how many notes link to it. The journals, the agents'
+  reports and the digests are not renamed or moved.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
 
@@ -678,6 +687,23 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     top. On the Mac and the iPad it opens in place.
   - The page has a viewport and, under 600 px, a phone's margins and 17 px text.
   - Notes are read-only until writing (step 3); todos tick and add already, through nt.
+- **Writing (step 3).**
+  - The note saves through the core as on the Mac (compare-and-swap, the edit hold, conflict
+    copies); after a save, or a todo or a line written through nt, the phone syncs half a minute
+    later, and when the person leaves the app (a background task) and comes back to it;
+    `BGAppRefreshTask` syncs in between when iOS allows.
+  - The keyboard bar is the input accessory of WebKit's content view, in place of WebKit's own
+    (Previous, Next, Done). On a touch screen the page corrects and capitalises as the keyboard
+    does, and a link on the line being edited shows an "open" chip.
+  - A photo goes in as a JPEG through `nt paste --from`, which takes no HEIC.
+  - Settings shows the repository's settings (`.nt/config.toml`); the phone's own machine
+    settings are its name and its key, which a new key replaces at once.
+  - Notes and folders, as on the Mac: + on the home list (New Note at nt's default folder, New
+    Folder at the root) and in a folder screen; a long press on a row has Rename, Move and
+    Delete, and a note's ⋯ the same. A row swipes as in Mail: to the right Move and Rename, to
+    the left Delete, a full swipe the first of them (a delete still asks). On the iPhone a new note opens on a
+    screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not
+    tapped for), and a screen follows what it shows when it moves, or closes when it is deleted.
 - **Shared Swift.** `app/shared/` takes the Mac app's portable model and views. Small seams
   (`#if os`) cover:
   - Brand on UIKit;
@@ -774,7 +800,21 @@ Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
-Step 0, the design, is at its gate.
+Steps 0 to 2 done; step 3, writing, is at its gate.
+
+**8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
+every client, with no new view and no format change; the details are settled at a design gate
+when it starts.
+- **Tags as a search filter.** The tags are the ones docs/format.md §4 already defines: the
+  frontmatter's `tags` and inline `#tag` words outside code. `#docker` in a search (`nt s`, the
+  browser's search, the Mac app's ⌘P, the iOS search) finds the notes tagged docker, and with
+  words, the tagged notes that have them; `#work` also finds `work/q3`. A tag in the apps'
+  folded frontmatter line runs that search. Not built: a tags list in the sidebar or the home
+  list, a tag tree, renaming or merging tags, tag colours, completion.
+- **Todos by folder.** The Todos view in the browser, the Mac app and the iOS app gets a scope
+  over its list: All, then each top-level folder that has todos, as `nt todo <folder>` already
+  does. The order stays by due date. Todos get no category of their own: the folder of the
+  `todo.md` or note a todo is in is its place.
 
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.

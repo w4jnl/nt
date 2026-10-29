@@ -49,6 +49,8 @@ folders
                        links to it and in it are fixed, its images go along [--dry-run]
   rename <from> <new>  a note's new title and file name, or a folder's new name [--dry-run]
   mkdir <folder>       a new folder, kept by git while it is empty
+  rm <note|folder>     delete a note, with the images only it uses and its line in its day's
+                       journal, or an empty folder; git keeps them [--dry-run]
 
 todos
   todo [folder]        the open todos in every note, or under folder, overdue first [--done] [--all]
@@ -131,6 +133,8 @@ func Main(args []string) int {
 		return runMv(args[1:])
 	case "rename":
 		return runRename(args[1:])
+	case "rm":
+		return runRm(args[1:])
 	case "mkdir":
 		return runMkdir(args[1:])
 	case "theme":

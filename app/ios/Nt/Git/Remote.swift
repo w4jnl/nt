@@ -5,12 +5,29 @@ import Clibgit2
 import Foundation
 
 struct Remote: Sendable {
-    /// key signs in; nil until the phone has made one.
-    var key: DeployKey?
+    /// key is the key that signs in, read when a transfer asks for it, so a key made new in
+    /// Settings counts at once; nil until the phone has made one.
+    let key: @Sendable () -> DeployKey?
     /// comment ends the public key line: nt@<host>.
     var comment: String
     /// knownHosts is the file of the hosts trusted on first use.
     var knownHosts: URL
+
+    /// init signs in with the key in the Keychain.
+    init(comment: String, knownHosts: URL) {
+        self.init(key: { DeployKey.load() }, comment: comment, knownHosts: knownHosts)
+    }
+
+    /// init signs in with key, for tests.
+    init(key: DeployKey?, comment: String, knownHosts: URL) {
+        self.init(key: { key }, comment: comment, knownHosts: knownHosts)
+    }
+
+    init(key: @escaping @Sendable () -> DeployKey?, comment: String, knownHosts: URL) {
+        self.key = key
+        self.comment = comment
+        self.knownHosts = knownHosts
+    }
 
     /// github are the SHA-256 fingerprints of GitHub's ssh host keys, Ed25519, ECDSA and RSA,
     /// as GitHub publishes them (docs.github.com, GitHub's SSH key fingerprints).
@@ -78,7 +95,7 @@ final class Transfer {
     /// the same key would be refused again.
     private func credential(_ out: UnsafeMutablePointer<UnsafeMutablePointer<git_credential>?>?, _ user: UnsafePointer<CChar>?) -> Int32 {
         tries += 1
-        guard let key = remote.key else {
+        guard let key = remote.key() else {
             problem = "this phone has no ssh key yet"
             return GIT_EAUTH.rawValue
         }

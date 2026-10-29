@@ -9,7 +9,7 @@ import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { post } from "./bridge.js";
-import { normalize, ownLine, rebase, toggleTask } from "./edits.js";
+import { headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
 import { frontmatterRange, headingAt, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocusMode } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
@@ -23,19 +23,29 @@ let inflight = null;
 let seq = 0;
 let focusMode = false;
 let idle = 0;
+let undoable = "";
+
+// touch: an iPhone or iPad. The keyboard there corrects and capitalises as everywhere on the
+// device, and a link on the line being edited shows an "open" chip.
+const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
 function extensions(path, readOnly) {
   return [
-    noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode })),
+    noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     markdown({ base: markdownLanguage }),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
     drawSelection(),
-    EditorView.contentAttributes.of({ spellcheck: "false", autocorrect: "off", autocapitalize: "off" }),
+    EditorView.contentAttributes.of(
+      touch ? { spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" } : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" },
+    ),
     livePreview,
     EditorView.updateListener.of(changed),
+    EditorView.updateListener.of((u) => {
+      if (u.focusChanged) post({ type: "focus", on: u.view.hasFocus });
+    }),
     EditorView.domEventHandlers({ paste: pasted, dragover: dragging, drop: dropped }),
   ];
 }
@@ -47,6 +57,7 @@ const view = new EditorView({
 
 function changed(u) {
   if (!u.docChanged) return;
+  reportHistory();
   let mine = false;
   for (const tr of u.transactions) {
     if (!tr.docChanged || tr.annotation(fromDisk)) continue;
@@ -56,6 +67,29 @@ function changed(u) {
   if (mine) post({ type: "edit" });
   clearTimeout(idle);
   idle = setTimeout(report, 400);
+}
+
+// reportHistory tells the app whether there is something to undo or redo, for the keyboard bar.
+function reportHistory() {
+  const now = `${undoDepth(view.state) > 0} ${redoDepth(view.state) > 0}`;
+  if (now === undoable) return;
+  undoable = now;
+  post({ type: "history", undo: undoDepth(view.state) > 0, redo: redoDepth(view.state) > 0 });
+}
+
+// lines changes each line the selection touches with f, for the keyboard bar.
+function lines(f) {
+  if (view.state.readOnly) return;
+  const { from, to } = view.state.selection.main;
+  const doc = view.state.doc;
+  const changes = [];
+  for (let n = doc.lineAt(from).number; n <= doc.lineAt(to).number; n++) {
+    const l = doc.line(n);
+    const text = f(l.text);
+    if (text !== l.text) changes.push({ from: l.from, to: l.to, insert: text });
+  }
+  if (changes.length) view.dispatch({ changes, userEvent: "input" });
+  view.focus();
 }
 
 // report tells the app the word count and the links to check, once the typing pauses.
@@ -137,6 +171,7 @@ window.nt = {
     } else if (anchor) requestAnimationFrame(() => scrollToAnchor(anchor));
     else if (line > 0) requestAnimationFrame(() => goLine(line));
     report();
+    reportHistory();
   },
   line: goLine,
   backlinks(list) {
@@ -211,6 +246,20 @@ window.nt = {
   canUndo: () => undoDepth(view.state) > 0,
   canRedo: () => redoDepth(view.state) > 0,
   focus: () => view.focus(),
+
+  // The keyboard bar on iPhone and iPad: a task box, a heading, a link around the selection,
+  // the cursor for a photo, and done, which lets the keyboard go.
+  task: () => lines(taskLine),
+  heading: () => lines(headingLine),
+  link() {
+    if (view.state.readOnly) return;
+    const { from, to } = view.state.selection.main;
+    const text = view.state.sliceDoc(from, to);
+    view.dispatch({ changes: { from, to, insert: `[${text}]()` }, selection: { anchor: text ? from + text.length + 3 : from + 1 }, userEvent: "input" });
+    view.focus();
+  },
+  cursor: () => view.state.selection.main.head,
+  blur: () => view.contentDOM.blur(),
 };
 
 // lay puts theirs under the changes not yet saved; false when both changed the same line.

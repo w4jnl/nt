@@ -3,15 +3,13 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/move"
-	"github.com/w4jnl/nt/internal/vault"
+	"github.com/w4jnl/nt/internal/ops"
 )
 
 // nt mv <note|folder> <to> [--dry-run] [--json]: move a note or a folder; the links to it and in
@@ -30,7 +28,7 @@ func runMv(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	p, err := move.Move(v, source(v, pos[0]), pos[1], dry)
+	p, err := move.Move(v, ops.Source(v, pos[0]), pos[1], dry)
 	if err != nil {
 		return fail(fmt.Errorf("mv: %w", err))
 	}
@@ -53,7 +51,7 @@ func runRename(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	p, err := move.Rename(v, source(v, pos[0]), strings.Join(pos[1:], " "), dry)
+	p, err := move.Rename(v, ops.Source(v, pos[0]), strings.Join(pos[1:], " "), dry)
 	if err != nil {
 		return fail(fmt.Errorf("rename: %w", err))
 	}
@@ -85,21 +83,47 @@ func runMkdir(args []string) int {
 	return 0
 }
 
-// source is the repository path of the note or folder named on the command line: a path from
-// the root of the notes, else from the working directory.
-func source(v *vault.Vault, p string) string {
-	if filepath.IsAbs(p) {
-		return p
+// nt rm <note|folder> [--dry-run] [--json]: delete a note, with the images no other note uses
+// and its line in the journal of its day, or an empty folder, as the browser's D does; sync
+// commits it and git keeps the files.
+func runRm(args []string) int {
+	args, asJSON := takeBool(args, "--json")
+	args, dry := takeBool(args, "--dry-run")
+	pos, err := positional("rm", args)
+	if err != nil {
+		return fail(err)
 	}
-	if _, err := os.Stat(v.Abs(p)); err == nil {
-		return p
+	if len(pos) != 1 {
+		return fail(errors.New("rm: use nt rm <note|folder>; a folder must be empty"))
 	}
-	if abs, err := filepath.Abs(p); err == nil {
-		if _, err := os.Stat(abs); err == nil {
-			return abs
-		}
+	v, _, err := openVault()
+	if err != nil {
+		return fail(err)
 	}
-	return p
+	r, err := ops.Remove(v, ops.Source(v, pos[0]), dry)
+	if err != nil {
+		return fail(fmt.Errorf("rm: %w", err))
+	}
+	if asJSON {
+		return printJSON(r)
+	}
+	what := r.Rel
+	if r.Folder {
+		what += "/"
+	}
+	if n := len(r.Images); n > 0 {
+		what += " and " + plural(n, "image")
+	}
+	verb := "deleted "
+	if r.DryRun {
+		verb = "would delete "
+	}
+	line := verb + what
+	if r.Links > 0 {
+		line += "; " + plural(r.Links, "note") + " link to it"
+	}
+	fmt.Println(line)
+	return 0
 }
 
 // printPlan says what a move or a rename did, or would do: the files that moved and the notes

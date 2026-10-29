@@ -77,6 +77,12 @@ func TestAppsReadOneJSON(t *testing.T) {
 		{args: func(s side) []string {
 			return []string{"paste", filepath.Join(s.root, "homelab", "2026-10-21-nas.md"), "--from", filepath.Join(s.root, "work", "diagram.png"), "--json"}
 		}},
+		{args: func(side) []string { return []string{"mkdir", "--json", "projects"} }},
+		{args: func(side) []string { return []string{"rename", "--json", "work/net.md", "Network plan"} }},
+		{args: func(side) []string { return []string{"mv", "--json", "homelab/2026-10-21-nas.md", "projects/"} }},
+		{args: func(side) []string { return []string{"rm", "--dry-run", "--json", "projects/2026-10-21-nas.md"} }},
+		{args: func(side) []string { return []string{"rm", "--json", "projects/2026-10-21-nas.md"} }},
+		{args: func(side) []string { return []string{"rm", "--json", "work"} }},
 	}
 	for _, st := range steps {
 		use(cli)

@@ -29,13 +29,19 @@ struct SidebarView: View {
                 .tag(Workspace.Selection.weekly)
             Label("Agents", systemImage: "apple.terminal")
                 .tag(Workspace.Selection.agents)
-            Section("Folders") {
+            Section {
                 TreeRows(nodes: ws.tree.pinned)
                 if !ws.tree.pinned.isEmpty && !ws.tree.rest.isEmpty {
                     Divider()
                 }
                 TreeRows(nodes: ws.tree.rest)
                 TreeRows(nodes: ws.tree.rootNotes)
+            } header: {
+                Text("Folders")
+                    .contextMenu {
+                        Button("New Note…") { ws.ask = .newNote("") }
+                        Button("New Folder…") { ws.ask = .newFolder("") }
+                    }
             }
         }
         .listStyle(.sidebar)

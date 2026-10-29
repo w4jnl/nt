@@ -114,6 +114,26 @@ export function toggleTask(line, day) {
   return m[2] === " " ? `${m[1]}x${rest} done:${day}` : `${m[1]} ${rest}`;
 }
 
+const ITEM = /^(\s*)([-*+] |\d+[.)] )?(\[[ xX]\] )?(.*)$/;
+
+// taskLine is the keyboard bar's task: a line gets a box, "- [ ] " after its indent or "[ ] "
+// after the list marker it has; a task loses its box and stays a list item.
+export function taskLine(text) {
+  const [, indent, marker = "", box = "", rest] = ITEM.exec(text);
+  if (box) return indent + marker + rest;
+  return indent + (marker || "- ") + "[ ] " + rest;
+}
+
+// headingLine is the keyboard bar's heading: a line steps through ## and ### back to text; the
+// title's # steps to ##.
+export function headingLine(text) {
+  const m = /^(#{1,6}) (.*)$/.exec(text);
+  if (!m) return "## " + text.trimStart();
+  if (m[1].length === 2) return "### " + m[2];
+  if (m[1].length >= 3) return m[2];
+  return "## " + m[2];
+}
+
 // ownLine is the change that puts text on a line of its own at the line holding pos: in its
 // place when that line is blank, else after it. The cursor goes to the end of text.
 export function ownLine(doc, pos, text) {

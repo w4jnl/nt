@@ -1,8 +1,10 @@
 // Phone is what the app keeps for this phone (docs/design.md §9): the first run (the repository's
 // address, this device's name, the phone's key, the clone), then nt on the clone, whose notes the
 // shared Workspace shows as the Mac app's does.
+import BackgroundTasks
 import Foundation
 import Observation
+import UIKit
 
 @MainActor @Observable
 final class Phone {
@@ -33,17 +35,22 @@ final class Phone {
 
     var publicKey: String { key?.publicLine("nt@\(host)") ?? "" }
 
+    /// keyMade is the day this phone's key was made, as Settings says it.
+    var keyMade: Date? { UserDefaults.standard.object(forKey: "keyMade") as? Date }
+
+    /// makeKey makes the phone's key, or a new one in its place: the old one stops working here.
     func makeKey() {
         let k = DeployKey.make()
         do {
             try k.save()
             key = k
+            UserDefaults.standard.set(Date.now, forKey: "keyMade")
         } catch {
             problem = error.localizedDescription
         }
     }
 
-    private var gitRemote: Remote { Remote(key: key, comment: "nt@\(host)", knownHosts: place.knownHosts) }
+    private var gitRemote: Remote { Remote(comment: "nt@\(host)", knownHosts: place.knownHosts) }
 
     /// clone clones the notes into the app's folder and opens them.
     func clone() async {
@@ -78,6 +85,65 @@ final class Phone {
             problem = error.localizedDescription
         }
     }
+}
+
+// MARK: Sync in the background
+
+extension Phone {
+    /// refreshID is the background refresh's task, in Info.plist's BGTaskSchedulerPermittedIdentifiers.
+    static let refreshID = "nl.w4j.nt.ios.sync"
+
+    /// leave saves the note and syncs as the app goes to the background, in a background task
+    /// so iOS lets it finish, and asks for a background refresh later.
+    func leave() {
+        scheduleRefresh()
+        guard let ws = workspace else { return }
+        let app = UIApplication.shared
+        let box = TaskBox()
+        box.id = app.beginBackgroundTask(withName: "nt sync") {
+            MainActor.assumeIsolated {
+                app.endBackgroundTask(box.id)
+                box.id = .invalid
+            }
+        }
+        Task {
+            await ws.settle()
+            if box.id != .invalid { app.endBackgroundTask(box.id) }
+            box.id = .invalid
+        }
+    }
+
+    /// back syncs as the app comes to the front again.
+    func back() {
+        guard let ws = workspace else { return }
+        Task { await ws.syncNow() }
+    }
+
+    /// refresh is a background refresh iOS granted: nt starts on the clone if it has not, and
+    /// syncs.
+    func refresh(_ task: BGAppRefreshTask) {
+        scheduleRefresh()
+        nonisolated(unsafe) let t = task
+        let work = Task {
+            if let ws = workspace { await ws.syncNow() } else { await open() }
+            t.setTaskCompleted(success: !Task.isCancelled)
+        }
+        t.expirationHandler = { work.cancel() }
+    }
+
+    /// scheduleRefresh asks iOS for a background refresh in a quarter of an hour at the soonest;
+    /// iOS decides when, or whether.
+    func scheduleRefresh() {
+        guard cloned else { return }
+        let r = BGAppRefreshTaskRequest(identifier: Self.refreshID)
+        r.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(r)
+    }
+}
+
+@MainActor
+private final class TaskBox {
+    var id = UIBackgroundTaskIdentifier.invalid
 }
 
 /// background runs work off the main thread: libgit2 blocks while it talks to the remote.

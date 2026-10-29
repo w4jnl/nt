@@ -237,8 +237,8 @@ EOF
 report mbp--claude-code--infra--1a2b3c4d.md infra claude-code done "Terraform for the new cron host"
 report mbp--copilot-cli--website--5e6f7a8b.md website copilot-cli blocked "Waiting on the DNS change"
 "$BIN" digest >/dev/null
-git -C "$N" add -A >/dev/null && git -C "$N" commit -qm "the demo notes" >/dev/null
 "$BIN" week >/dev/null
+git -C "$N" add -A >/dev/null && git -C "$N" commit -qm "the demo notes" >/dev/null
 # the brand line's sync state, as a synced machine shows it
 mkdir -p "$D/state"
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)

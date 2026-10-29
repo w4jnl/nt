@@ -49,6 +49,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         web.backgroundColor = .clear
         web.scrollView.backgroundColor = .clear
         web.accessibilityLabel = "Note"
+        web.setKeyboardBar(KeyboardBar.host(workspace))
         #endif
         if let page = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "editor"),
            let resources = Bundle.main.resourceURL {
@@ -225,12 +226,35 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         }
     }
 
-    /// kick starts a sync now when something was saved since the last one.
+    /// kick starts a sync now when something was saved since the last one: nt _editor kick on
+    /// the Mac, the app's own sync on iPhone and iPad.
     func kick() {
         kickSoon?.cancel()
         guard wrote, !dirty, let nt = ws.nt else { return }
         wrote = false
+        #if os(macOS)
         Task { _ = try? await nt.run(["_editor", "kick"]) }
+        #else
+        _ = nt
+        Task { await ws.syncNow() }
+        #endif
+    }
+
+    // MARK: The keyboard bar (iPhone and iPad)
+
+    func task() { page("window.nt.task()") }
+    func heading() { page("window.nt.heading()") }
+    func link() { page("window.nt.link()") }
+    func undo() { page("window.nt.undo()") }
+    func redo() { page("window.nt.redo()") }
+
+    /// done lets the keyboard go.
+    func done() { page("window.nt.blur()") }
+
+    /// cursor is where the cursor is in the note, for a photo.
+    func cursor() async -> Int {
+        guard ready else { return 0 }
+        return (try? await call("return window.nt.cursor()")) as? Int ?? 0
     }
 
     // MARK: Page → Swift
@@ -256,6 +280,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             }
         case "stats":
             ws.words = body["words"] as? Int ?? 0
+        case "focus":
+            ws.editing = body["on"] as? Bool ?? false
+        case "history":
+            ws.undoable = body["undo"] as? Bool ?? false
+            ws.redoable = body["redo"] as? Bool ?? false
         case "toggle":
             if let line = body["line"] as? Int {
                 Task {
@@ -264,20 +293,21 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
                 }
             }
         case "image":
-            if let data = body["data"] as? String, let pos = body["pos"] as? Int {
+            if let b64 = body["data"] as? String, let data = Data(base64Encoded: b64), let pos = body["pos"] as? Int {
                 let name = body["name"] as? String ?? "image"
                 let mime = body["mime"] as? String ?? "image/png"
-                Task { await paste(name: name, mime: mime, base64: data, at: pos) }
+                Task { await paste(name: name, mime: mime, data: data, at: pos) }
             }
         default:
             break
         }
     }
 
-    /// paste saves an image pasted or dropped on the note with nt paste, beside the note, and puts
-    /// the line that shows it on a line of its own.
-    func paste(name: String, mime: String, base64: String, at pos: Int) async {
-        guard let nt = ws.nt, let note = ws.note, let root = ws.root, let data = Data(base64Encoded: base64) else { return }
+    /// paste saves an image pasted or dropped on the note, or picked from Photos or taken with the
+    /// camera, with nt paste, beside the note, and puts the line that shows it on a line of its
+    /// own.
+    func paste(name: String, mime: String, data: Data, at pos: Int) async {
+        guard let nt = ws.nt, let note = ws.note, let root = ws.root else { return }
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appending(path: "nt-paste-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }

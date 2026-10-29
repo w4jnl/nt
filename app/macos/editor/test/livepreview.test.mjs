@@ -19,11 +19,11 @@ import {
   setFocus,
 } from "../src/livepreview.js";
 
-function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [] } = {}) {
+function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [], touch = false } = {}) {
   let s = EditorState.create({
     doc,
     selection: { anchor: cursor },
-    extensions: [noteField.init(() => ({ path, broken: new Set(), focused: false })), markdown({ base: markdownLanguage }), frontmatterField],
+    extensions: [noteField.init(() => ({ path, broken: new Set(), focused: false, touch })), markdown({ base: markdownLanguage }), frontmatterField],
   });
   s = s.update({ effects: [setFocus.of(focused), setBroken.of(broken)] }).state;
   return s;
@@ -157,4 +157,12 @@ test("editor.css carries the design system's colours", () => {
     assert.equal(value(light, name), t.value.light, `${name} light`);
     assert.equal(value(dark, name), t.value.dark, `${name} dark`);
   }
+});
+
+test("a link on the line being edited gets an open chip on a touch screen, and only there", () => {
+  const doc = "See [the network](../work/net.md) and https://example.com today.\n\nNext line [x](a.md)";
+  const chips = (opts) => decos(buildDecorations(state(doc, opts))).filter((d) => d.widget === "OpenChip").map((d) => d.from);
+  assert.deepEqual(chips({ cursor: 2, focused: true, touch: true }), [33, 57]);
+  assert.deepEqual(chips({ cursor: 2, focused: true, touch: false }), []);
+  assert.deepEqual(chips({ cursor: 2, focused: false, touch: true }), []);
 });
