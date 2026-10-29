@@ -251,6 +251,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     /// done lets the keyboard go.
     func done() { page("window.nt.blur()") }
 
+    /// hearing shows the words being dictated that may still change, faintly at the cursor;
+    /// dictate puts settled ones in there.
+    func hearing(_ words: String) { page("window.nt.hearing(w)", ["w": words]) }
+    func dictate(_ words: String) { page("window.nt.dictate(w)", ["w": words]) }
+
     /// cursor is where the cursor is in the note, for a photo.
     func cursor() async -> Int {
         guard ready else { return 0 }
@@ -282,6 +287,9 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             ws.words = body["words"] as? Int ?? 0
         case "focus":
             ws.editing = body["on"] as? Bool ?? false
+            #if os(iOS)
+            if !ws.editing { ws.keyboardWent() }
+            #endif
         case "history":
             ws.undoable = body["undo"] as? Bool ?? false
             ws.redoable = body["redo"] as? Bool ?? false

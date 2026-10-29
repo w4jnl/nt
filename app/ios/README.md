@@ -17,6 +17,7 @@ and cmake (`brew install cmake`).
 make ios-build      # the core and libgit2 when missing, the project, a simulator build
 make ios-test       # the Swift tests in the simulator
 make ios-ssh-test   # ssh with the phone's key, against a throwaway sshd on 127.0.0.1
+make ios-voice      # speech to words in English, Dutch and Slovak, on the Mac (the simulator has no models)
 make ios-device     # build, install and launch on a connected iPhone or iPad
 make ios-testflight # archive and upload to App Store Connect, for TestFlight
 make ios-core       # rebuild nt for the phone after a change to the Go code
@@ -54,11 +55,24 @@ A note is written in place, and saved through nt as on the Mac (`nt _editor save
 after the typing stops, a save that lands only on the version it was read from, the edit hold
 while unsaved, a conflict copy when both changed the same line. The bar above the keyboard has a
 task box, a heading, a link, a photo (from the library or the camera, saved beside the note as a
-JPEG), undo, redo and done. The pencil at the foot of the home list adds a line to today, or a
+JPEG), the mic, undo, redo and done. The pencil at the foot of the home list adds a line to today, or a
 todo. + on the home list and in a folder makes a note or a folder there; a long press on a row,
 or a note's ⋯, renames, moves or deletes it (nt rename, mv and rm, which keep the links); a
 swipe to the right moves or renames, to the left deletes, as in Mail. The phone syncs when it opens, half a minute after it wrote, when you leave it (a background
 task lets it finish), when you come back to it, and in background refresh when iOS allows.
+
+## Voice
+
+The keyboard bar's mic dictates at the cursor: each piece goes in once the model has settled it,
+the words it may still change shown faintly there; a tap again, or letting the keyboard go,
+stops it, and holding it chooses the language, whose code shows under it. The mic in the
+capture sheet talks a note instead: it listens until stopped, and each pause adds what was said as a line to today's Log
+(`nt a`). The language, English, Nederlands or Slovenčina, is remembered on the device. Apple's
+SpeechAnalyzer does the work on the device: SpeechTranscriber for English, DictationTranscriber,
+the keyboard's model, for Dutch and Slovak; iOS downloads a language's model the first time it
+is used. Only the words are kept, never the sound. The simulator has no speech models, so
+`make ios-voice` runs the same Listener on the Mac, on a sentence in each language that `say`
+speaks.
 
 ## The screens
 
@@ -83,8 +97,10 @@ Nt/Git/DeployKey.swift  the phone's key: CryptoKit, the Keychain, OpenSSH's form
 Nt/Views/            the first run; the home list and search; the two layouts (the iPhone's
                      stack with its folder and note screens, the iPad's split view); the
                      keyboard bar and photos; the capture sheet; Settings and the key; the mark
+Nt/Voice/            speech to words (Listener, Mic), dictation at the cursor, Talk a note
 NtTests/             Swift Testing: LibGit against repositories on disk with nt's sync deciding,
-                     the key's formats, ssh against a test sshd (make ios-ssh-test)
+                     the key's formats, ssh against a test sshd (make ios-ssh-test), where a
+                     pause ends a spoken line
 ```
 
 `../shared` is compiled in with the Mac app: Brand, the model (Workspace, NT, RepoIndex, Capture,

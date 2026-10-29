@@ -10,7 +10,7 @@ struct HomeList: View {
     let stacked: Bool
     @State private var query = ""
     @State private var lines: [Workspace.SearchHit] = []
-    @State private var capturing = false
+    @State private var sheet: Sheet?
     @Environment(\.verticalSizeClass) private var height
     @State private var settings = false
 
@@ -68,7 +68,7 @@ struct HomeList: View {
             HStack {
                 SyncBadgeView()
                 Spacer()
-                Button { capturing = true } label: {
+                Button { sheet = .capture } label: {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 20))
                         .foregroundStyle(Brand.accent)
@@ -81,11 +81,22 @@ struct HomeList: View {
             .background(Brand.ground)
             .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
         }
-        .sheet(isPresented: $capturing) { CaptureSheet(workspace: ws) }
+        .sheet(item: $sheet) { s in
+            switch s {
+            case .capture: CaptureSheet(workspace: ws) { sheet = .talk }
+            case .talk: TalkSheet(workspace: ws)
+            }
+        }
         .onAppear {
             // for screenshots, as on the Mac: -NTCapture opens the capture sheet
-            if UserDefaults.standard.string(forKey: "NTCapture") != nil { capturing = true }
+            if UserDefaults.standard.string(forKey: "NTCapture") != nil { sheet = .capture }
         }
+    }
+
+    /// Sheet is what the foot's pencil opens: the capture sheet, from which the mic talks a note.
+    enum Sheet: Identifiable {
+        case capture, talk
+        var id: Self { self }
     }
 
     @ViewBuilder
