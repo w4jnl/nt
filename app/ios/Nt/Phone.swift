@@ -19,6 +19,7 @@ final class Phone {
     private(set) var workspace: Workspace?
     /// problem is the last thing that went wrong, as the person reads it.
     var problem: String?
+    @ObservationIgnored private var starting: Task<Workspace?, Never>?
 
     let place: Place
 
@@ -71,19 +72,65 @@ final class Phone {
         }
     }
 
-    /// open starts nt on the clone, once, and shows today and the sync state.
+    /// open is the app on screen: nt runs on the clone, started if a Shortcut has not started it
+    /// already, and it syncs.
     func open() async {
-        guard workspace == nil, cloned else { return }
+        guard let ws = await started() else { return }
+        await ws.syncNow()
+    }
+
+    /// started is the notes with nt running on the clone, started once: by the app on screen, or
+    /// by a Shortcut with the app off screen. Nil when there is no clone yet, or nt cannot start
+    /// (problem says why).
+    func started() async -> Workspace? {
+        guard cloned else { return nil }
+        let start = starting ?? Task { await self.start() }
+        starting = start
+        let ws = await start.value
+        if ws == nil { starting = nil } // Try again starts it again
+        return ws
+    }
+
+    private func start() async -> Workspace? {
         do {
             try place.configure(host: host)
             let core = try Core(place: place, git: LibGit(root: place.notes, author: host, remote: gitRemote))
             let ws = Workspace(nt: NT(core: core))
             workspace = ws
             await ws.start()
-            await ws.syncNow()
+            return ws
         } catch {
             problem = error.localizedDescription
+            return nil
         }
+    }
+}
+
+// MARK: Shortcuts and Siri
+
+extension Phone {
+    /// add adds text from outside the app (Shortcuts, Siri, Spotlight, the Action button) as the
+    /// capture sheet does: a line to today's journal under Log, or a todo to todo.md under
+    /// Inbox, due:fri in the text setting its date. It says where the text went, or throws why it
+    /// did not.
+    func add(_ text: String, todo: Bool) async throws -> Capture.Added {
+        guard cloned else { throw LibGit.failure("Your notes are not on this phone yet. Open nt and clone them first.") }
+        guard let ws = await started() else { throw LibGit.failure(problem ?? "nt did not start") }
+        let capture = Capture(workspace: ws)
+        capture.mode = todo ? .todo : .today
+        capture.text = text
+        guard await capture.submit(alternate: false), let added = capture.added else {
+            throw LibGit.failure(capture.problem.isEmpty ? "Nothing to add: the text is empty." : capture.problem)
+        }
+        return added
+    }
+
+    /// syncAdded syncs what add wrote. On screen the app syncs half a minute later, as after a
+    /// save; off screen it syncs now, in a background task, since iOS may suspend the app before
+    /// then.
+    func syncAdded() {
+        guard UIApplication.shared.applicationState != .active, let ws = workspace else { return }
+        whileAway { await ws.settle() }
     }
 }
 
@@ -98,6 +145,14 @@ extension Phone {
     func leave() {
         scheduleRefresh()
         guard let ws = workspace else { return }
+        whileAway {
+            await ws.stopDictating()
+            await ws.settle()
+        }
+    }
+
+    /// whileAway does work in a background task, so iOS lets it finish with the app off screen.
+    private func whileAway(_ work: @escaping @MainActor () async -> Void) {
         let app = UIApplication.shared
         let box = TaskBox()
         box.id = app.beginBackgroundTask(withName: "nt sync") {
@@ -107,8 +162,7 @@ extension Phone {
             }
         }
         Task {
-            await ws.stopDictating()
-            await ws.settle()
+            await work()
             if box.id != .invalid { app.endBackgroundTask(box.id) }
             box.id = .invalid
         }
@@ -126,7 +180,7 @@ extension Phone {
         scheduleRefresh()
         nonisolated(unsafe) let t = task
         let work = Task {
-            if let ws = workspace { await ws.syncNow() } else { await open() }
+            await open()
             t.setTaskCompleted(success: !Task.isCancelled)
         }
         t.expirationHandler = { work.cancel() }

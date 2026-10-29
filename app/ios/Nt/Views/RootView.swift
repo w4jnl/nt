@@ -7,28 +7,35 @@ struct RootView: View {
     @Environment(Phone.self) private var phone
 
     var body: some View {
-        if let ws = phone.workspace {
-            WorkspaceView()
-                .environment(ws)
-        } else if phone.cloned {
-            VStack(spacing: 14) {
-                if let p = phone.problem {
-                    Text(p)
-                        .foregroundStyle(Brand.ink)
-                        .multilineTextAlignment(.center)
-                        .textSelection(.enabled)
-                    Button("Try again") { Task { await phone.open() } }
-                } else {
-                    ProgressView()
-                }
+        Group {
+            if let ws = phone.workspace {
+                WorkspaceView()
+                    .environment(ws)
+            } else if phone.cloned {
+                starting
+            } else {
+                SetupView()
             }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Brand.ground)
-            .task { await phone.open() }
-        } else {
-            SetupView()
         }
+        // on screen it syncs, also when a Shortcut started nt with the app off screen
+        .task { await phone.open() }
+    }
+
+    private var starting: some View {
+        VStack(spacing: 14) {
+            if let p = phone.problem {
+                Text(p)
+                    .foregroundStyle(Brand.ink)
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                Button("Try again") { Task { await phone.open() } }
+            } else {
+                ProgressView()
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Brand.ground)
     }
 }
 
