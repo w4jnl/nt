@@ -800,7 +800,21 @@ Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
-Step 0, the design, is at its gate.
+Steps 0 to 2 done; step 3, writing, is at its gate.
+
+**8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
+every client, with no new view and no format change; the details are settled at a design gate
+when it starts.
+- **Tags as a search filter.** The tags are the ones docs/format.md §4 already defines: the
+  frontmatter's `tags` and inline `#tag` words outside code. `#docker` in a search (`nt s`, the
+  browser's search, the Mac app's ⌘P, the iOS search) finds the notes tagged docker, and with
+  words, the tagged notes that have them; `#work` also finds `work/q3`. A tag in the apps'
+  folded frontmatter line runs that search. Not built: a tags list in the sidebar or the home
+  list, a tag tree, renaming or merging tags, tag colours, completion.
+- **Todos by folder.** The Todos view in the browser, the Mac app and the iOS app gets a scope
+  over its list: All, then each top-level folder that has todos, as `nt todo <folder>` already
+  does. The order stays by due date. Todos get no category of their own: the folder of the
+  `todo.md` or note a todo is in is its place.
 
 ## Cutover checklist (end of phase 1)
 1. Turn off obsidian-git, or quit Obsidian. Do a last push of `<you>/obsidian`.
