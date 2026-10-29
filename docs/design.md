@@ -628,7 +628,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - **The keyboard bar's mic** dictates at the cursor: each piece goes in once the model has
     settled it, with a space where one is needed; the words it may still change show faintly
     at the cursor. A second tap, or letting the keyboard go, stops it; held, it chooses the
-    language.
+    language, whose code (EN, NL, SK) shows under it.
   - **The capture sheet's mic** talks a note instead of typing ("Talk a note"), after adding
     what was typed. It listens until stopped, and each pause (1.5 s with every word settled)
     adds what was said as a line to today's Log, through `nt a`. Done adds the last words,

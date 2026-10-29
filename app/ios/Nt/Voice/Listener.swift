@@ -41,13 +41,16 @@ enum Language: String, CaseIterable, Identifiable, Sendable {
         return mine + [Locale(identifier: usual)]
     }
 
+    /// key is where the language last chosen is kept, in the app's defaults.
+    static let key = "NTVoiceLanguage"
+
     static var remembered: Language {
         get {
-            if let l = UserDefaults.standard.string(forKey: "NTVoiceLanguage").flatMap(Language.init) { return l }
+            if let l = UserDefaults.standard.string(forKey: key).flatMap(Language.init) { return l }
             let first = Locale.preferredLanguages.first.map { Locale(identifier: $0).language.languageCode?.identifier ?? "" }
             return Language(rawValue: first ?? "") ?? .english
         }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: "NTVoiceLanguage") }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
     }
 }
 

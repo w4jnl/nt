@@ -65,8 +65,8 @@ task lets it finish), when you come back to it, and in background refresh when i
 
 The keyboard bar's mic dictates at the cursor: each piece goes in once the model has settled it,
 the words it may still change shown faintly there; a tap again, or letting the keyboard go,
-stops it, and holding it chooses the language. The mic in the capture sheet talks a note
-instead: it listens until stopped, and each pause adds what was said as a line to today's Log
+stops it, and holding it chooses the language, whose code shows under it. The mic in the
+capture sheet talks a note instead: it listens until stopped, and each pause adds what was said as a line to today's Log
 (`nt a`). The language, English, Nederlands or Slovenčina, is remembered on the device. Apple's
 SpeechAnalyzer does the work on the device: SpeechTranscriber for English, DictationTranscriber,
 the keyboard's model, for Dutch and Slovak; iOS downloads a language's model the first time it

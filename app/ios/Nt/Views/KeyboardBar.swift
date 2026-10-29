@@ -8,6 +8,7 @@ import UIKit
 
 struct KeyboardBar: View {
     @Environment(Workspace.self) private var ws
+    @AppStorage(Language.key) private var language = Language.remembered // chosen here, on Talk a note, or in the capture sheet
 
     var body: some View {
         HStack(spacing: 0) {
@@ -30,32 +31,39 @@ struct KeyboardBar: View {
         .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
     }
 
-    /// mic dictates at the cursor, or stops; held, it chooses the language.
+    /// mic dictates at the cursor, or stops; held, it chooses the language, whose code shows
+    /// under it.
     private var mic: some View {
         let listener = ws.dictation
         return Menu {
-            Picker("Language", selection: Binding(get: { Language.remembered }, set: { l in Task { await ws.dictate(in: l) } })) {
+            Picker("Language", selection: Binding(get: { language }, set: { l in Task { await ws.dictate(in: l) } })) {
                 ForEach(Language.allCases) { Text($0.name).tag($0) }
             }
         } label: {
-            Group {
-                switch listener.state {
-                case .preparing:
-                    ProgressView().controlSize(.small)
-                case .listening:
-                    Image(systemName: "mic.fill")
-                        .foregroundStyle(Brand.alert)
-                        .symbolEffect(.pulse, options: .repeating)
-                default:
-                    Image(systemName: "mic").foregroundStyle(Brand.accent)
+            VStack(spacing: 2) {
+                Group {
+                    switch listener.state {
+                    case .preparing:
+                        ProgressView().controlSize(.small)
+                    case .listening:
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(Brand.alert)
+                            .symbolEffect(.pulse, options: .repeating)
+                    default:
+                        Image(systemName: "mic").foregroundStyle(Brand.accent)
+                    }
                 }
+                .font(.system(size: 17))
+                .frame(height: 20)
+                Text(language.short)
+                    .font(Brand.mono(9, bold: true))
+                    .foregroundStyle(Brand.muted)
             }
-            .font(.system(size: 19))
             .frame(maxWidth: .infinity, minHeight: 44)
         } primaryAction: {
             Task { await ws.dictate() }
         }
-        .accessibilityLabel(listener.busy ? "Stop dictating" : "Dictate at the cursor")
+        .accessibilityLabel(listener.busy ? "Stop dictating" : "Dictate at the cursor, in \(language.name)")
     }
 
     private func key(_ label: String, _ symbol: String, enabled: Bool = true, tint: Color? = nil, _ action: @escaping () -> Void) -> some View {
