@@ -820,7 +820,8 @@ Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
-Steps 0 to 4 done; step 5, Shortcuts and Siri, is at its gate.
+Done: steps 0 to 5, and step 6 as far as TestFlight (`make ios-testflight`); the App Store
+later, if wanted.
 
 **8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
 every client, with no new view and no format change; the details are settled at a design gate
