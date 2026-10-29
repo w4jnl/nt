@@ -119,10 +119,10 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 		}
 	}
 	if rec.Created != "" {
-		r.Set("created", rec.Created)
+		r.Set("created", stamp(created))
 	}
 	if r.Get("ended") == "" && rec.Ended != "" {
-		r.Set("ended", rec.Ended) // set once: a session resumed after its end still adds its turns
+		r.Set("ended", stamp(parseTime(rec.Ended, now))) // set once: a session resumed after its end still adds its turns
 	}
 	r.Set("updated", later(r.Get("updated"), parseTime(rec.Updated, now)))
 	if !e.agentStatus {
@@ -192,13 +192,13 @@ func turnEnded(rec Record) bool {
 	return false
 }
 
-// minutes is seconds as whole minutes for the frontmatter, at least 1 when there were any; ""
-// (no key) for none.
+// minutes is seconds as whole minutes for the frontmatter, to the nearest; "" (no key) under
+// half a minute.
 func minutes(s int) string {
-	if s <= 0 {
-		return ""
+	if m := (s + 30) / 60; m > 0 {
+		return strconv.Itoa(m)
 	}
-	return strconv.Itoa(max(1, (s+30)/60))
+	return ""
 }
 
 var (

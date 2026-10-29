@@ -29,7 +29,7 @@ func TestImport(t *testing.T) {
 	v, state := testVault(t)
 	cwd := t.TempDir()
 	rec := Record{Version: 1, Agent: "claude-code", Session: "F0CECA08-e88a-4f70", Cwd: cwd, Branch: "main", Head: "1553630",
-		Model: "claude-fable-5-1", Created: "2026-10-29T13:47:44+01:00", Updated: "2026-10-29T13:47:44+01:00", State: "working"}
+		Model: "claude-fable-5-1", Created: "2026-10-29T13:47:44.512036+01:00", Updated: "2026-10-29T13:47:44.512036+01:00", State: "working"}
 	rel, ended, err := Import(v, state, rec, at("2026-10-29 13:48"))
 	if err != nil || ended {
 		t.Fatal(err, ended)
@@ -160,6 +160,14 @@ func TestImportStatusAndHost(t *testing.T) {
 		// a remote host's alias is the host, the created day the folder
 		if !strings.HasPrefix(rel, "agents/2026/2026-10-28/macmini--copilot-cli--api--") || r.Get("host") != "macmini" {
 			t.Errorf("%s: %s, host %q", c.name, rel, r.Get("host"))
+		}
+	}
+}
+
+func TestMinutes(t *testing.T) {
+	for s, want := range map[int]string{0: "", 1: "", 29: "", 30: "1", 89: "1", 95: "2", 710: "12"} {
+		if got := minutes(s); got != want {
+			t.Errorf("minutes(%d) = %q, want %q", s, got, want)
 		}
 	}
 }
