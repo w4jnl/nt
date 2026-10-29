@@ -37,6 +37,21 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
     struct List: Decodable {
         let todos: [Todo]
     }
+
+    /// folder is the top-level folder the todo is in, "" for the root's todo.md.
+    var folder: String { rel.firstIndex(of: "/").map { String(rel[..<$0]) } ?? "" }
+
+    /// scopes are what the Todos view can keep to besides every note: the top-level folders with
+    /// open todos, with how many, A to Z, as `nt todo <folder>` reads them; keep stays, even with
+    /// none left open.
+    static func scopes(_ todos: [Todo], keep: String = "") -> [(folder: String, open: Int)] {
+        var per: [String: Int] = [:]
+        for t in todos where !t.done && !t.folder.isEmpty {
+            per[t.folder, default: 0] += 1
+        }
+        if !keep.isEmpty, per[keep] == nil { per[keep] = 0 }
+        return per.keys.sorted { $0.lowercased() < $1.lowercased() }.map { ($0, per[$0] ?? 0) }
+    }
 }
 
 /// AgentReport is an agent session's report, from its frontmatter (docs/format.md §6).

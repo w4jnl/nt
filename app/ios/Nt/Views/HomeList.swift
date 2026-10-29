@@ -58,6 +58,13 @@ struct HomeList: View {
         // at the top, under the title, as designed (iOS 26 would put it at the bottom, where a
         // phone on its side has no room for it); on its side it scrolls away with the list
         .searchable(text: $query, placement: stacked ? .navigationBarDrawer(displayMode: upright ? .always : .automatic) : .sidebar, prompt: "Search notes")
+        .onChange(of: ws.searchAsked, initial: true) {
+            // a tag tapped in a note: its search here
+            if let q = ws.searchAsked {
+                query = q
+                ws.searchAsked = nil
+            }
+        }
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }

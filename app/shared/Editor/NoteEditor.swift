@@ -283,6 +283,8 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             } else if let path = body["path"] as? String {
                 ws.go(path)
             }
+        case "tag":
+            if let q = body["query"] as? String { ws.find(q) }
         case "stats":
             ws.words = body["words"] as? Int ?? 0
         case "focus":

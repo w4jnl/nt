@@ -178,6 +178,8 @@ html { -webkit-text-size-adjust: 100%; }
   padding-bottom: 10px;
   cursor: pointer;
 }
+#editor .cm-fm-tag { color: var(--accent); }
+#editor .cm-fm-tag:hover { text-decoration: underline; text-underline-offset: 3px; }
 #editor .cm-fm-none { height: 0; }
 
 #editor .cm-backlinks { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }

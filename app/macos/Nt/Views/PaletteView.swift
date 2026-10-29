@@ -64,7 +64,8 @@ struct PaletteView: View {
         }
         .onAppear {
             focused = true
-            query = UserDefaults.standard.string(forKey: "NTQuery") ?? ""
+            query = ws.searchAsked ?? UserDefaults.standard.string(forKey: "NTQuery") ?? ""
+            ws.searchAsked = nil
         }
         .onChange(of: query) { sel = 0 }
         .task(id: query) {
