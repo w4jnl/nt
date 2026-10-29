@@ -107,7 +107,7 @@ struct FolderScreen: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("New note, new folder, and more")
+                .accessibilityLabel("New note, folder or todo, and more")
             }
         }
     }

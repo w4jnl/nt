@@ -1,6 +1,7 @@
-// The questions before nt writes a note or a folder: a name for a new one or a new name, the
-// folder to move to, and whether to delete, saying what goes along and how many notes link to
-// it. ItemMenu is what can be done to a note or a folder, for its menus.
+// The questions before nt writes a note or a folder: a name for a new one or a new name, a new
+// todo for a folder's todo.md, the folder to move to, and whether to delete, saying what goes
+// along and how many notes link to it. ItemMenu is what can be done to a note or a folder, for
+// its menus.
 import SwiftUI
 
 struct Asking: ViewModifier {
@@ -12,7 +13,7 @@ struct Asking: ViewModifier {
         content
             .alert(title, isPresented: Binding(get: { showsAlert }, set: { if !$0 { ws.ask = nil } })) {
                 switch ws.ask {
-                case .newNote, .newFolder, .rename:
+                case .newNote, .newFolder, .newTodo, .rename:
                     TextField(placeholder, text: $name)
                     Button(action) { answer() }
                     Button("Cancel", role: .cancel) {}
@@ -47,7 +48,7 @@ struct Asking: ViewModifier {
     /// showsAlert: a name is asked for, or a delete once what it takes is known.
     private var showsAlert: Bool {
         switch ws.ask {
-        case .newNote, .newFolder, .rename: true
+        case .newNote, .newFolder, .newTodo, .rename: true
         case .delete: removal != nil
         default: false
         }
@@ -57,6 +58,7 @@ struct Asking: ViewModifier {
         switch ws.ask {
         case .newNote(let f): f.isEmpty ? "New note" : "New note in \(f)"
         case .newFolder(let f): f.isEmpty ? "New folder" : "New folder in \(f)"
+        case .newTodo(let f): "New todo in \(f)"
         case .rename(let p): p.hasSuffix(".md") ? "Rename the note" : "Rename \((p as NSString).lastPathComponent)"
         case .delete(let p): "Delete \(removal?.title.map { "“\($0)”" } ?? (p as NSString).lastPathComponent)?"
         default: ""
@@ -66,17 +68,20 @@ struct Asking: ViewModifier {
     private var placeholder: String {
         if case .rename(let p) = ws.ask, !p.hasSuffix(".md") { return "Name" }
         if case .newFolder = ws.ask { return "Name" }
+        if case .newTodo = ws.ask { return "Todo" }
         return "Title"
     }
 
     private var action: String {
         if case .rename = ws.ask { return "Rename" }
+        if case .newTodo = ws.ask { return "Add" }
         return "Create"
     }
 
     private var message: String {
         switch ws.ask {
         case .newNote: return "Its title; the file is named after it, with today's date."
+        case .newTodo(let f): return "It goes under Inbox in \(f)/todo.md; due:fri in the text sets its date."
         case .rename(let p): return p.hasSuffix(".md") ? "The title and the file name change; the links to it are fixed." : "The links into it are fixed."
         case .delete:
             guard let r = removal else { return "" }
@@ -99,6 +104,9 @@ struct Asking: ViewModifier {
             switch ask {
             case .newNote(let f): await ws.create(name, in: f)
             case .newFolder(let f): await ws.makeFolder(name, in: f)
+            case .newTodo(let f):
+                let text = name.trimmingCharacters(in: .whitespaces)
+                if !text.isEmpty, await ws.addTodo(text, in: f) { ws.say("Added to \(f)/todo.md · Inbox") }
             case .rename(let p): if !name.trimmingCharacters(in: .whitespaces).isEmpty { await ws.rename(p, to: name) }
             case .delete(let p): await ws.remove(p)
             default: break
@@ -158,8 +166,9 @@ struct MoveSheet: View {
     }
 }
 
-/// ItemMenu is what can be done to a note or a folder: in a folder, a new note or folder; and
-/// rename, move and delete where nt allows them.
+/// ItemMenu is what can be done to a note or a folder: in a folder, a new note or folder, and a
+/// todo for its todo.md (not in the journals', agents' or weekly folder); and rename, move and
+/// delete where nt allows them.
 struct ItemMenu: View {
     @Environment(Workspace.self) private var ws
     let path: String
@@ -169,6 +178,9 @@ struct ItemMenu: View {
         if folder {
             Button("New Note…") { ws.ask = .newNote(path) }
             Button("New Folder…") { ws.ask = .newFolder(path) }
+            if !ws.fixed(path) {
+                Button("New Todo…") { ws.ask = .newTodo(path) }
+            }
         }
         if !ws.fixed(path) {
             Button("Rename…") { ws.ask = .rename(path) }

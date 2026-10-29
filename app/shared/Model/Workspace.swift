@@ -33,6 +33,7 @@ final class Workspace {
     enum Ask: Identifiable, Equatable {
         case newNote(String) // in this folder; "" is nt's default folder
         case newFolder(String) // in this folder; "" is the root
+        case newTodo(String) // at the end of Inbox in this folder's todo.md
         case rename(String)
         case move(String)
         case delete(String)
