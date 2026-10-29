@@ -119,7 +119,8 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   Open, written by Claude Code or Copilot CLI: what was written at work goes only to the work
   machine's tool.
 - **Agents.** `nt install --hooks` gives every Claude Code and Copilot CLI session a report in
-  `agents/YYYY/YYYY-MM-DD/`; the skill teaches them to search your notes, add to the journal and
+  `agents/YYYY/YYYY-MM-DD/`, or [flok](https://github.com/w4jnl/flok) does, with what each turn
+  ran and where it waited, through `nt agent import`; the skill teaches them to search your notes, add to the journal and
   write their own Done, Decisions and Open.
 - **Sync.** `nt sync` commits, fetches, merges and pushes: on a timer, when the browser starts,
   and when nvim exits after a note was written. It never rebases, and it does not merge while a

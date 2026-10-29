@@ -28,27 +28,72 @@ func sessionFile(stateDir, agent, session string) string {
 	return filepath.Join(stateDir, "sessions", clean)
 }
 
-func rememberSession(stateDir, agent, session, rel string) error {
-	p := sessionFile(stateDir, agent, session)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+// entry is a session's line in the state folder's map: its report's path, then what nt knows of
+// who writes it, a word a line.
+type entry struct {
+	rel         string
+	flok        bool // flok imports the session (nt agent import): nt's hooks leave it alone
+	agentStatus bool // the agent wrote its status with nt agent write: an import keeps it
+}
+
+func readEntry(file string) entry {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return entry{}
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	e := entry{rel: strings.TrimSpace(lines[0])}
+	for _, l := range lines[1:] {
+		switch strings.TrimSpace(l) {
+		case "flok":
+			e.flok = true
+		case "agent-status":
+			e.agentStatus = true
+		}
+	}
+	return e
+}
+
+func (e entry) writeTo(file string) error {
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
-	return vault.WriteFile(p, []byte(rel+"\n"))
+	s := e.rel + "\n"
+	if e.flok {
+		s += "flok\n"
+	}
+	if e.agentStatus {
+		s += "agent-status\n"
+	}
+	return vault.WriteFile(file, []byte(s))
+}
+
+func readSession(stateDir, agent, session string) entry {
+	return readEntry(sessionFile(stateDir, agent, session))
+}
+
+func (e entry) write(stateDir, agent, session string) error {
+	return e.writeTo(sessionFile(stateDir, agent, session))
+}
+
+func rememberSession(stateDir, agent, session, rel string) error {
+	e := readSession(stateDir, agent, session)
+	e.rel = rel
+	return e.write(stateDir, agent, session)
 }
 
 func recallSession(stateDir, agent, session string) string {
-	b, err := os.ReadFile(sessionFile(stateDir, agent, session))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
+	return readSession(stateDir, agent, session).rel
 }
 
 // Apply records ev in its session's report at now and returns the report's repository path.
 // The first event of a session makes the report; a start after the session ended, or on a later
 // day, makes a new one that continues it, and ends the earlier one if it never ended. ended is
-// final and updated never moves back.
+// final and updated never moves back. A session flok imports is flok's: Apply leaves it alone.
 func Apply(v *vault.Vault, stateDir string, ev Event, now time.Time) (string, error) {
+	if e := readSession(stateDir, ev.Agent, ev.Session); e.flok {
+		return e.rel, nil
+	}
 	unlock, err := v.Lock()
 	if err != nil {
 		return "", err
@@ -235,18 +280,23 @@ var ErrNoReport = errors.New("no report for this session")
 
 // Find is the repository path of the report sel picks.
 func Find(v *vault.Vault, stateDir string, sel Selector) (string, error) {
+	rel, _, err := find(v, stateDir, sel)
+	return rel, err
+}
+
+// find is Find, with the map file that names the report.
+func find(v *vault.Vault, stateDir string, sel Selector) (rel, file string, err error) {
 	files, _ := filepath.Glob(filepath.Join(stateDir, "sessions", "*"))
-	best, bestRunning, bestAt := "", false, ""
+	best, bestFile, bestRunning, bestAt := "", "", false, ""
 	for _, f := range files {
 		agent, session, ok := strings.Cut(filepath.Base(f), "--")
 		if !ok || sel.Session != "" && session != sel.Session || sel.Agent != "" && sel.Session != "" && agent != sel.Agent {
 			continue
 		}
-		b, err := os.ReadFile(f)
-		if err != nil {
+		rel := readEntry(f).rel
+		if rel == "" {
 			continue
 		}
-		rel := strings.TrimSpace(string(b))
 		rb, err := os.ReadFile(v.Abs(rel))
 		if err != nil {
 			continue
@@ -257,13 +307,13 @@ func Find(v *vault.Vault, stateDir string, sel Selector) (string, error) {
 		}
 		running, at := r.Get("ended") == "", r.Get("updated")
 		if best == "" || running && !bestRunning || running == bestRunning && at > bestAt {
-			best, bestRunning, bestAt = rel, running, at
+			best, bestFile, bestRunning, bestAt = rel, f, running, at
 		}
 	}
 	if best == "" {
-		return "", ErrNoReport
+		return "", "", ErrNoReport
 	}
-	return best, nil
+	return best, bestFile, nil
 }
 
 // Write puts the agent's own account into a report: the Done, Decisions and Open sections of
@@ -273,7 +323,7 @@ func Write(v *vault.Vault, stateDir string, sel Selector, text, status, summary 
 	if status != "" && !valid(status) {
 		return "", fmt.Errorf("status is one of %s, not %q", strings.Join(Statuses, ", "), status)
 	}
-	rel, err := Find(v, stateDir, sel)
+	rel, file, err := find(v, stateDir, sel)
 	if errors.Is(err, ErrNoReport) {
 		ev := Event{Kind: "start", Agent: orWord(sel.Agent, "agent"), Session: sel.Session, Cwd: sel.Cwd}
 		if ev.Session == "" {
@@ -282,6 +332,7 @@ func Write(v *vault.Vault, stateDir string, sel Selector, text, status, summary 
 		if rel, err = Apply(v, stateDir, ev, now); err != nil {
 			return "", err
 		}
+		file = sessionFile(stateDir, ev.Agent, ev.Session)
 	} else if err != nil {
 		return "", err
 	}
@@ -303,6 +354,13 @@ func Write(v *vault.Vault, stateDir string, sel Selector, text, status, summary 
 	}
 	if status != "" {
 		r.Set("status", status)
+		// the agent's own status: flok's imports keep it
+		if e := readEntry(file); !e.agentStatus {
+			e.agentStatus = true
+			if err := e.writeTo(file); err != nil {
+				return "", err
+			}
+		}
 	}
 	if s := strings.TrimSpace(strings.SplitN(summary, "\n", 2)[0]); s != "" {
 		r.Set("summary", s)

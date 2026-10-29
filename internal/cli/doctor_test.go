@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/w4jnl/nt/internal/agents"
 )
 
 func TestHookChecks(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("NT_STATE", filepath.Join(dir, "state"))
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
 	t.Setenv("COPILOT_HOME", filepath.Join(dir, "copilot"))
 	nt := filepath.Join(dir, "bin", "nt")
@@ -28,7 +30,7 @@ func TestHookChecks(t *testing.T) {
 		})
 		return strings.Join(got, "\n")
 	}
-	if got := check(); !strings.HasPrefix(got, "warn hooks agent sessions get no reports") {
+	if got := check(); !strings.HasPrefix(got, "warn reports agent sessions get no reports: no report imported yet") {
 		t.Errorf("no hooks: %s", got)
 	}
 	if _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, false); err != nil {
@@ -39,6 +41,30 @@ func TestHookChecks(t *testing.T) {
 	}
 	if got := check(); got != "ok hooks Claude Code and Copilot CLI sessions get reports" {
 		t.Errorf("both hooked: %s", got)
+	}
+	// flok imports reports: the hooks leave its sessions to it, and without them all is well
+	if err := agents.MarkImported(filepath.Join(dir, "state"), time.Date(2026, 10, 29, 14, 5, 0, 0, time.Local)); err != nil {
+		t.Fatal(err)
+	}
+	if got := check(); got != "ok reports imported by flok, last at Thu 29 Oct 14:05\nok hooks Claude Code and Copilot CLI; they leave the sessions flok imports to flok" {
+		t.Errorf("imported and hooked: %s", got)
+	}
+	for _, remove := range []func() error{
+		func() error { _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, true); return err },
+		func() error { _, err := agents.CopilotHooks(agents.CopilotHooksPath(), nt, true); return err },
+	} {
+		if err := remove(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := check(); got != "ok reports imported by flok, last at Thu 29 Oct 14:05" {
+		t.Errorf("imported, no hooks: %s", got)
+	}
+	if _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agents.CopilotHooks(agents.CopilotHooksPath(), nt, false); err != nil {
+		t.Fatal(err)
 	}
 	// the binary the hooks run goes away, as when ~/.local/bin/nt is removed for Homebrew's
 	if err := os.Remove(nt); err != nil {

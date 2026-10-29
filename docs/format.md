@@ -156,8 +156,9 @@ type: daily
 ## 6. Agent reports
 
 - **One file per agent session.**
-  - The session's process is the only writer: the hook receiver, or the agent through `nt agent`.
+  - nt is the only writer: of flok's records of the session (`nt agent import`), of its own hooks' events until flok imports the session, and of the agent's own account (`nt agent write`).
   - The path is fixed by the date of the session's first event and never changes. A session that runs past midnight stays in its first day's folder.
+  - A session flok imports stays in one file: each record is the whole session.
   - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`). If the earlier one never ended, the writer ends it then: `ended` is its `updated`, its status is set as at an end, and its last log line links to the new file.
   - A writer that finds no report for the session (no hooks, or hooks added mid-session) starts one.
   - A session in a temporary folder (`/tmp`, `/var/tmp`, the system's temp folder) gets no report: it is a throwaway, such as a script's `claude -p` in a scratch folder.
@@ -186,8 +187,13 @@ type: daily
 | `summary` | string | one line, the outcome |
 | `tags` | list | optional |
 | `continues` | path | optional, the report this one resumes |
+| `turns` | number | optional, the turns the session took (from flok) |
+| `tools` | number | optional, the tools it ran |
+| `blocked_minutes` | number | optional, the minutes it waited on a person: a permission, a question |
+| `waited_minutes` | number | optional, the minutes it waited on background work |
 
 - The hooks set `in-progress` at the start. At the end a report still `in-progress` becomes `abandoned` when it never finished a turn, `failed` when the session ended on an error, else `done`; a status the agent wrote stays.
+- From flok's records: `blocked` while the session waits on a person, else `in-progress`; at the end as above, `abandoned` when it took no turn.
 - Once `ended` is set, nothing sets `in-progress` again; a late turn still adds its log line.
 
 **Body.**
@@ -204,7 +210,7 @@ type: daily
 ```
 
 - `## Done`, `## Decisions` and `## Open` belong to the agent: `nt agent write` replaces them.
-- `## Log` is appended to: `started in <cwd> (<branch>)`, one line per turn, and `ended`. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). A line that would repeat the log's last line, its minute included, is not added. Secrets and full transcripts do not belong in a report.
+- `## Log` holds `started in <cwd> (<branch>)`, one line per turn, and `ended`. From flok's records a turn's line has what happened in it on indented lines under it: the tools it ran (`  - Bash ×12, Read ×3`) and its events with their times (`  - 13:48 blocked: permission: Bash`, `asked: …`, `waited 12 min for …`, `error: …`, `compacted`), every line at most 200 characters. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). A line that would repeat the log's last line, its minute included, is not added. Secrets and full transcripts do not belong in a report.
 
 ## 7. Digest
 
