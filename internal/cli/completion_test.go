@@ -77,7 +77,7 @@ c nt config set s
 		"--sync --nvim --hooks --skill",
 		"bash zsh",
 		"obsidian",
-		"start turn end write",
+		"import write start turn end",
 		"blocked",
 		"add done undo due rm",
 		"fri",

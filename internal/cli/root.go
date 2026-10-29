@@ -59,8 +59,10 @@ todos
   todo done <todo>     check it; undo, rm, and due <todo> <when> too. <todo>: words or path:line
 
 agents
-  agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin)
+  agent import            flok's record of a session (JSON on stdin) into its report [--probe]
   agent write             the agent's own Done, Decisions and Open on stdin [--status s] [--summary text]
+  agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin);
+                          a session flok imports is left to flok
   digest [date]           write the day's agents/…/README.md from its reports and list them
   week [date|last]        compile the week's weekly/GGGG/GGGG-Www.md now; the machine with
                           weekly = true does it on every sync

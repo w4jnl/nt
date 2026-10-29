@@ -17,18 +17,65 @@ import (
 	"github.com/w4jnl/nt/skills"
 )
 
-// nt agent start|turn|end|write.
+// nt agent import|write|start|turn|end.
 func runAgent(args []string) int {
 	if len(args) == 0 {
-		return fail(errors.New("agent: use start, turn, end (hooks) or write"))
+		return fail(errors.New("agent: use import (flok), write, or start, turn, end (hooks)"))
 	}
 	switch args[0] {
+	case "import":
+		return runAgentImport(args[1:])
 	case "start", "turn", "end":
 		return runAgentHook(args[0], args[1:])
 	case "write":
 		return runAgentWrite(args[1:])
 	}
-	return fail(fmt.Errorf("agent: unknown %q: use start, turn, end or write", args[0]))
+	return fail(fmt.Errorf("agent: unknown %q: use import, write, start, turn or end", args[0]))
+}
+
+// nt agent import [--probe]: flok's record of one agent session, JSON on stdin, written as the
+// session's report (agents.Import). It prints nothing and exits 0; on a failure it says why on
+// one line and exits 1, or 2 for a record newer than this nt. A session in a temporary folder is
+// skipped. The end of a session starts a sync. --probe prints the newest record version nt reads.
+func runAgentImport(args []string) int {
+	args, probe := takeBool(args, "--probe")
+	if _, err := positional("agent import", args); err != nil {
+		return fail(err)
+	}
+	if probe {
+		fmt.Println(agents.RecordVersion)
+		return 0
+	}
+	if stdinIsTerminal() {
+		return report(errors.New("agent import: give flok's session record on stdin"))
+	}
+	b, err := io.ReadAll(io.LimitReader(os.Stdin, 4<<20))
+	if err != nil {
+		return report(fmt.Errorf("agent import: %w", err))
+	}
+	rec, err := agents.ParseRecord(b)
+	if errors.Is(err, agents.ErrNewerRecord) {
+		return fail(fmt.Errorf("agent import: %w", err))
+	} else if err != nil {
+		return report(fmt.Errorf("agent import: %w", err))
+	}
+	if agents.Temporary(rec.Cwd) && os.Getenv("NT_REPORT_TEMP") == "" {
+		return 0 // a throwaway session, as the hooks have it
+	}
+	v, m, err := openVault()
+	if err != nil {
+		return report(fmt.Errorf("agent import: %w", err))
+	}
+	now := v.Now()
+	_, ended, err := agents.Import(v, config.StateDir(), rec, now)
+	if err != nil {
+		return report(fmt.Errorf("agent import: %w", err))
+	}
+	_ = agents.MarkImported(config.StateDir(), now)
+	if ended {
+		kickSync(m)
+	}
+	return 0
 }
 
 // nt agent start|turn|end [--agent name]: a hook. It reads the hook's payload on stdin, in

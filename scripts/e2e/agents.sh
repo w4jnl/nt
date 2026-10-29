@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Agent reports: Claude Code and Copilot CLI hook payloads into reports, nt agent write, the
 # digest, and 5 sessions reporting at once on two clones that sync all the while: every report
-# arrives whole on both sides, with no conflict copy. Then the hook and skill installers.
+# arrives whole on both sides, with no conflict copy. Then a session flok imports (nt agent
+# import), and the hook and skill installers.
 source "$(dirname "$0")/lib.sh"
 
 git init --quiet --bare -b main "$T/remote.git"
@@ -87,13 +88,38 @@ expect "the digest machine lists B's sessions too" 's5bbbbbb' "$(cat "$D")"
 B sync >/dev/null 2>&1
 expect "and B gets the digest by sync" 's5bbbbbb' "$(cat "$T/b/${D#"$T/a/"}")"
 
+# --- a session flok imports: the whole session on stdin each time, nt's hooks leaving it alone
+F() { NT_CONFIG=$T/a.toml NT_STATE=$T/f.state "$BIN" "$@"; }
+expect "agent import --probe says the record version" '^1$' "$(F agent import --probe)"
+rec() { # rec UPDATED ENDED STATE TURNS LOG
+  printf '{"version":1,"agent":"claude-code","session":"f0ceca08-e88a","cwd":"%s","branch":"feature","model":"claude-fable-5-1","created":"2026-10-29T13:47:44+01:00","updated":"%s","ended":"%s","state":"%s","turns":%s,"tools":4,"waited_s":710,"log":[%s],"later":{"x":1}}' "$P" "$1" "$2" "$3" "$4" "$5"; }
+turn='{"started":"2026-10-29T13:47:50+01:00","ended":"2026-10-29T13:52:10+01:00","text":"Yes, rework it.","tools":{"Bash":3,"Read":1},"events":[{"at":"2026-10-29T13:48:02+01:00","kind":"blocked","text":"permission: Bash"}]}'
+rc=0; out=$(rec 2026-10-29T13:47:44+01:00 "" working 0 "" | F agent import 2>&1) || rc=$?
+expect "an import prints nothing and exits 0" '^0:$' "$rc:$out"
+FR=$(find "$T/a/agents/2026/2026-10-29" -name 'a--claude-code--notetaking--f0ceca08.md' 2>/dev/null)
+expect "it makes the report in the folder of the day it was created" 'f0ceca08\.md$' "$FR"
+rec 2026-10-29T14:01:00+01:00 "" blocked 1 "$turn" | F agent import
+expect "a later record rewrites the Log" '^  - 13:48 blocked: permission: Bash$' "$(cat "$FR")"
+expect "and the live status" 'status: blocked' "$(cat "$FR")"
+claude Stop f0ceca08-e88a ',"last_assistant_message":"from the hook"' | F agent turn
+expect "nt's hook leaves a session flok imports alone" '^0$' "$(grep -c 'from the hook' "$FR")"
+rec 2026-10-29T14:06:00+01:00 2026-10-29T14:06:00+01:00 done 1 "$turn" | F agent import
+expect "the end ends it done" 'status: done' "$(cat "$FR")"
+expect "with the counts in the frontmatter" '^waited_minutes: 12$' "$(cat "$FR")"
+rc=0; out=$(printf '{"version":9,"agent":"a","session":"s"}' | F agent import 2>&1) || rc=$?
+expect "a newer record is refused with exit 2 and one line" '^2:nt: agent import: the record is newer' "$rc:$out"
+rc=0; printf '{"version":1,"agent":"claude-code","session":"tmp1","cwd":"/tmp/x"}' | NT_REPORT_TEMP= F agent import || rc=$?
+expect "a throwaway session is skipped, exit 0" '^0:$' "$rc:$(find "$T/a/agents" -name '*tmp1*')"
+expect "doctor says flok imports the reports" '^ok$' "$(F doctor --json 2>/dev/null | python3 -c 'import sys, json
+print(*[c["state"] for c in json.load(sys.stdin)["checks"] if c["check"] == "reports"])')"
+
 # --- the installers write into a home of their own
 H=$T/home; mkdir -p "$H/.claude"
 printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/opt/flok hook claude"}]}]}}' > "$H/.claude/settings.json"
 I() { HOME=$H XDG_DATA_HOME=$H/.local/share NT_CONFIG=$T/a.toml NT_STATE=$T/a.state "$BIN" "$@"; }
 check() { I doctor --json 2>/dev/null | python3 -c 'import sys, json
 print(*[c["state"] for c in json.load(sys.stdin)["checks"] if c["check"] == sys.argv[1]])' "$1"; }
-expect "doctor asks for the hooks" '^warn$' "$(check hooks)"
+expect "doctor says no session gets a report" '^warn$' "$(check reports)"
 I install --hooks --skill >/dev/null
 expect "install --hooks adds the three hooks" '^3$' "$(grep -c 'nt agent \(start\|turn\|end\)' "$H/.claude/settings.json")"
 expect "and keeps flok's" 'flok hook claude' "$(cat "$H/.claude/settings.json")"

@@ -218,8 +218,9 @@ func summaryCheck(m config.Machine, add func(name, state, format string, a ...an
 	}
 }
 
-// hookChecks reports the agent hooks: which agents' sessions get reports, and that the nt the
-// hooks run is there, since a hook that cannot run fails without a word.
+// hookChecks reports where agent sessions' reports come from: flok's imports (nt agent import),
+// else nt's own hooks, which flok replaces; and that the nt the hooks run is there, since a hook
+// that cannot run fails without a word.
 func hookChecks(add func(name, state, format string, a ...any)) {
 	ev, bins := agents.ClaudeHooked(agents.ClaudeSettingsPath())
 	copilot := agents.CopilotHooked(agents.CopilotHooksPath())
@@ -236,13 +237,19 @@ func hookChecks(add func(name, state, format string, a ...any)) {
 	if len(copilot) == len(agents.Kinds) {
 		who = append(who, "Copilot CLI")
 	}
+	last, imported := agents.LastImport(config.StateDir())
+	if imported {
+		add("reports", "ok", "imported by flok, last at %s", last.Local().Format("Mon 2 Jan 15:04"))
+	}
 	switch {
 	case len(ev) > 0 && len(ev) < len(agents.Kinds):
 		add("hooks", "warn", "only %s hooked in %s: nt install --hooks", strings.Join(ev, ", "), tilde(agents.ClaudeSettingsPath()))
+	case len(who) > 0 && imported:
+		add("hooks", "ok", "%s; they leave the sessions flok imports to flok", strings.Join(who, " and "))
 	case len(who) > 0:
 		add("hooks", "ok", "%s sessions get reports", strings.Join(who, " and "))
-	default:
-		add("hooks", "warn", "agent sessions get no reports: nt install --hooks")
+	case !imported:
+		add("reports", "warn", "agent sessions get no reports: no report imported yet, is flok's [notes] on? (or nt install --hooks)")
 	}
 }
 

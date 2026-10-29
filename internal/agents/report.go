@@ -1,6 +1,7 @@
 // Package agents keeps agent session reports (docs/format.md §6) and the day's digest (§7).
-// Hook payloads from Claude Code and Copilot CLI become one report per session, written under
-// the repository lock; the agent adds its own Done, Decisions and Open with nt agent write.
+// flok's session records (nt agent import), or until flok imports them nt's own hooks' payloads
+// from Claude Code and Copilot CLI, become one report per session, written under the repository
+// lock; the agent adds its own Done, Decisions and Open with nt agent write.
 package agents
 
 import (
@@ -14,10 +15,12 @@ import (
 // keys is the frontmatter in the order nt writes it (docs/format.md §6); other keys follow in
 // the order they came.
 var keys = []string{"type", "schema", "date", "created", "updated", "ended", "agent", "agent_version",
-	"model", "host", "session", "project", "cwd", "git_branch", "git_head", "status", "summary", "tags", "continues"}
+	"model", "host", "session", "project", "cwd", "git_branch", "git_head", "status", "summary", "tags", "continues",
+	"turns", "tools", "blocked_minutes", "waited_minutes"}
 
 // raw are the keys written as they are: dates, times, numbers and a flow list.
-var raw = map[string]bool{"schema": true, "date": true, "created": true, "updated": true, "ended": true, "tags": true}
+var raw = map[string]bool{"schema": true, "date": true, "created": true, "updated": true, "ended": true, "tags": true,
+	"turns": true, "tools": true, "blocked_minutes": true, "waited_minutes": true}
 
 // sections are the body's sections in order; Done, Decisions and Open are the agent's.
 var sections = []string{"Done", "Decisions", "Open", "Log"}
