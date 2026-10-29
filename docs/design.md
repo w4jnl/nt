@@ -832,7 +832,7 @@ Done: steps 0 to 5, and step 6 as far as TestFlight (`make ios-testflight`); the
 later, if wanted.
 
 **8. Tags and todos by folder** (planned 2026-10-29, after the iOS app; designed and built the
-same day, at its gate). Two small additions to every client, with no new view and no format
+same day, released with 0.7.0). Two small additions to every client, with no new view and no format
 change.
 - **Tags as a search filter.** The tags are the ones docs/format.md §4 already defines: the
   frontmatter's `tags` (a flow list, a block list or one value) and inline `#tag` words outside
