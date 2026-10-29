@@ -4,6 +4,24 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.6.0 (2026-10-29)
+
+Notes and folders made, renamed, moved and deleted in nt for Mac, `nt rm`, and search without
+rg. Underneath, the groundwork for nt on iPhone and iPad, which is in testing and not released
+yet.
+
+- **`nt rm <note|folder>`** deletes a note, with the images no other note uses and its line in
+  its day's journal, or an empty folder. `--dry-run` says what would go, `--json` also how many
+  notes link to it. The browser's `D` does the same; sync commits it, and git keeps the files.
+- **Notes and folders in nt for Mac:** a folder in the sidebar selects, as the place ⌘N makes a
+  note in. A right-click on a folder or a note has New Note, New Folder, Rename, Move and
+  Delete. A delete says what goes with it and which notes link to it; a move shows the folders.
+- **Search without rg:** `nt s` and the browser's search use rg when it is there, else nt's own
+  search, which finds the same lines (smart case, markdown only, hidden folders left out).
+- **Under the hood:** the operations the apps call live in one place (`internal/ops`), so the
+  command line, nt for Mac and the phone print the same JSON; sync reaches git through an
+  interface, so the phone can sync with libgit2. Nothing changes on the command line.
+
 ## 0.5.1 (2026-10-28)
 
 nt for Mac, the first release: `brew install --cask w4jnl/tap/nt-app`, or the DMG below. It

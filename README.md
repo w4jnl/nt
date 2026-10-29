@@ -19,8 +19,8 @@ other editor.
 
 ## Setup
 
-Current version: 0.5.1 · [release notes](CHANGELOG.md). Needs git, and `rg` and `fzf` for
-search and find; details under [Requirements](#requirements).
+Current version: 0.6.0 · [release notes](CHANGELOG.md). Needs git, and `fzf` for find, `rg`
+for faster search; details under [Requirements](#requirements).
 
 1. Install the binary. Homebrew, on macOS or Linux:
    ```sh
@@ -29,7 +29,7 @@ search and find; details under [Requirements](#requirements).
    Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
    (Linux and macOS, `amd64` and `arm64`, no Go, no root):
    ```sh
-   ver=0.5.1; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+   ver=0.6.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
    shasum -a 256 -c --ignore-missing sha256sums.txt
@@ -139,7 +139,7 @@ Every command that prints data takes `--json`.
 | `nt t` | open today's journal in `$EDITOR` |
 | `nt a "text"` | add a timestamped line to today's journal (`pbpaste \| nt a` works too) |
 | `nt n "Title" [folder]` | a new dated note, linked from today's journal |
-| `nt f` / `nt s <query>` | find a note with fzf; search with rg |
+| `nt f` / `nt s <query>` | find a note with fzf; search the text (with rg when installed) |
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
@@ -178,7 +178,8 @@ The mouse selects text in the note, resizes the list by dragging the divider, an
 ## Requirements
 
 - macOS or Linux, and git. The remote is reached over ssh, so a key that works without a prompt.
-- `rg` for search and `fzf` for `nt f`. Optional: `glow` for `v`, `chafa` for images over ssh.
+- `fzf` for `nt f`. Optional: `rg` for faster search (nt searches without it), `glow` for `v`,
+  `chafa` for images over ssh.
 - Images inside the note need a terminal with the kitty graphics protocol (Ghostty, kitty); in
   tmux, `set -g allow-passthrough on`. Other terminals show the alt text.
 - The agent reports need Claude Code or Copilot CLI.
@@ -191,8 +192,8 @@ follows them.
 
 - **The format** ([docs/format.md](docs/format.md)) is the contract for a notes repository:
   layout, names, frontmatter, journals, agent reports, digests, todos, moving and renaming, and
-  how clients write and sync. Any client can follow it: nt, the agents, a script, or a Mac or
-  iOS app later. A repository that follows it reads well without nt.
+  how clients write and sync. Any client can follow it: nt, nt for Mac, the agents, a script, or
+  the iPhone app in testing. A repository that follows it reads well without nt.
 - **How nt works** ([docs/design.md](docs/design.md)): sync, agents, the CLI and the browser,
   images, the code layout and the phases it is built in. [docs/research.md](docs/research.md) is
   the survey of notes tools behind it.
@@ -231,8 +232,9 @@ What that means in practice:
   says how it changes. Read the release notes before `brew upgrade`.
 - Bug reports with a reproduction are welcome; support is best effort.
 
-nt is at 0.5.1 (2026-10-28), the first release with nt for Mac. [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release,
-newest first; the same text is on each GitHub release.
+nt is at 0.6.0 (2026-10-29): notes and folders in nt for Mac, and `nt rm`.
+[`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release, newest first; the same text
+is on each GitHub release.
 
 ## Credits and license
 
