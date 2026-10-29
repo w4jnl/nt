@@ -4,6 +4,27 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.7.0 (2026-10-29)
+
+Tags as a search filter, todos by folder, and agent reports from flok.
+
+- **`#tag` in a search:** `nt s '#docker'`, the browser's `/`, and ⌘P and ⇧⌘F in nt for Mac find
+  the notes tagged docker, by their frontmatter's `tags` or a `#docker` in the text; `#work` also
+  finds `work/q3`. A tag alone lists each note once, newest first; with words, their lines in
+  those notes. In a shell, quote it.
+- **Tags in nt for Mac** are in the note's folded frontmatter line in accent; a click searches
+  for the tag.
+- **Todos by folder:** the browser's todos take `f`, a picker of every note and the top-level
+  folders with open todos; in nt for Mac, "from every note" in the Todos summary is the same as
+  a menu. A todo added there goes to that folder's `todo.md`.
+- **`nt agent import`:** [flok](https://github.com/w4jnl/flok), with its `[notes]` on, sends
+  each agent session's record, and nt writes the report from it: a Log line per turn with the
+  tools it ran and where it was blocked, asked or waited, and the counts `turns`, `tools`,
+  `blocked_minutes` and `waited_minutes` (optional keys; no format change). nt's own hooks
+  leave the sessions flok imports alone, and `nt doctor` says when flok last imported one.
+  Once flok reports every session on a machine, `nt uninstall --hooks` there; a later release
+  removes the hooks.
+
 ## 0.6.0 (2026-10-29)
 
 Notes and folders made, renamed, moved and deleted in nt for Mac, `nt rm`, and search without
