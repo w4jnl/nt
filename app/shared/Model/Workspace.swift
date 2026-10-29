@@ -121,6 +121,7 @@ final class Workspace {
     #if !os(macOS)
     var preview: URL? // a file a link points at, shown with Quick Look
     var picking = false // the keyboard bar asked for a photo
+    @ObservationIgnored let dictation = Listener() // the keyboard bar's mic
     #endif
 
     /// navigate shows a note the person asked for on the iPhone: a screen of its own on the

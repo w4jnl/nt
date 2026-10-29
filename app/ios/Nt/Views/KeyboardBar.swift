@@ -1,6 +1,6 @@
 // KeyboardBar is the bar above the keyboard while a note is written (docs/design.md §9): a task
-// box, a heading, a link, a photo, undo, redo, and done, which lets the keyboard go. It takes the
-// place of WebKit's own bar (Previous, Next, Done), which has nothing to do in a note.
+// box, a heading, a link, a photo, the mic, undo, redo, and done, which lets the keyboard go. It
+// takes the place of WebKit's own bar (Previous, Next, Done), which has nothing to do in a note.
 import ObjectiveC
 import PhotosUI
 import SwiftUI
@@ -18,6 +18,7 @@ struct KeyboardBar: View {
             .accessibilityLabel("Heading")
             key("Link", "link") { ws.editor?.link() }
             key("Photo", "photo") { ws.picking = true }
+            mic
             key("Undo", "arrow.uturn.backward", enabled: ws.undoable) { ws.editor?.undo() }
             key("Redo", "arrow.uturn.forward", enabled: ws.redoable) { ws.editor?.redo() }
             key("Done writing", "keyboard.chevron.compact.down", tint: Brand.accent) { ws.editor?.done() }
@@ -27,6 +28,34 @@ struct KeyboardBar: View {
         .padding(.horizontal, 6)
         .background(Brand.surface)
         .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
+    }
+
+    /// mic dictates at the cursor, or stops; held, it chooses the language.
+    private var mic: some View {
+        let listener = ws.dictation
+        return Menu {
+            Picker("Language", selection: Binding(get: { Language.remembered }, set: { l in Task { await ws.dictate(in: l) } })) {
+                ForEach(Language.allCases) { Text($0.name).tag($0) }
+            }
+        } label: {
+            Group {
+                switch listener.state {
+                case .preparing:
+                    ProgressView().controlSize(.small)
+                case .listening:
+                    Image(systemName: "mic.fill")
+                        .foregroundStyle(Brand.alert)
+                        .symbolEffect(.pulse, options: .repeating)
+                default:
+                    Image(systemName: "mic").foregroundStyle(Brand.accent)
+                }
+            }
+            .font(.system(size: 19))
+            .frame(maxWidth: .infinity, minHeight: 44)
+        } primaryAction: {
+            Task { await ws.dictate() }
+        }
+        .accessibilityLabel(listener.busy ? "Stop dictating" : "Dictate at the cursor")
     }
 
     private func key(_ label: String, _ symbol: String, enabled: Bool = true, tint: Color? = nil, _ action: @escaping () -> Void) -> some View {

@@ -142,6 +142,21 @@ export function ownLine(doc, pos, text) {
   return { changes: { from: l.to, insert: "\n" + text }, selection: { anchor: l.to + 1 + text.length } };
 }
 
+// dictated is the change that puts dictated words in at pos: a space before them unless the
+// line starts there, a space or an opening bracket is there already, or they start with
+// punctuation; a space after them when a word follows. The cursor goes after them; null when
+// there are no words.
+export function dictated(doc, pos, text) {
+  const words = text.trim().replace(/\s+/g, " ");
+  if (!words) return null;
+  const l = doc.lineAt(pos);
+  const before = doc.sliceString(l.from, pos);
+  const after = doc.sliceString(pos, l.to);
+  const lead = before !== "" && !/[\s(\[{"“‘]$/.test(before) && !/^[.,;:!?)\]}]/.test(words) ? " " : "";
+  const trail = /^[\p{L}\p{N}]/u.test(after) ? " " : "";
+  return { changes: { from: pos, insert: lead + words + trail }, selection: { anchor: pos + lead.length + words.length } };
+}
+
 // paragraphAt is the run of non-blank lines around pos, as line numbers [first, last]; a blank
 // line is a run of its own.
 export function paragraphAt(doc, pos) {

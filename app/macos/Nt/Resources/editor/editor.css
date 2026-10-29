@@ -124,6 +124,8 @@ html { -webkit-text-size-adjust: 100%; }
   vertical-align: 1px;
   cursor: pointer;
 }
+/* words being dictated that the model may still change: faint, at the cursor */
+#editor .cm-hearing { color: var(--ink-faint); }
 #editor .cm-link-broken { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
 #editor .cm-url { color: var(--ink-muted); font-size: 0.9em; }
 

@@ -63,6 +63,8 @@ targets:
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [nl.w4j.nt.ios.sync]
         NSCameraUsageDescription: Take a photo for the note you are writing; it is saved beside the note.
+        NSMicrophoneUsageDescription: Dictate into a note, or talk a note into today's journal. The words are made on this device; the sound is never kept.
+        NSSpeechRecognitionUsageDescription: Your speech is turned into words on this device, for the note you dictate. The sound is never kept.
         # export compliance, as declared in App Store Connect (2026-10-28): standard encryption
         # algorithms (ssh through libssh2 and mbedTLS), not on the App Store in France, which App
         # Store Connect records as no non-exempt encryption; so builds no longer ask

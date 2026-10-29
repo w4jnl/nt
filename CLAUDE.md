@@ -67,7 +67,8 @@ person's notes live in their own repository.
   `make mac-editor`: test and rebuild its editor page after a change under `app/macos/editor/src` (Node).
 - `make ios-build`, `make ios-test`, `make ios-device`, `make ios-testflight`: the iOS app (app/ios)
   in the simulator, its tests, on a connected iPhone, or uploaded for TestFlight; `make ios-core` rebuilds nt for the phone (gomobile) after a Go
-  change, `make ios-libgit2` its libgit2 (cmake), `make ios-ssh-test` its ssh against a test sshd.
+  change, `make ios-libgit2` its libgit2 (cmake), `make ios-ssh-test` its ssh against a test sshd,
+  `make ios-voice` its speech to words on the Mac (the simulator has no speech models).
 - `make e2e`: end-to-end suites in `scripts/e2e/` (isolated tmux servers).
 - `scripts/release.sh <version>`: tag a release and bump `Formula/nt.rb` in w4jnl/homebrew-tap.
   Run it on `main` after the PR with the CHANGELOG section has merged.

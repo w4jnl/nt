@@ -30,6 +30,10 @@
 	<string>public.app-category.productivity</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo for the note you are writing; it is saved beside the note.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dictate into a note, or talk a note into today's journal. The words are made on this device; the sound is never kept.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Your speech is turned into words on this device, for the note you dictate. The sound is never kept.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

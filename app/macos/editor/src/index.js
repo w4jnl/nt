@@ -9,8 +9,8 @@ import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { post } from "./bridge.js";
-import { headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
-import { frontmatterRange, headingAt, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocusMode } from "./livepreview.js";
+import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
+import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -42,6 +42,7 @@ function extensions(path, readOnly) {
       touch ? { spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" } : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" },
     ),
     livePreview,
+    hearingField,
     EditorView.updateListener.of(changed),
     EditorView.updateListener.of((u) => {
       if (u.focusChanged) post({ type: "focus", on: u.view.hasFocus });
@@ -260,6 +261,15 @@ window.nt = {
   },
   cursor: () => view.state.selection.main.head,
   blur: () => view.contentDOM.blur(),
+
+  // The keyboard bar's mic: hearing shows the words the model may still change, faintly at the
+  // cursor ("" when none); dictate puts settled words in at the cursor.
+  hearing: (words) => view.dispatch({ effects: setHearing.of(words) }),
+  dictate(words) {
+    if (view.state.readOnly) return;
+    const spec = dictated(view.state.doc, view.state.selection.main.head, words);
+    if (spec) view.dispatch({ ...spec, scrollIntoView: true, userEvent: "input.dictate" });
+  },
 };
 
 // lay puts theirs under the changes not yet saved; false when both changed the same line.

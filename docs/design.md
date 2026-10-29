@@ -624,16 +624,25 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 - **Settings:** the device's name, the repository and its key, the shared settings of
   `.nt/config.toml`, and the text size.
 - **Voice**, on the phone and offline.
-  - **Free with the keyboard:** its microphone works in the capture sheet and, once tested, in the
-    note.
-  - **A mic button**, beside the capture field and in the keyboard bar, dictates at the cursor.
-  - **"Talk a note"** keeps listening: each pause adds a timestamped line to today's Log.
-  - **Language:** English, Nederlands and Slovenčina, chosen in a switch that remembers the last
-    one, since speech is not told its language by itself.
-  - **The model:** Apple's `SpeechAnalyzer` with `SpeechTranscriber` where the device supports
-    the language (`supportedLocales`), else `DictationTranscriber`, the keyboard's model, which
-    covers all three.
+  - **Free with the keyboard:** its microphone works in the capture sheet and in the note.
+  - **The keyboard bar's mic** dictates at the cursor: each piece goes in once the model has
+    settled it, with a space where one is needed; the words it may still change show faintly
+    at the cursor. A second tap, or letting the keyboard go, stops it; held, it chooses the
+    language.
+  - **The capture sheet's mic** talks a note instead of typing ("Talk a note"), after adding
+    what was typed. It listens until stopped, and each pause (1.5 s with every word settled)
+    adds what was said as a line to today's Log, through `nt a`. Done adds the last words,
+    Cancel drops them; the lines added stay.
+  - **Language:** English, Nederlands and Slovenčina, chosen beside the capture sheet's mic, on
+    Talk a note, or in the bar mic's menu, since speech is not told its language by itself. The
+    last one is remembered on the device.
+  - **The model:** Apple's `SpeechAnalyzer` with `SpeechTranscriber` where the device has the
+    language exactly (`supportedLocales`; English), else `DictationTranscriber`, the keyboard's
+    model (Dutch and Slovak). iOS downloads a language's model the first time it is used; then
+    it all happens on the device.
   - **Only the words are kept,** never the sound: audio would only grow the repository.
+  - **Tests:** the simulator has no speech models, so `make ios-voice` runs the same `Listener`
+    on the Mac, on a sentence in each language spoken by `say`.
 
 **Sync.**
 - **When:** on opening, 30 s after the last save, when the app goes to the background (with a
@@ -800,7 +809,7 @@ Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
-Steps 0 to 2 done; step 3, writing, is at its gate.
+Steps 0 to 3 done; step 4, voice, is at its gate.
 
 **8. Tags and todos by folder** (planned 2026-10-29, after the iOS app). Two small additions to
 every client, with no new view and no format change; the details are settled at a design gate

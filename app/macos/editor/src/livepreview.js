@@ -16,6 +16,24 @@ export const setBacklinks = StateEffect.define();
 // setFocusMode turns focus mode on or off: the paragraph being written stays, the rest dims.
 export const setFocusMode = StateEffect.define();
 
+// setHearing gives the words being dictated that the model may still change, "" when none.
+export const setHearing = StateEffect.define();
+
+// hearingField shows them faintly at the cursor, until they are settled and put in the text.
+export const hearingField = StateField.define({
+  create: () => "",
+  update(v, tr) {
+    for (const e of tr.effects) if (e.is(setHearing)) v = e.value;
+    return v;
+  },
+  provide: (f) =>
+    EditorView.decorations.compute([f, "selection"], (state) => {
+      const words = state.field(f);
+      if (!words) return Decoration.none;
+      return Decoration.set([Decoration.widget({ widget: new TextWidget(" " + words, "cm-hearing"), side: 1 }).range(state.selection.main.head)]);
+    }),
+});
+
 // noteField is what the preview knows besides the text: the note's repository path, its broken
 // links, the focus and focus mode, and whether the screen is touched rather than clicked.
 export const noteField = StateField.define({

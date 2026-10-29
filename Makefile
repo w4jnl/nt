@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/w4jnl/nt/internal/cli.Version=$(VERSION)
 
-.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core ios-libgit2 ios-project ios-build ios-test ios-ssh-test ios-device ios-testflight
+.PHONY: build install test vet fmt brand e2e nt-universal mac-editor mac-project mac-build mac-test mac-run mac-release ios-core ios-libgit2 ios-project ios-build ios-test ios-ssh-test ios-voice ios-device ios-testflight
 
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o bin/$(BIN) ./cmd/$(BIN)
@@ -103,6 +103,17 @@ ios-test: ios-project
 # The phone's ssh in the simulator, against a throwaway sshd on 127.0.0.1 (scripts/ios-ssh-test.sh).
 ios-ssh-test: ios-project
 	IOS_SIM='$(IOS_SIM)' scripts/ios-ssh-test.sh
+
+# The phone's speech to words (app/ios/Nt/Voice) on the Mac, which has the speech models the
+# simulator lacks: a sentence each in English, Dutch and Slovak, spoken by say and played to it
+# as the microphone would be (scripts/ios-voice.swift).
+ios-voice:
+	@mkdir -p $(IOS)/build/voice
+	say -v Samantha -o $(IOS)/build/voice/en.aiff "Called the internet provider about the static address. They need the serial number of the router."
+	say -v Xander -o $(IOS)/build/voice/nl.aiff "Ik heb de provider gebeld over het vaste adres. Ze hebben het serienummer van de router nodig."
+	say -v Laura -o $(IOS)/build/voice/sk.aiff "Volal som poskytovateľovi kvôli pevnej adrese. Potrebujú sériové číslo routera."
+	swiftc -parse-as-library -target $(shell uname -m)-apple-macos26.0 -swift-version 6 -o $(IOS)/build/voice/check $(IOS)/Nt/Voice/Listener.swift scripts/ios-voice.swift
+	$(IOS)/build/voice/check $(IOS)/build/voice
 
 # Build, install and launch on the iPhone or iPad (unlocked; on a cable, or on Wi-Fi once
 # paired), signed with Local.xcconfig's team. The first device devicectl lists as reachable is

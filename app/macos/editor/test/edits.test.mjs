@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChangeSet, EditorState, Text } from "@codemirror/state";
-import { clashes, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, taskLine, toggleTask } from "../src/edits.js";
+import { clashes, dictated, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, taskLine, toggleTask } from "../src/edits.js";
 
 // edit is the text after the person's changes, and those changes as a ChangeSet from base.
 function edit(base, ...specs) {
@@ -106,6 +106,27 @@ test("ownLine puts an image on a line of its own", () => {
   spec = ownLine(doc, 12, img);
   assert.deepEqual(spec.changes, { from: 12, to: 12, insert: img });
   assert.equal(spec.selection.anchor, 12 + img.length);
+});
+
+test("dictated puts words in at the cursor with the spaces they need", () => {
+  const doc = Text.of(["- [ ] Call the", "Done.", ""]);
+  const put = (pos, words) => {
+    const spec = dictated(doc, pos, words);
+    return spec && doc.replace(spec.changes.from, spec.changes.from, Text.of([spec.changes.insert])).toString().split("\n")[doc.lineAt(pos).number - 1];
+  };
+  // after a word: a space before
+  assert.equal(put(14, "ISP about the IP"), "- [ ] Call the ISP about the IP");
+  // after a space, or at the start of a line: none; before a word: one after
+  assert.equal(put(6, "Please"), "- [ ] Please Call the");
+  assert.equal(put(15, "Then"), "Then Done.");
+  // punctuation goes on the word before
+  assert.equal(put(14, ", then"), "- [ ] Call the, then");
+  // the cursor lands after the words, not the space after them
+  const spec = dictated(doc, 15, "Then");
+  assert.equal(spec.selection.anchor, 15 + 4);
+  // on an empty line, nothing around them; no words, no change
+  assert.equal(put(21, "  a  new   line "), "a new line");
+  assert.equal(dictated(doc, 21, "   "), null);
 });
 
 test("paragraphAt is the run of lines around the cursor", () => {

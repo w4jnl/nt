@@ -107,6 +107,7 @@ extension Phone {
             }
         }
         Task {
+            await ws.stopDictating()
             await ws.settle()
             if box.id != .invalid { app.endBackgroundTask(box.id) }
             box.id = .invalid
