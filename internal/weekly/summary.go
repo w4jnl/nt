@@ -236,8 +236,8 @@ func RefreshSummaries(ctx context.Context, v *vault.Vault, tool Tool, stateDir s
 }
 
 // run asks the tool. claude reads the week on stdin, with no tools, no hooks and no session
-// kept; copilot gets it in the prompt. NT_NO_REPORT keeps nt's own hooks from reporting the call
-// as an agent session. The answer becomes one paragraph.
+// kept; copilot gets it in the prompt. It runs in a temp folder, so the call is no agent session
+// with a report (agents.Temporary). The answer becomes one paragraph.
 func run(ctx context.Context, tool Tool, in string) (string, error) {
 	var args []string
 	stdin := in
@@ -271,7 +271,6 @@ func run(ctx context.Context, tool Tool, in string) (string, error) {
 	defer stop()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir // not the notes: no AGENTS.md, nothing to read but the week
-	cmd.Env = append(os.Environ(), "NT_NO_REPORT=1")
 	cmd.Stdin = strings.NewReader(stdin)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut

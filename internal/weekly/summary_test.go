@@ -61,12 +61,12 @@ func openVault(t *testing.T) *vault.Vault {
 }
 
 // fakeTool puts a stand-in for claude and copilot on PATH: it keeps its stdin, its arguments
-// and NT_NO_REPORT in dir, and answers with a summary over a few lines, or fails when told to.
+// and the folder it ran in in dir, and answers with a summary over a few lines, or fails when told to.
 func fakeTool(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	script := "#!/bin/sh\ncat > \"" + dir + "/$(basename \"$0\").in\"\nprintf '%s\\n' \"$@\" > \"" + dir + "/$(basename \"$0\").args\"\n" +
-		"echo \"$NT_NO_REPORT\" > \"" + dir + "/$(basename \"$0\").noreport\"\n" +
+		"pwd > \"" + dir + "/$(basename \"$0\").pwd\"\n" +
 		"[ -f \"" + dir + "/fail\" ] && { echo 'not logged in' >&2; exit 1; }\n" +
 		"printf '**Done**\\n- The NAS got its disks.\\n- The domain was renewed.\\n**Decided**\\n- nothing\\n**Open**\\n- Order the cables.\\n'\n"
 	for _, name := range []string{"claude", "copilot"} {
@@ -123,7 +123,7 @@ func TestSummarize(t *testing.T) {
 	}
 	in, _ := os.ReadFile(filepath.Join(tools, "claude.in"))
 	args, _ := os.ReadFile(filepath.Join(tools, "claude.args"))
-	noReport, _ := os.ReadFile(filepath.Join(tools, "claude.noreport"))
+	ranIn, _ := os.ReadFile(filepath.Join(tools, "claude.pwd"))
 	if !strings.Contains(string(in), "NAS disks arrived") || strings.Contains(string(in), "Billing") {
 		t.Errorf("claude read on stdin:\n%s", in)
 	}
@@ -132,8 +132,8 @@ func TestSummarize(t *testing.T) {
 			t.Errorf("claude's arguments lack %q:\n%s", a, args)
 		}
 	}
-	if strings.TrimSpace(string(noReport)) != "1" {
-		t.Error("the tool runs without NT_NO_REPORT: nt's own hooks would report it as a session")
+	if !strings.HasPrefix(filepath.Base(strings.TrimSpace(string(ranIn))), "nt-summary-") {
+		t.Errorf("the tool ran in %s, not a temp folder of its own: flok would report it as a session", ranIn)
 	}
 
 	digest, _ := Text(v, at("2026-10-28 10:00"))

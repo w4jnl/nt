@@ -18,7 +18,7 @@ struct AgentsView: View {
                     .foregroundStyle(Brand.muted)
                     .padding(.bottom, 26)
                 if days.isEmpty {
-                    Text("No agent sessions yet. nt install --hooks reports Claude Code's and Copilot CLI's.")
+                    Text("No agent sessions yet. flok reports Claude Code's and Copilot CLI's, with its [notes] on.")
                         .font(.system(size: 14))
                         .foregroundStyle(Brand.muted)
                 }

@@ -223,7 +223,7 @@ func (b *browser) viewHint(view string) (what, how string) {
 		if isDir(b.v.Abs(b.v.AgentsRel(b.v.Day(b.v.Now())))) {
 			return "today's agent sessions", "enter opens them"
 		}
-		return "no agent sessions today", "nt install --hooks reports Claude Code's and Copilot CLI's"
+		return "no agent sessions today", "flok reports Claude Code's and Copilot CLI's, with its [notes] on"
 	}
 	return "", ""
 }

@@ -81,23 +81,16 @@ Decisions taken with the user (2026-10-26):
 ## 3. Agents (the contract for flok)
 
 **`nt agent import [--probe]`** (`internal/agents/import.go`, 2026-10-29). flok's record of one session, JSON on stdin, the whole session on every call (flok's `docs/notes.md`, "The record"); nt writes the session's report from it, so a missed call is mended by the next.
-- It prints nothing and exits 0; on a failure it says why on one line and exits 1, or 2 for a record newer than it reads. `--probe` prints the newest record version it reads (1). Fields it does not know are left alone. A session in a temporary folder is skipped, as below.
+- It prints nothing and exits 0; on a failure it says why on one line and exits 1, or 2 for a record newer than it reads. `--probe` prints the newest record version it reads (1). Fields it does not know are left alone. A session in a temporary folder (`/tmp`, `/var/tmp`, `$TMPDIR`) is skipped: a throwaway, such as a script's `claude -p` in a scratch folder or nt's weekly summary. `NT_REPORT_TEMP=1` imports it all the same; the end-to-end suites set it, since they run in a temp directory.
 - The first record makes the report in the folder of `created`'s day (the record's own offset, with `day_starts`), named for `host`: nt's own for `""`, else flok's alias for the remote host the agent runs on.
 - Every record rewrites the frontmatter and `## Log`: `model`, `cwd`, `git_branch`, `git_head`, `ended` (once), `updated` (never back), and the optional `turns`, `tools`, `blocked_minutes`, `waited_minutes`. Done, Decisions, Open, the summary and a status the agent wrote stay.
 - The status, unless the agent wrote one: `blocked` while flok's state is blocked, else `in-progress`; at the end `failed` on an error, `abandoned` when no turn ended (closed in its first), else `done`.
 - The Log: the start; a line per turn at the time its reply came, with the first line of the reply (`turn ended` without one), its tools (`Bash ×12, Read ×3`) and its events (blocked, asked, waited, error, compacted) on indented lines under it; a turn still running shows once something happened in it; the end. flok sends the latest 200 turns at most: the lines of the turns it no longer sends stay, as many of the oldest as `turns` less the turns sent.
-- The sessions map marks the session as flok's: `nt agent write` finds the report as before, and nt's own hooks leave it alone. The end starts a sync. `nt doctor` says when flok last imported a report (a stamp in the state folder), and warns when nothing was ever imported and no hooks are installed.
+- A `sid → path` map in the state folder names the report, so `nt agent write` finds it. The end starts a sync. `nt doctor` says when flok last imported a report (a stamp in the state folder), and warns when nothing was ever imported.
 
-**`nt agent start|turn|end`** (`internal/agents`), nt's own hooks until flok imports every session (below). Reads a hook payload on stdin, in either the Claude (snake_case) or Copilot (camelCase) shape; a session flok imports is left to flok.
-- Fast and deterministic; always exits 0 and prints nothing. Failures go to `agent.log` in the state folder.
-- Claude Code: `SessionStart` → start, `Stop` → turn, `SessionEnd` → end; a subagent's events (`agent_id`) are skipped. Copilot CLI: `sessionStart`, `agentStop`, `sessionEnd`, with `--agent copilot-cli` because its payloads do not name the agent.
-- A session in a temporary folder (`/tmp`, `/var/tmp`, `$TMPDIR`) gets no report: it is a throwaway, such as a script's `claude -p` probe in a scratch folder. `NT_REPORT_TEMP=1` reports it all the same; the end-to-end suites set it, since they run in a temp directory.
-- The hooks run in order, not in the background (`async`): each takes milliseconds, and a session's events then reach its report in the order they happened. Every write is under the repository lock.
-- The report path is fixed by the date of the session's **first** event. A `sid → path` map lives in the state dir, so sessions that cross midnight stay in one file.
-- `turn` updates `updated` (the max) and adds one `## Log` line of at most 200 characters, taken from `last_assistant_message`, or `turn ended` without one. A line that would repeat the last one, its minute included, is not added: Copilot CLI sends several `agentStop`s for one turn.
-- `end` sets `ended`, which is final, the final `git_head`, and a status from the outcome (docs/format.md §6). A late Stop can't flip the status back. It also starts a sync, so the report goes out at once.
+**nt's old hooks.** nt 0.7 and before installed hooks of its own in Claude Code's `settings.json` and `~/.copilot/hooks/nt.json`, which ran `nt agent start|turn|end`; flok replaced them (below). `nt agent start|turn|end` now reads the payload and does nothing, so a machine that still has them sees no error. `nt doctor` warns while they are there, and `nt uninstall --hooks` takes them out of every event, other hooks kept and the settings backed up first. A later nt drops both.
 
-**`nt agent write [--status s] [--summary text] [--session ID]`.** The agent's own rich report (Done / Decisions / Open), read from stdin. Without `--session` it fills the latest report whose session started in the working folder or one above it; with none, it starts one, so an agent without hooks can report too.
+**`nt agent write [--status s] [--summary text] [--session ID]`.** The agent's own rich report (Done / Decisions / Open), read from stdin. Without `--session` it fills the latest report whose session started in the working folder or one above it; with none, it starts one, so an agent flok does not follow can report too.
 
 **`nt digest [date]`.**
 - Builds the day's `README.md` from the reports' frontmatter, grouped by project: status, summary, link.
@@ -111,7 +104,7 @@ Decisions taken with the user (2026-10-26):
 - Every command takes `--json`.
 - The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
-**flok** (decided 2026-10-29). flok becomes the one hook receiver and journals each session; nt stays the one writer of the notes and owns the report's format, the digests and `nt agent write`, and installs no hooks once flok imports every session. The order, so no day loses its reports: this nt (`nt agent import`, the hooks kept and leaving flok's sessions to it), then flok, then `nt uninstall --hooks` on each machine, then an nt without `install|uninstall --hooks`, the hooks' payload parsing, `NT_NO_REPORT` and the hooks' doctor check. Until then, `nt install --hooks` adds hooks next to flok's in Claude Code's `settings.json` (a backup first, other hooks kept) and writes `~/.copilot/hooks/nt.json`, as `flok/internal/install` does. `nt uninstall --hooks` takes them out; `nt doctor` checks them and the skill, and fails when the nt a hook runs, or the sync job runs, is no longer there (a hook that cannot run fails without a word); `nt install --hooks` and `--sync` write the `nt` on PATH, which survives Homebrew upgrades.
+**flok** (decided 2026-10-29). flok is the one hook receiver and journals each session; nt stays the one writer of the notes and owns the report's format, the digests and `nt agent write`. The order, so no day lost its reports: nt 0.7.0 (`nt agent import`, its hooks leaving flok's sessions to it), then flok 0.13.0, then `nt uninstall --hooks` on each machine, then an nt without `nt install --hooks`, the hooks' payload parsing, `agent.log` and `NT_NO_REPORT`, which keeps `nt agent start|turn|end` as a no-op and `nt uninstall --hooks` for one more release, so machines upgrade in any order.
 
 ## 4. CLI and TUI (simplicity first)
 
@@ -138,8 +131,8 @@ Decisions taken with the user (2026-10-26):
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
 | `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
-| `nt install --hooks`, `--skill` | Agent hooks for Claude Code and Copilot CLI; the agent skill (§3) |
-| `nt agent import`, `nt agent write`, `nt agent start\|turn\|end` | Agent session reports: flok's records, the agent's own account, nt's hooks (§3) |
+| `nt install --skill`, `nt uninstall --skill` | The agent skill (§3); `nt uninstall --hooks` takes out nt's old hooks |
+| `nt agent import`, `nt agent write` | Agent session reports: flok's records, the agent's own account (§3) |
 | `nt digest [date]` | Write and list a day's agent digest (§3) |
 | `nt week [date\|last]` | Compile a week's digest now (Weekly digest, below); the machine with `weekly = true` does it on every sync |
 | `nt completion bash\|zsh` | Print a completion script: commands, flags and their values, and the repository's folders and notes (from the hidden `nt _complete folders\|notes`), as flok's |
@@ -218,7 +211,7 @@ Decisions taken with the user (2026-10-26):
 
 **Weekly digest** (`internal/weekly`, docs/format.md §7). `weekly/GGGG/GGGG-Www.md`, compiled before each sync commits by the one machine with `weekly = true`, like the agent digests on the one with `digest = true`: the week's new and changed notes, its todos, its agent sessions per project, and each day's Log lines. The changed notes come from `git log --since --until` over the week (read only: sync stays the only git writer); the rest from the files. It is written only when its bytes change, so a sync with nothing new makes no commit; a change a merge brings in reaches it on the next run. In a conflict the remote digest is taken and compiled again, as the agent digests are.
 
-**Weekly summaries** (`internal/weekly/summary.go`, docs/format.md §7). A machine whose config names a tool (`[summary] tool = "claude"` at home, `"copilot"` at the office) writes, once a week is over, `weekly/GGGG/GGGG-Www-<host>.md`: what was written on that machine, in three short lists (Done, Decided, Open) that nt keeps to bold labels and plain bullets. That is read from git, the commits sync made there (`nt: <host> ·`), and from the reports with that host, so it needs no folders configured and a week written at work never reaches the tool at home. Sync runs it before the weekly digest, which shows every machine's summary; `nt week --summarize` writes one by hand. The tool is called as a one-shot command in a temp folder: `claude -p --tools "" --settings '{"disableAllHooks":true}' --no-session-persistence` with the week on stdin, or `copilot -p "<prompt and week>" --silent`, with `NT_NO_REPORT=1` so nt's own hooks do not report the call as an agent session. A failed call (offline, logged out) is logged and tried again an hour later; `nt doctor` checks the tool is there. nt itself still talks only to git and ssh: the tool is the person's, and opt-in.
+**Weekly summaries** (`internal/weekly/summary.go`, docs/format.md §7). A machine whose config names a tool (`[summary] tool = "claude"` at home, `"copilot"` at the office) writes, once a week is over, `weekly/GGGG/GGGG-Www-<host>.md`: what was written on that machine, in three short lists (Done, Decided, Open) that nt keeps to bold labels and plain bullets. That is read from git, the commits sync made there (`nt: <host> ·`), and from the reports with that host, so it needs no folders configured and a week written at work never reaches the tool at home. Sync runs it before the weekly digest, which shows every machine's summary; `nt week --summarize` writes one by hand. The tool is called as a one-shot command in a temp folder: `claude -p --tools "" --settings '{"disableAllHooks":true}' --no-session-persistence` with the week on stdin, or `copilot -p "<prompt and week>" --silent`, in a temp folder, so the call gets no session report. A failed call (offline, logged out) is logged and tried again an hour later; `nt doctor` checks the tool is there. nt itself still talks only to git and ssh: the tool is the person's, and opt-in.
 
 **Settings** (`internal/config/settings.go`). `config.Settings` lists every key of the two config files: this machine's (`~/.config/nt/config.toml`) and the repository's (`.nt/config.toml`, shared through sync), each with its kind (true or false, a word from a list, text, a list, `HH:MM`, a duration) and what it does. A change edits that one line, a commented-out line that names the key, or a new line at the end of its table, keeping the comments and the rest of the file; the result must load, else nothing is written. The repository's file is written under the repository lock. `nt config set` and the browser's `,` share this. `,` shows the settings in the note's pane (the whole screen on a narrow one), the folder list staying as it was: a heading per file, then each setting's key, its value in `accent` and what it does. `j` `k` move, enter flips a true/false setting or asks for a value on the footer line, `e` opens the setting's file in `$EDITOR`, a click selects and a second click changes, esc goes back to the note; the selected setting's meaning is on the footer line. The browser takes a change at once where it can (theme, pins, the image viewer, its own sync); a change to the sync timer needs `nt install --sync`.
 
@@ -376,7 +369,7 @@ internal/mdparse    title, links, images, headings (goldmark); wikilink read sup
 internal/scan       in-memory backlinks/titles (no persisted index)
 internal/search     rg --json wrapper, fuzzy titles
 internal/gitsync    cycle above, conflict resolver, status.json, launchd/systemd unit install, notify
-internal/agents     hook adapters (claude/copilot), report upsert, sid map, digest, hook installers
+internal/agents     flok's records into reports, nt agent write, sid map, digest, old hooks' remover
 internal/todo       todos: parse task lines, collect, sort, dates in words, add/check/due/remove one line
 internal/move       mv, rename, mkdir: move files and rewrite the links to and in them, under the lock
 internal/weekly     the weekly digest: compile a week from its journals, notes, todos and agent reports
@@ -576,8 +569,8 @@ rendered text.
 **Later**, kept for after the app has been used a while (nothing here is planned yet):
 - **First run without the command line.** Make or clone the notes repository from the app
   (`nt init`, `nt init --clone`) with its bundled nt, so it stands on its own.
-- **The background sync and the agent hooks from Settings,** with the bundled nt or the one on
-  PATH (`nt install --sync`, `--hooks`); today they come from the command line.
+- **The background sync from Settings,** with the bundled nt or the one on PATH
+  (`nt install --sync`); today it comes from the command line.
 - **⌘K, the command palette**, every verb of the command line; in the first plan, not built.
 - **Typewriter scrolling and focus mode's defaults** in Settings; in the first plan, not built.
 - **The capture shortcut's default.** macOS keeps ⌥⌘Space for the Finder search window unless
@@ -877,11 +870,11 @@ change.
   - slugs and `day_starts`;
   - templates;
   - link and image extraction, and wikilink rewriting;
-  - hook adapters, with fixtures for both payload shapes;
+  - flok's records into reports;
   - deterministic digest;
   - importer, against a fixture copied from `~/Notes`.
 - **e2e: sync** (`scripts/e2e`, in flok's style). A bare repo stands in for GitHub, with two clones.
-  - 5 sessions × parallel `agent start/turn/end`, with both clones looping `nt sync`.
+  - 5 sessions × parallel `agent import` of flok's records, with both clones looping `nt sync`.
   - Assert: every report is on both sides, the frontmatter is valid, and nothing is lost.
 - **e2e: conflict.**
   - The same topic note edited in both clones produces exactly one `.conflict-` copy and no markers.

@@ -126,8 +126,8 @@ func plural(n int, what string) string {
 	return fmt.Sprintf("%d %ss", n, what)
 }
 
-// nt install --sync|--nvim|--hooks|--skill: the background sync timer, the nvim plugin, the
-// agent hooks and the agent skill; nt uninstall takes the same flags and removes them.
+// nt install --sync|--nvim|--skill: the background sync timer, the nvim plugin and the agent
+// skill; nt uninstall takes the same flags and removes them, and --hooks, nt's old agent hooks.
 func runInstall(args []string, remove bool) int {
 	args, sync := takeBool(args, "--sync")
 	args, withNvim := takeBool(args, "--nvim")
@@ -136,8 +136,11 @@ func runInstall(args []string, remove bool) int {
 	if _, err := positional("install", args); err != nil {
 		return fail(err)
 	}
+	if hooks && !remove {
+		return fail(errors.New("install: nt has no agent hooks any more: flok writes the session reports, with its [notes] on"))
+	}
 	if !sync && !withNvim && !hooks && !skill {
-		return fail(errors.New("install: use --sync, --nvim, --hooks or --skill (nt uninstall takes the same)"))
+		return fail(errors.New("install: use --sync, --nvim or --skill (nt uninstall takes the same, and --hooks)"))
 	}
 	if withNvim {
 		if err := installNvim(remove); err != nil {
@@ -145,8 +148,8 @@ func runInstall(args []string, remove bool) int {
 		}
 	}
 	if hooks {
-		if err := installHooks(remove); err != nil {
-			return fail(fmt.Errorf("install: hooks: %w", err))
+		if err := removeHooks(); err != nil {
+			return fail(fmt.Errorf("uninstall: hooks: %w", err))
 		}
 	}
 	if skill {

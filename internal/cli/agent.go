@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,20 +16,30 @@ import (
 	"github.com/w4jnl/nt/skills"
 )
 
-// nt agent import|write|start|turn|end.
+// nt agent import|write.
 func runAgent(args []string) int {
 	if len(args) == 0 {
-		return fail(errors.New("agent: use import (flok), write, or start, turn, end (hooks)"))
+		return fail(errors.New("agent: use import (flok) or write"))
 	}
 	switch args[0] {
 	case "import":
 		return runAgentImport(args[1:])
-	case "start", "turn", "end":
-		return runAgentHook(args[0], args[1:])
 	case "write":
 		return runAgentWrite(args[1:])
+	case "start", "turn", "end":
+		return runOldHook()
 	}
-	return fail(fmt.Errorf("agent: unknown %q: use import, write, start, turn or end", args[0]))
+	return fail(fmt.Errorf("agent: unknown %q: use import or write", args[0]))
+}
+
+// nt agent start|turn|end: what nt's own hooks ran before flok wrote the reports. It reads the
+// hook's payload and does nothing, so a machine that still has them sees no error; nt doctor
+// warns about them and nt uninstall --hooks takes them out.
+func runOldHook() int {
+	if !stdinIsTerminal() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(os.Stdin, 4<<20))
+	}
+	return 0
 }
 
 // nt agent import [--probe]: flok's record of one agent session, JSON on stdin, written as the
@@ -60,7 +69,7 @@ func runAgentImport(args []string) int {
 		return report(fmt.Errorf("agent import: %w", err))
 	}
 	if agents.Temporary(rec.Cwd) && os.Getenv("NT_REPORT_TEMP") == "" {
-		return 0 // a throwaway session, as the hooks have it
+		return 0 // a throwaway session
 	}
 	v, m, err := openVault()
 	if err != nil {
@@ -76,61 +85,6 @@ func runAgentImport(args []string) int {
 		kickSync(m)
 	}
 	return 0
-}
-
-// nt agent start|turn|end [--agent name]: a hook. It reads the hook's payload on stdin, in
-// Claude Code's or Copilot CLI's shape, and records the event in the session's report. It
-// prints nothing and always exits 0, so a hook never holds up or fails the agent; what goes
-// wrong is written to agent.log in the state folder. The end of a session starts a sync.
-func runAgentHook(kind string, args []string) (code int) {
-	if os.Getenv("NT_NO_REPORT") != "" {
-		return 0 // nt's own call to an agent, for the weekly summary: not a session to report
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			agentLog("%s: panic: %v", kind, r)
-			code = 0
-		}
-	}()
-	_, agent, _, _ := takeValue(args, "--agent")
-	var payload []byte
-	if !stdinIsTerminal() {
-		payload, _ = io.ReadAll(io.LimitReader(os.Stdin, 4<<20))
-	}
-	ev, ok, err := agents.ParseEvent(kind, payload, agent)
-	if err != nil {
-		agentLog("%s: %v", kind, err)
-		return 0
-	}
-	if !ok {
-		return 0
-	}
-	v, m, err := openVault()
-	if err != nil {
-		agentLog("%s %s: %v", kind, ev.Session, err)
-		return 0
-	}
-	if _, err := agents.Apply(v, config.StateDir(), ev, v.Now()); err != nil {
-		agentLog("%s %s: %v", kind, ev.Session, err)
-	}
-	if kind == "end" {
-		kickSync(m)
-	}
-	return 0
-}
-
-// agentLog notes a hook's failure in agent.log in the state folder; hooks print nothing.
-func agentLog(format string, a ...any) {
-	dir := config.StateDir()
-	if os.MkdirAll(dir, 0o755) != nil {
-		return
-	}
-	f, err := os.OpenFile(filepath.Join(dir, "agent.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	fmt.Fprintf(f, "%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, a...))
 }
 
 // nt agent write [--session id] [--agent name] [--status s] [--summary text]: the agent's own
@@ -239,29 +193,29 @@ func runDigest(args []string) int {
 	return 0
 }
 
-// installHooks adds nt agent to Claude Code's settings and writes Copilot CLI's hooks file, or
-// removes both.
-func installHooks(remove bool) error {
-	bin, err := stableBinary()
-	if err != nil {
-		return err
-	}
+// removeHooks takes nt's own hooks out of Claude Code's settings and Copilot CLI's hooks
+// directory: flok writes the reports now.
+func removeHooks() error {
 	cp, cpp := agents.ClaudeSettingsPath(), agents.CopilotHooksPath()
-	changed, err := agents.ClaudeHooks(cp, bin, remove)
+	claude, err := agents.RemoveClaudeHooks(cp)
 	if err != nil {
 		return err
 	}
-	copilot, err := agents.CopilotHooks(cpp, bin, remove)
+	copilot, err := agents.RemoveCopilotHooks(cpp)
 	if err != nil {
 		return err
 	}
-	switch {
-	case remove:
-		fmt.Printf("removed nt's hooks from %s and %s\n", tilde(cp), tilde(cpp))
-	case changed || copilot:
-		fmt.Printf("hooked %s agent start|turn|end into Claude Code (%s) and Copilot CLI (%s); new sessions get reports\n", tilde(bin), tilde(cp), tilde(cpp))
-	default:
-		fmt.Println("the hooks are in place: " + tilde(cp) + ", " + tilde(cpp))
+	var from []string
+	if claude {
+		from = append(from, tilde(cp))
+	}
+	if copilot {
+		from = append(from, tilde(cpp))
+	}
+	if len(from) == 0 {
+		fmt.Println("no hooks of nt's to remove")
+	} else {
+		fmt.Printf("removed nt's hooks from %s; flok writes the session reports\n", strings.Join(from, " and "))
 	}
 	return nil
 }

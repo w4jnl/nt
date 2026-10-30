@@ -218,42 +218,27 @@ func summaryCheck(m config.Machine, add func(name, state, format string, a ...an
 	}
 }
 
-// hookChecks reports where agent sessions' reports come from: flok's imports (nt agent import),
-// else nt's own hooks, which flok replaces; and that the nt the hooks run is there, since a hook
-// that cannot run fails without a word.
-func hookChecks(add func(name, state, format string, a ...any)) {
-	ev, bins := agents.ClaudeHooked(agents.ClaudeSettingsPath())
-	copilot := agents.CopilotHooked(agents.CopilotHooksPath())
-	for _, bin := range append(bins, copilot...) {
-		if !runs(bin) {
-			add("hooks", "fail", "they run %s, which is not there, so agent sessions get no reports: nt install --hooks", tilde(bin))
-			return
-		}
+// reportChecks says when flok last imported a session's report (nt agent import), and warns
+// while nt's own hooks from before flok are still installed: they do nothing now.
+func reportChecks(add func(name, state, format string, a ...any)) {
+	var left []string
+	if agents.ClaudeHooked(agents.ClaudeSettingsPath()) {
+		left = append(left, tilde(agents.ClaudeSettingsPath()))
 	}
-	var who []string
-	if len(ev) == len(agents.Kinds) {
-		who = append(who, "Claude Code")
+	if agents.CopilotHooked(agents.CopilotHooksPath()) {
+		left = append(left, tilde(agents.CopilotHooksPath()))
 	}
-	if len(copilot) == len(agents.Kinds) {
-		who = append(who, "Copilot CLI")
+	if len(left) > 0 {
+		add("hooks", "warn", "nt's old hooks are still in %s; flok writes the reports now: nt uninstall --hooks", strings.Join(left, " and "))
 	}
-	last, imported := agents.LastImport(config.StateDir())
-	if imported {
+	if last, ok := agents.LastImport(config.StateDir()); ok {
 		add("reports", "ok", "imported by flok, last at %s", last.Local().Format("Mon 2 Jan 15:04"))
-	}
-	switch {
-	case len(ev) > 0 && len(ev) < len(agents.Kinds):
-		add("hooks", "warn", "only %s hooked in %s: nt install --hooks", strings.Join(ev, ", "), tilde(agents.ClaudeSettingsPath()))
-	case len(who) > 0 && imported:
-		add("hooks", "ok", "%s; they leave the sessions flok imports to flok", strings.Join(who, " and "))
-	case len(who) > 0:
-		add("hooks", "ok", "%s sessions get reports", strings.Join(who, " and "))
-	case !imported:
-		add("reports", "warn", "agent sessions get no reports: no report imported yet, is flok's [notes] on? (or nt install --hooks)")
+	} else {
+		add("reports", "warn", "agent sessions get no reports: none imported yet, is flok's [notes] on?")
 	}
 }
 
-// runs says whether bin, the nt a hook or the sync job runs, is there to run: an executable
+// runs says whether bin, the nt the sync job runs, is there to run: an executable
 // file, or a name on PATH. An empty bin has nothing to check.
 func runs(bin string) bool {
 	if bin == "" {
@@ -284,7 +269,7 @@ func toolChecks(add func(name, state, format string, a ...any)) {
 	} else {
 		add("editor", "ok", "%s", ed)
 	}
-	hookChecks(add)
+	reportChecks(add)
 	if s := skills.State(skills.Dir(), skills.Links()); s == "" {
 		add("skill", "ok", "%s", tilde(skills.Dir()))
 	} else {

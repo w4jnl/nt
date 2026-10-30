@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -83,9 +82,8 @@ func ParseRecord(b []byte) (Record, error) {
 
 // Import writes rec's session's report: made the first time, in the agents folder of the day it
 // was created, then its frontmatter and ## Log rewritten from the record on every call. The
-// agent's own sections, its summary and a status it wrote stay. The sessions map marks the
-// session as flok's, so nt's own hooks leave it alone and nt agent write finds it. ended says the
-// session ended with this call.
+// agent's own sections, its summary and a status it wrote stay. The sessions map names the
+// report, so nt agent write finds it. ended says the session ended with this call.
 func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel string, ended bool, err error) {
 	unlock, err := v.Lock()
 	if err != nil {
@@ -136,7 +134,6 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 	if err := vault.WriteFile(v.Abs(e.rel), r.Bytes()); err != nil {
 		return "", false, err
 	}
-	e.flok = true
 	if err := e.write(stateDir, rec.Agent, rec.Session); err != nil {
 		return "", false, err
 	}
@@ -145,14 +142,8 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 
 // newImported is a new report for rec's session, in the agents folder of the day it was created.
 func newImported(v *vault.Vault, rec Record, host, project string, created time.Time) (string, *Report) {
-	sid := strings.ToLower(rec.Session)
-	if len(sid) > 8 {
-		sid = sid[:8]
-	}
-	name := strings.Join([]string{orWord(vault.Slug(host), "host"), orWord(vault.Slug(rec.Agent), "agent"),
-		orWord(vault.Slug(project), "project"), orWord(vault.Slug(sid), "session")}, "--") + ".md"
 	day := v.Day(created)
-	rel := v.Unique(path.Join(v.AgentsRel(day), name))
+	rel := reportPath(v, day, host, rec.Agent, project, rec.Session)
 	r := newReport()
 	for _, f := range []field{{"type", "agent-report"}, {"schema", "1"}, {"date", day.Format("2006-01-02")},
 		{"created", stamp(created)}, {"project", project}} {
@@ -374,4 +365,47 @@ func LastImport(stateDir string) (time.Time, bool) {
 	}
 	t, err := time.Parse(time.RFC3339, strings.TrimSpace(string(b)))
 	return t, err == nil
+}
+
+// Temporary says whether dir is in a temporary folder (/tmp, /var/tmp, $TMPDIR), where a
+// session is a throwaway: a script's `claude -p` in a scratch folder, nt's own weekly summary, a
+// test. Such sessions get no report; NT_REPORT_TEMP=1 reports them all the same.
+func Temporary(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	paths := []string{filepath.Clean(dir)}
+	if r, err := filepath.EvalSymlinks(dir); err == nil {
+		paths = append(paths, r)
+	}
+	for _, root := range []string{os.TempDir(), "/tmp", "/var/tmp"} {
+		roots := []string{filepath.Clean(root)}
+		if r, err := filepath.EvalSymlinks(root); err == nil {
+			roots = append(roots, r)
+		}
+		for _, p := range paths {
+			for _, r := range roots {
+				if r != "/" && (p == r || strings.HasPrefix(p, r+string(filepath.Separator))) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// logLine is what a turn adds to ## Log: the first line of the agent's reply with text in it,
+// spaces folded, at most 200 characters. Long answers and secrets stay out of the report.
+func logLine(msg string) string {
+	for _, l := range strings.Split(msg, "\n") {
+		l = strings.Join(strings.Fields(strings.TrimLeft(l, "#>*- \t")), " ")
+		if l == "" || strings.HasPrefix(l, "```") {
+			continue
+		}
+		if utf8.RuneCountInString(l) > 200 {
+			l = string([]rune(l)[:199]) + "…"
+		}
+		return l
+	}
+	return ""
 }

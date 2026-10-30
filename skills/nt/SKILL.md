@@ -47,7 +47,7 @@ A todo is a task line in any note: `- [ ] text due:YYYY-MM-DD`, and once done
 
 ## This session's report
 
-A hook already logs this session (start, a line per turn, end) in
+flok logs this session into nt (start, turns, blocks, end) in
 `agents/YYYY/YYYY-MM-DD/<host>--<agent>--<project>--<session>.md`. Add your own account when
 a piece of work is finished, when you are blocked, or when the person asks:
 

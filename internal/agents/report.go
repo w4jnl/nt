@@ -1,7 +1,7 @@
 // Package agents keeps agent session reports (docs/format.md §6) and the day's digest (§7).
-// flok's session records (nt agent import), or until flok imports them nt's own hooks' payloads
-// from Claude Code and Copilot CLI, become one report per session, written under the repository
-// lock; the agent adds its own Done, Decisions and Open with nt agent write.
+// flok's records of Claude Code and Copilot CLI sessions (nt agent import) become one report per
+// session, written under the repository lock; the agent adds its own Done, Decisions and Open
+// with nt agent write.
 package agents
 
 import (
@@ -68,29 +68,6 @@ func (r *Report) Section(name string) string { return r.text[name] }
 
 // SetSection replaces the text of a section.
 func (r *Report) SetSection(name, text string) { r.text[name] = strings.Trim(text, "\n") }
-
-// Log adds a line to ## Log.
-func (r *Report) Log(line string) {
-	if t := r.text["Log"]; t != "" {
-		r.text["Log"] = t + "\n" + line
-	} else {
-		r.text["Log"] = line
-	}
-}
-
-// LastLog is the last line of ## Log, or "".
-func (r *Report) LastLog() string {
-	log := r.text["Log"]
-	return log[strings.LastIndex(log, "\n")+1:]
-}
-
-// LogLines is how many lines ## Log has.
-func (r *Report) LogLines() int {
-	if r.text["Log"] == "" {
-		return 0
-	}
-	return strings.Count(r.text["Log"], "\n") + 1
-}
 
 // Title is the report's heading: "<project>: <summary>", or the project alone.
 func (r *Report) Title() string {

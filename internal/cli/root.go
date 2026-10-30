@@ -61,8 +61,6 @@ todos
 agents
   agent import            flok's record of a session (JSON on stdin) into its report [--probe]
   agent write             the agent's own Done, Decisions and Open on stdin [--status s] [--summary text]
-  agent start|turn|end    hooks: a session's start, each turn and its end into its report (stdin);
-                          a session flok imports is left to flok
   digest [date]           write the day's agents/…/README.md from its reports and list them
   week [date|last]        compile the week's weekly/GGGG/GGGG-Www.md now; the machine with
                           weekly = true does it on every sync
@@ -72,7 +70,7 @@ repository
   sync                 commit, merge and push now
   install --sync       run nt sync in the background every sync.interval; uninstall --sync stops it
   install --nvim       nt's nvim plugin: paste images, no merge under unsaved notes, sync on exit
-  install --hooks      report Claude Code and Copilot CLI sessions; --skill: teach them nt
+  install --skill      teach Claude Code and Copilot CLI nt; uninstall --hooks: nt's old hooks
   doctor               check the repository, git, the sync timer and the tools nt uses
   config               every setting, its value and what it does; config set <key> <value>,
                        config get <key>, config edit [--repo] (the whole file in $EDITOR)

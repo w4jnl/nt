@@ -32,40 +32,6 @@ func at(s string) time.Time {
 	return t
 }
 
-func TestParseEvent(t *testing.T) {
-	for _, tc := range []struct {
-		name, kind, payload, agent string
-		want                       Event
-		ok                         bool
-	}{
-		{"claude start", "start", `{"hook_event_name":"SessionStart","session_id":"00893aaf-19fa","cwd":"/p","source":"startup","model":"claude-opus-5-5"}`, "",
-			Event{Kind: "start", Agent: "claude-code", Session: "00893aaf-19fa", Cwd: "/p", Model: "claude-opus-5-5"}, true},
-		{"claude stop", "turn", `{"hook_event_name":"Stop","session_id":"s1","cwd":"/p","last_assistant_message":"Done.\nMore"}`, "",
-			Event{Kind: "turn", Agent: "claude-code", Session: "s1", Cwd: "/p", Message: "Done.\nMore"}, true},
-		{"claude end", "end", `{"hook_event_name":"SessionEnd","session_id":"s1","cwd":"/p","reason":"prompt_input_exit"}`, "",
-			Event{Kind: "end", Agent: "claude-code", Session: "s1", Cwd: "/p", Reason: "prompt_input_exit"}, true},
-		{"claude subagent", "turn", `{"hook_event_name":"SubagentStop","session_id":"s1","agent_id":"a1","cwd":"/p"}`, "", Event{}, false},
-		{"copilot start", "start", `{"sessionId":"c1","timestamp":1761470000000,"cwd":"/q"}`, "",
-			Event{Kind: "start", Agent: "copilot-cli", Session: "c1", Cwd: "/q"}, true},
-		{"copilot stop", "turn", `{"sessionId":"c1","cwd":"/q","transcriptPath":"/t","stopReason":"end_turn"}`, "copilot-cli",
-			Event{Kind: "turn", Agent: "copilot-cli", Session: "c1", Cwd: "/q", Reason: "end_turn"}, true},
-		{"copilot end", "end", `{"sessionId":"c1","cwd":"/q","reason":"error"}`, "",
-			Event{Kind: "end", Agent: "copilot-cli", Session: "c1", Cwd: "/q", Reason: "error"}, true},
-		{"no session", "turn", `{"cwd":"/q"}`, "", Event{}, false},
-	} {
-		got, ok, err := ParseEvent(tc.kind, []byte(tc.payload), tc.agent)
-		if err != nil || ok != tc.ok || ok && got != tc.want {
-			t.Errorf("%s: got %+v, %v, %v; want %+v, %v", tc.name, got, ok, err, tc.want, tc.ok)
-		}
-	}
-	if _, _, err := ParseEvent("turn", []byte("{not json"), ""); err == nil {
-		t.Error("a broken payload is not an error")
-	}
-	if _, _, err := ParseEvent("stop", nil, ""); err == nil {
-		t.Error("an unknown kind is not an error")
-	}
-}
-
 func TestTemporary(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	cases := map[string]bool{
@@ -86,15 +52,6 @@ func TestTemporary(t *testing.T) {
 		if got := Temporary(dir); got != want {
 			t.Errorf("Temporary(%q) = %v, want %v", dir, got, want)
 		}
-	}
-	// a session in a temporary folder gets no report, unless NT_REPORT_TEMP asks for one
-	payload := []byte(`{"session_id":"s1","cwd":"/tmp/probe"}`)
-	if _, ok, _ := ParseEvent("start", payload, ""); ok {
-		t.Error("a throwaway session in /tmp is reported")
-	}
-	t.Setenv("NT_REPORT_TEMP", "1")
-	if _, ok, _ := ParseEvent("start", payload, ""); !ok {
-		t.Error("NT_REPORT_TEMP=1 does not report a session in /tmp")
 	}
 }
 
@@ -123,124 +80,17 @@ func read(t *testing.T, v *vault.Vault, rel string) *Report {
 	return ParseReport(b)
 }
 
-func TestSession(t *testing.T) {
-	v, state := testVault(t)
-	cwd := filepath.Join(t.TempDir(), "noteTaking")
-	_ = os.Mkdir(cwd, 0o755)
-	ev := func(kind, msg, reason string) Event {
-		return Event{Kind: kind, Agent: "claude-code", Session: "00893AAF-19fa-41d2", Cwd: cwd, Message: msg, Reason: reason}
-	}
-	rel, err := Apply(v, state, ev("start", "", ""), at("2026-10-26 23:50"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rel != "agents/2026/2026-10-26/mbp--claude-code--notetaking--00893aaf.md" {
-		t.Fatalf("path %s", rel)
-	}
-	// past midnight the session stays in its first day's report
-	if again, _ := Apply(v, state, ev("turn", "Built the digest.\nDetails follow.", ""), at("2026-10-27 05:10")); again != rel {
-		t.Fatalf("the next day's turn went to %s", again)
-	}
-	if _, err := Apply(v, state, ev("end", "", "prompt_input_exit"), at("2026-10-27 05:20")); err != nil {
-		t.Fatal(err)
-	}
-	// a late turn (an async Stop after the end) keeps ended and the status
-	_, _ = Apply(v, state, ev("turn", "Late line.", ""), at("2026-10-27 05:19"))
-	r := read(t, v, rel)
-	for k, want := range map[string]string{
-		"type": "agent-report", "schema": "1", "date": "2026-10-26", "agent": "claude-code", "host": "mbp",
-		"session": "00893AAF-19fa-41d2", "project": "noteTaking", "cwd": cwd, "status": "done",
-		"created": stamp(at("2026-10-26 23:50")), "ended": stamp(at("2026-10-27 05:20")), "updated": stamp(at("2026-10-27 05:20")),
-	} {
-		if got := r.Get(k); got != want {
-			t.Errorf("%s: %q, want %q", k, got, want)
-		}
-	}
-	log := r.Section("Log")
-	for _, want := range []string{"- 23:50 started in " + cwd, "- 05:10 Built the digest.", "- 05:20 ended", "- 05:19 Late line."} {
-		if !strings.Contains(log, want) {
-			t.Errorf("the log lacks %q:\n%s", want, log)
-		}
-	}
-	// resumed after it ended: a new report on the new day that continues the first
-	next, _ := Apply(v, state, ev("start", "", ""), at("2026-10-27 09:00"))
-	if next == rel || !strings.HasPrefix(next, "agents/2026/2026-10-27/") {
-		t.Fatalf("the resumed session went to %s", next)
-	}
-	if got := read(t, v, next).Get("continues"); got != "../2026-10-26/mbp--claude-code--notetaking--00893aaf.md" {
-		t.Errorf("continues: %q", got)
-	}
-	if r := read(t, v, rel); r.Get("ended") != stamp(at("2026-10-27 05:20")) || strings.Contains(r.Section("Log"), "continued in") {
-		t.Errorf("a report that ended is changed by the session going on: ended %q\n%s", r.Get("ended"), r.Section("Log"))
-	}
-
-	// went on the next day without ending (a resume, a compaction): the earlier report ends at
-	// its last update, with a line that links to the next
-	_, _ = Apply(v, state, ev("turn", "Wrote the plan.", ""), at("2026-10-27 22:40"))
-	third, _ := Apply(v, state, ev("start", "", ""), at("2026-10-28 08:15"))
-	if third == next || !strings.HasPrefix(third, "agents/2026/2026-10-28/") {
-		t.Fatalf("the session going on went to %s", third)
-	}
-	r = read(t, v, next)
-	if r.Get("ended") != stamp(at("2026-10-27 22:40")) || r.Get("status") != "done" || r.Get("updated") != stamp(at("2026-10-27 22:40")) {
-		t.Errorf("the earlier report: ended %q, status %q, updated %q", r.Get("ended"), r.Get("status"), r.Get("updated"))
-	}
-	if log := r.Section("Log"); !strings.Contains(log, "- 22:40 continued in [2026-10-28](../2026-10-28/mbp--claude-code--notetaking--00893aaf.md)") {
-		t.Errorf("the earlier report does not say where the session went on:\n%s", log)
-	}
-	if r := read(t, v, third); r.Get("status") != "in-progress" || r.Get("ended") != "" {
-		t.Errorf("the new report: status %q, ended %q", r.Get("status"), r.Get("ended"))
-	}
-}
-
-func TestEndStatus(t *testing.T) {
-	v, state := testVault(t)
-	cwd := t.TempDir()
-	start := func(s string) {
-		_, _ = Apply(v, state, Event{Kind: "start", Agent: "copilot-cli", Session: s, Cwd: cwd}, at("2026-10-26 09:00"))
-	}
-	end := func(s, reason string) string {
-		rel, _ := Apply(v, state, Event{Kind: "end", Agent: "copilot-cli", Session: s, Cwd: cwd, Reason: reason}, at("2026-10-26 10:00"))
-		return read(t, v, rel).Get("status")
-	}
-	start("quiet")
-	if got := end("quiet", "user_exit"); got != "abandoned" {
-		t.Errorf("a session without a turn ended %s, want abandoned", got)
-	}
-	start("worked") // Copilot CLI's turns carry no message text
-	rel, _ := Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd, Reason: "end_turn"}, at("2026-10-26 09:30"))
-	if log := read(t, v, rel).Section("Log"); !strings.Contains(log, "- 09:30 turn ended") {
-		t.Errorf("a turn without text leaves no line in the log:\n%s", log)
-	}
-	// Copilot CLI sends several agentStops for one turn: the same line in the same minute is
-	// written once, and a later turn gets its own
-	for _, when := range []string{"2026-10-26 09:30", "2026-10-26 09:30", "2026-10-26 09:31"} {
-		_, _ = Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "worked", Cwd: cwd}, at(when))
-	}
-	if log := read(t, v, rel).Section("Log"); strings.Count(log, "09:30 turn ended") != 1 || strings.Count(log, "09:31 turn ended") != 1 {
-		t.Errorf("repeated turns are not folded into one line a minute:\n%s", log)
-	}
-	if got := end("worked", "complete"); got != "done" {
-		t.Errorf("a session whose turns had no text ended %s, want done", got)
-	}
-	start("broken")
-	_, _ = Apply(v, state, Event{Kind: "turn", Agent: "copilot-cli", Session: "broken", Cwd: cwd, Message: "trying"}, at("2026-10-26 09:30"))
-	if got := end("broken", "error"); got != "failed" {
-		t.Errorf("a session that ended on an error is %s, want failed", got)
-	}
-	start("held")
-	if _, err := Write(v, state, Selector{Session: "held"}, "", "blocked", "Waiting on the API key", at("2026-10-26 09:40")); err != nil {
-		t.Fatal(err)
-	}
-	if got := end("held", "complete"); got != "blocked" {
-		t.Errorf("the end replaced the agent's own status: %s", got)
-	}
-}
-
 func TestWrite(t *testing.T) {
 	v, state := testVault(t)
 	cwd := t.TempDir()
-	rel, _ := Apply(v, state, Event{Kind: "start", Agent: "claude-code", Session: "s1", Cwd: cwd}, at("2026-10-26 09:00"))
+	// a session flok does not follow: write makes its report
+	rel, err := Write(v, state, Selector{Agent: "claude-code", Session: "s1", Cwd: cwd}, "", "", "", at("2026-10-26 09:00"))
+	if err != nil || rel != "agents/2026/2026-10-26/mbp--claude-code--"+vault.Slug(filepath.Base(cwd))+"--s1.md" {
+		t.Fatalf("the report write makes: %s, %v", rel, err)
+	}
+	if r := read(t, v, rel); r.Get("status") != "in-progress" || r.Section("Log") != "- 09:00 started in "+cwd {
+		t.Errorf("a new report: status %q, Log %q", r.Get("status"), r.Section("Log"))
+	}
 	in := "Intro without a heading.\n\n## Decisions\n- merge, never rebase\n\n### open\n- the API key\n"
 	got, err := Write(v, state, Selector{Cwd: filepath.Join(cwd, "sub")}, in, "done", "Digest and hooks\nsecond line", at("2026-10-26 09:30"))
 	if err != nil || got != rel {
@@ -256,18 +106,27 @@ func TestWrite(t *testing.T) {
 	if !strings.Contains(r.Section("Log"), "started in") {
 		t.Error("write touched the log")
 	}
-	_, _ = Apply(v, state, Event{Kind: "end", Agent: "claude-code", Session: "s1", Cwd: cwd}, at("2026-10-26 10:00"))
+	// flok's import of the session fills the same report, and keeps the agent's status
+	rec := Record{Version: 1, Agent: "claude-code", Session: "s1", Cwd: cwd, Created: stamp(at("2026-10-26 09:00")),
+		Updated: stamp(at("2026-10-26 10:00")), Ended: stamp(at("2026-10-26 10:00")), Turns: 1,
+		Log: []Turn{{Started: stamp(at("2026-10-26 09:01")), Ended: stamp(at("2026-10-26 09:20")), Text: "Built it."}}}
+	if got, _, err := Import(v, state, rec, at("2026-10-26 10:00")); err != nil || got != rel {
+		t.Fatalf("the import went to %s, %v; want %s", got, err, rel)
+	}
+	if r := read(t, v, rel); r.Get("status") != "done" || r.Section("Done") != "Intro without a heading." {
+		t.Errorf("after the import: status %q, Done %q", r.Get("status"), r.Section("Done"))
+	}
 	if _, err := Write(v, state, Selector{Session: "s1"}, "", "in-progress", "", at("2026-10-26 10:05")); err == nil {
 		t.Error("an ended session went back to in-progress")
 	}
 	if _, err := Write(v, state, Selector{Session: "s1"}, "", "finished", "", at("2026-10-26 10:05")); err == nil {
 		t.Error("an unknown status was taken")
 	}
-	// an agent without hooks: write makes its report
+	// no session named: write makes one of its own
 	other := t.TempDir()
 	made, err := Write(v, state, Selector{Agent: "codex", Cwd: other}, "Did it.", "done", "Ran once", at("2026-10-26 11:00"))
 	if err != nil || !strings.Contains(made, "--codex--") || read(t, v, made).Section("Done") != "Did it." {
-		t.Fatalf("a report without hooks: %s, %v", made, err)
+		t.Fatalf("a report of its own: %s, %v", made, err)
 	}
 }
 
@@ -291,9 +150,8 @@ func TestDigest(t *testing.T) {
 	day := at("2026-10-26 12:00")
 	mk := func(agent, session, cwd, status, summary string, when time.Time) {
 		_ = os.MkdirAll(cwd, 0o755)
-		_, _ = Apply(v, state, Event{Kind: "start", Agent: agent, Session: session, Cwd: cwd}, when)
-		if status != "" {
-			_, _ = Write(v, state, Selector{Session: session}, "", status, summary, when)
+		if _, err := Write(v, state, Selector{Agent: agent, Session: session, Cwd: cwd}, "", status, summary, when); err != nil {
+			t.Fatal(err)
 		}
 	}
 	base := t.TempDir()
@@ -336,79 +194,51 @@ func TestDigest(t *testing.T) {
 	}
 }
 
-func TestClaudeHooks(t *testing.T) {
+func TestRemoveHooks(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "settings.json")
-	flok := `{"type":"command","command":"/opt/flok hook claude","async":true,"timeout":5}`
-	_ = os.WriteFile(p, []byte(`{"model":"opus","hooks":{"Stop":[{"hooks":[`+flok+`]}],"PreToolUse":[{"matcher":"Bash","hooks":[`+flok+`]}]}}`), 0o600)
-	changed, err := ClaudeHooks(p, "/Users/x/.local/bin/nt", false)
-	if err != nil || !changed {
-		t.Fatalf("install: %v, %v", changed, err)
+	flok := `{"type":"command","command":"/opt/flok hook claude","timeout":5}`
+	nt := func(kind string) string {
+		return `{"type":"command","command":"'/Users/a b/nt' agent ` + kind + `","timeout":10}`
 	}
-	if got, bins := ClaudeHooked(p); strings.Join(got, " ") != "SessionEnd SessionStart Stop" || len(bins) != 3 || bins[0] != "/Users/x/.local/bin/nt" {
-		t.Fatalf("hooked events: %v, binaries %v", got, bins)
+	_ = os.WriteFile(p, []byte(`{"model":"opus","hooks":{"Stop":[{"hooks":[`+flok+`,`+nt("turn")+`]}],"SessionStart":[{"hooks":[`+nt("start")+`]}],`+
+		`"SessionEnd":[{"hooks":[`+nt("end")+`]}],"PreToolUse":[{"matcher":"Bash","hooks":[`+flok+`]}]}}`), 0o600)
+	if !ClaudeHooked(p) {
+		t.Fatal("nt's hooks are not found")
 	}
-	b, _ := os.ReadFile(p)
-	for _, want := range []string{`"model": "opus"`, `/opt/flok hook claude`, `"matcher": "Bash"`, `"/Users/x/.local/bin/nt agent turn"`} {
-		if !strings.Contains(string(b), want) {
-			t.Errorf("settings lack %s:\n%s", want, b)
-		}
-	}
-	if changed, _ := ClaudeHooks(p, "/Users/x/.local/bin/nt", false); changed {
-		t.Error("installing twice changed the file")
-	}
-	if changed, _ := ClaudeHooks(p, "/usr/local/bin/nt", false); !changed {
-		t.Error("a new binary path did not update the hooks")
-	}
-	if b, _ := os.ReadFile(p); strings.Count(string(b), "agent turn") != 1 {
-		t.Errorf("the hook is there more than once:\n%s", b)
-	}
-	if changed, err := ClaudeHooks(p, "", true); err != nil || !changed {
+	if changed, err := RemoveClaudeHooks(p); err != nil || !changed {
 		t.Fatalf("remove: %v, %v", changed, err)
 	}
-	b, _ = os.ReadFile(p)
-	if strings.Contains(string(b), "agent ") || strings.Count(string(b), "flok hook claude") != 2 || strings.Contains(string(b), "SessionStart") {
-		t.Errorf("after removing, nt's hooks or empty events are left, or flok's went:\n%s", b)
-	}
-	if bak, _ := filepath.Glob(p + ".bak-*"); len(bak) == 0 {
-		t.Error("no backup was written")
-	}
-}
-
-func TestHookBinary(t *testing.T) {
-	for cmd, want := range map[string]string{
-		"/opt/homebrew/bin/nt agent turn":                 "/opt/homebrew/bin/nt",
-		"'/Users/a b/nt' agent start --agent copilot-cli": "/Users/a b/nt",
-		"'/Users/it'\\''s/nt' agent end":                  "/Users/it's/nt",
-		"nt agent turn":                                   "nt",
-		"/opt/flok hook claude":                           "",
-	} {
-		if got := hookBinary(cmd); got != want {
-			t.Errorf("hookBinary(%q) = %q, want %q", cmd, got, want)
-		}
-	}
-}
-
-func TestCopilotHooks(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "hooks", "nt.json")
-	if changed, err := CopilotHooks(p, "/bin dir/nt", false); err != nil || !changed {
-		t.Fatalf("install: %v, %v", changed, err)
-	}
 	b, _ := os.ReadFile(p)
-	for _, want := range []string{`"sessionStart"`, `"agentStop"`, `"sessionEnd"`, `"'/bin dir/nt' agent turn --agent copilot-cli"`} {
-		if !strings.Contains(string(b), want) {
-			t.Errorf("hooks file lacks %s:\n%s", want, b)
-		}
+	if strings.Contains(string(b), "agent ") || strings.Count(string(b), "flok hook claude") != 2 || strings.Contains(string(b), "SessionStart") ||
+		!strings.Contains(string(b), `"model": "opus"`) || !strings.Contains(string(b), `"matcher": "Bash"`) {
+		t.Errorf("after removing, nt's hooks or empty events are left, or another hook or setting went:\n%s", b)
 	}
-	if changed, _ := CopilotHooks(p, "/bin dir/nt", false); changed {
-		t.Error("writing the same hooks changed the file")
+	if ClaudeHooked(p) {
+		t.Error("nt's hooks are still found")
 	}
-	if bins := CopilotHooked(p); len(bins) != 3 || bins[0] != "/bin dir/nt" {
-		t.Errorf("the hooks' binaries: %v", bins)
+	if bak, _ := filepath.Glob(p + ".bak-*"); len(bak) != 1 {
+		t.Errorf("backups: %v", bak)
 	}
-	if changed, _ := CopilotHooks(p, "", true); !changed {
-		t.Error("remove did nothing")
+	if changed, _ := RemoveClaudeHooks(p); changed {
+		t.Error("removing twice changed the file")
 	}
-	if _, err := os.Stat(p); err == nil {
+	if changed, err := RemoveClaudeHooks(filepath.Join(t.TempDir(), "none.json")); changed || err != nil {
+		t.Errorf("no settings: %v, %v", changed, err)
+	}
+
+	c := filepath.Join(t.TempDir(), "hooks", "nt.json")
+	_ = os.MkdirAll(filepath.Dir(c), 0o755)
+	_ = os.WriteFile(c, []byte(`{"version":1,"hooks":{"agentStop":[{"type":"command","bash":"/usr/local/bin/nt agent turn --agent copilot-cli"}]}}`), 0o644)
+	if !CopilotHooked(c) {
+		t.Fatal("Copilot's nt hooks are not found")
+	}
+	if changed, err := RemoveCopilotHooks(c); err != nil || !changed {
+		t.Fatalf("remove Copilot's: %v, %v", changed, err)
+	}
+	if CopilotHooked(c) {
 		t.Error("the hooks file is still there")
+	}
+	if changed, _ := RemoveCopilotHooks(c); changed {
+		t.Error("removing a file that is gone changed something")
 	}
 }
