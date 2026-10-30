@@ -4,6 +4,22 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.8.0 (2026-10-30)
+
+New Todo in nt for Mac's menus, and flok writes every agent session's report.
+
+- **New Todo… in nt for Mac:** a right-click on a folder, at any depth, has New Todo…, which
+  asks for the text and adds it under Inbox in that folder's `todo.md`. File › New Todo… (⇧⌘N)
+  does the same in the folder ⌘N would use, and the Folders heading's menu in the root's
+  `todo.md`. The journals', agents' and weekly folders take no todos.
+- **File › Add to Today…** shows; it was missing from the menu since 0.5.1.
+- **nt's own agent hooks are gone:** [flok](https://github.com/w4jnl/flok) 0.13 or later, with
+  its `[notes]` on, writes the session reports through `nt agent import`. `nt install --hooks`
+  says so and installs nothing. On a machine that still has nt's hooks,
+  `nt agent start|turn|end` read their input and do nothing, `nt doctor` warns about them,
+  and `nt uninstall --hooks` takes them out and leaves flok's; both go in a later release.
+  `nt agent write` still starts a report for a session flok does not follow.
+
 ## 0.7.0 (2026-10-29)
 
 Tags as a search filter, todos by folder, and agent reports from flok.
