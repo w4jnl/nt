@@ -527,6 +527,13 @@ final class Workspace {
         return Self.newFolder(for: n.path, folders: ix.folders)
     }
 
+    /// todoFolder is where New Todo… from the File menu adds one: where ⌘N puts a note, unless
+    /// that is the journals', the agents' or the weekly folder; then the root's todo.md ("").
+    var todoFolder: String {
+        let f = newFolder
+        return fixed(f) ? "" : f
+    }
+
     nonisolated static func newFolder(for path: String, folders: RepoIndex.Folders) -> String {
         let dir = (path as NSString).deletingLastPathComponent
         let kept = [folders.daily, folders.agents, folders.weekly].filter { !$0.isEmpty }

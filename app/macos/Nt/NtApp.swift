@@ -32,19 +32,22 @@ struct NtApp: App {
         }
         .defaultSize(width: 1180, height: 820)
         .commands {
-            CommandGroup(after: .newItem) {
-                Button("Add to Today…") { app.capture.open(.today) }
-            }
             CommandGroup(before: .sidebar) {
                 Button(workspace.sidebar ? "Hide Sidebar" : "Show Sidebar") { workspace.sidebar.toggle() }
                     .keyboardShortcut("s", modifiers: [.command, .control])
                 Toggle("Focus Mode", isOn: Binding(get: { workspace.focusMode }, set: { _ in workspace.toggleFocus() }))
                     .keyboardShortcut("l", modifiers: [.command, .shift])
             }
+            // one group: a group placed after .newItem is dropped once .newItem is replaced
             CommandGroup(replacing: .newItem) {
                 Button("New Note…") { workspace.palette = .new }
                     .keyboardShortcut("n")
                     .disabled(workspace.phase != .ready)
+                Button("New Todo…") { workspace.ask = .newTodo(workspace.todoFolder) }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .disabled(workspace.phase != .ready)
+                Button("Add to Today…") { app.capture.open(.today) }
+                Divider()
                 Button("Today") { Task { await workspace.openToday() } }
                     .keyboardShortcut("t")
                 Button("Open…") { workspace.palette = .open }

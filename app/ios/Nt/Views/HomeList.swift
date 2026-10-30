@@ -34,10 +34,11 @@ struct HomeList: View {
                 Menu {
                     Button("New Note…") { ws.ask = .newNote("") }
                     Button("New Folder…") { ws.ask = .newFolder("") }
+                    Button("New Todo…") { ws.ask = .newTodo("") }
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("New note or folder")
+                .accessibilityLabel("New note, folder or todo")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if stacked {
