@@ -16,8 +16,8 @@ import (
 // Statuses are the values of status, in the order a session moves through them.
 var Statuses = []string{"in-progress", "blocked", "done", "failed", "abandoned"}
 
-// sessionFile is where the state folder keeps a session's report path: the path is fixed by
-// the session's first event, so a session that runs past midnight stays in one file.
+// sessionFile is where the state folder keeps a session's report path: the path is fixed when
+// the report is made, so a session that runs past midnight stays in one file.
 func sessionFile(stateDir, agent, session string) string {
 	clean := strings.Map(func(r rune) rune {
 		if r == '/' || r == '\\' || r == 0 {
@@ -29,10 +29,10 @@ func sessionFile(stateDir, agent, session string) string {
 }
 
 // entry is a session's line in the state folder's map: its report's path, then what nt knows of
-// who writes it, a word a line.
+// who writes it, a word a line. Words it does not know, such as the "flok" of nt 0.7, are left
+// out when it is written again.
 type entry struct {
 	rel         string
-	flok        bool // flok imports the session (nt agent import): nt's hooks leave it alone
 	agentStatus bool // the agent wrote its status with nt agent write: an import keeps it
 }
 
@@ -44,10 +44,7 @@ func readEntry(file string) entry {
 	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
 	e := entry{rel: strings.TrimSpace(lines[0])}
 	for _, l := range lines[1:] {
-		switch strings.TrimSpace(l) {
-		case "flok":
-			e.flok = true
-		case "agent-status":
+		if strings.TrimSpace(l) == "agent-status" {
 			e.agentStatus = true
 		}
 	}
@@ -59,9 +56,6 @@ func (e entry) writeTo(file string) error {
 		return err
 	}
 	s := e.rel + "\n"
-	if e.flok {
-		s += "flok\n"
-	}
 	if e.agentStatus {
 		s += "agent-status\n"
 	}
@@ -76,152 +70,44 @@ func (e entry) write(stateDir, agent, session string) error {
 	return e.writeTo(sessionFile(stateDir, agent, session))
 }
 
-func rememberSession(stateDir, agent, session, rel string) error {
-	e := readSession(stateDir, agent, session)
-	e.rel = rel
-	return e.write(stateDir, agent, session)
-}
-
-func recallSession(stateDir, agent, session string) string {
-	return readSession(stateDir, agent, session).rel
-}
-
-// Apply records ev in its session's report at now and returns the report's repository path.
-// The first event of a session makes the report; a start after the session ended, or on a later
-// day, makes a new one that continues it, and ends the earlier one if it never ended. ended is
-// final and updated never moves back. A session flok imports is flok's: Apply leaves it alone.
-func Apply(v *vault.Vault, stateDir string, ev Event, now time.Time) (string, error) {
-	if e := readSession(stateDir, ev.Agent, ev.Session); e.flok {
-		return e.rel, nil
+// reportPath is a new report's repository path: in the agents folder of day, named
+// <host>--<agent>--<project>--<session>.md with the session's first 8 characters.
+func reportPath(v *vault.Vault, day time.Time, host, agent, project, session string) string {
+	sid := strings.ToLower(session)
+	if len(sid) > 8 {
+		sid = sid[:8]
 	}
+	name := strings.Join([]string{orWord(vault.Slug(host), "host"), orWord(vault.Slug(agent), "agent"),
+		orWord(vault.Slug(project), "project"), orWord(vault.Slug(sid), "session")}, "--") + ".md"
+	return v.Unique(path.Join(v.AgentsRel(day), name))
+}
+
+// start makes the report of a session nt has none for, in the agents folder of now's day, and
+// remembers it in the sessions map, so flok's imports of the session fill the same file.
+func start(v *vault.Vault, stateDir, agent, session, cwd string, now time.Time) (string, error) {
 	unlock, err := v.Lock()
 	if err != nil {
 		return "", err
 	}
 	defer unlock()
-	rel := recallSession(stateDir, ev.Agent, ev.Session)
-	var r *Report
-	if rel != "" {
-		if b, err := os.ReadFile(v.Abs(rel)); err == nil {
-			r = ParseReport(b)
-		}
+	project := projectName(cwd)
+	rel := reportPath(v, v.Day(now), v.Host, agent, project, session)
+	r := newReport()
+	branch, head := gitState(cwd)
+	for _, f := range []field{{"type", "agent-report"}, {"schema", "1"}, {"date", v.Day(now).Format("2006-01-02")},
+		{"created", stamp(now)}, {"updated", stamp(now)}, {"agent", agent}, {"host", v.Host}, {"session", session},
+		{"project", project}, {"cwd", cwd}, {"git_branch", branch}, {"git_head", head}, {"status", "in-progress"}} {
+		r.Set(f.key, f.value)
 	}
-	continues := ""
-	if r != nil && ev.Kind == "start" && (r.Get("ended") != "" || r.Get("date") != v.Day(now).Format("2006-01-02")) {
-		continues, r = rel, nil // resumed: a new report that links to the earlier one
+	where := cwd
+	if branch != "" {
+		where += " (" + branch + ")"
 	}
-	created := r == nil
-	if created {
-		rel, r = newSession(v, ev, now)
-		if continues != "" {
-			r.Set("continues", vault.RelLink(rel, continues))
-		}
-	}
-	clock := now.Format("15:04")
-	switch ev.Kind {
-	case "start":
-		if created {
-			where := ev.Cwd
-			if b := r.Get("git_branch"); b != "" {
-				where += " (" + b + ")"
-			}
-			r.Log("- " + clock + " started in " + where)
-		}
-	case "turn":
-		l := logLine(ev.Message)
-		if l == "" {
-			l = "turn ended" // Copilot CLI's agentStop carries no text; the turn still counts
-		}
-		// a turn that says what the last line said, in the same minute, says nothing new:
-		// Copilot CLI sends several agentStops for one turn
-		if line := "- " + clock + " " + l; line != r.LastLog() {
-			r.Log(line)
-		}
-	case "end":
-		if r.Get("ended") == "" {
-			r.Set("ended", stamp(now))
-			if r.Get("status") == "in-progress" {
-				r.Set("status", endStatus(r, ev.Reason))
-			}
-			branch, head := gitState(ev.Cwd)
-			r.Set("git_branch", branch)
-			r.Set("git_head", head)
-			r.Log("- " + clock + " ended")
-		}
-	}
-	if ev.Model != "" && r.Get("model") == "" {
-		r.Set("model", ev.Model)
-	}
-	r.Set("updated", later(r.Get("updated"), now))
+	r.SetSection("Log", "- "+now.Format("15:04")+" started in "+where)
 	if err := vault.WriteFile(v.Abs(rel), r.Bytes()); err != nil {
 		return "", err
 	}
-	if continues != "" {
-		if err := closeEarlier(v, continues, rel); err != nil {
-			return "", err
-		}
-	}
-	return rel, rememberSession(stateDir, ev.Agent, ev.Session, rel)
-}
-
-// closeEarlier ends the report a session went on from, at its last update, when it never ended:
-// a resume or a compaction on a later day sends a start without an end before it, and the report
-// would read in progress for good. Its last log line links to the report the session went on in.
-func closeEarlier(v *vault.Vault, rel, next string) error {
-	b, err := os.ReadFile(v.Abs(rel))
-	if err != nil {
-		return nil // gone meanwhile: nothing to end
-	}
-	r := ParseReport(b)
-	if r.Get("ended") != "" {
-		return nil
-	}
-	at := r.Get("updated")
-	if at == "" {
-		at = r.Get("created")
-	}
-	r.Set("ended", at)
-	if r.Get("status") == "in-progress" {
-		r.Set("status", endStatus(r, ""))
-	}
-	clock := ""
-	if t, err := time.Parse(time.RFC3339, at); err == nil {
-		clock = t.Format("15:04") + " "
-	}
-	r.Log("- " + clock + "continued in [" + path.Base(path.Dir(next)) + "](" + vault.RelLink(rel, next) + ")")
-	return vault.WriteFile(v.Abs(rel), r.Bytes())
-}
-
-// newSession is a new report for ev's session, at a path in the agents folder of now's day.
-func newSession(v *vault.Vault, ev Event, now time.Time) (string, *Report) {
-	project := projectName(ev.Cwd)
-	sid := strings.ToLower(ev.Session)
-	if len(sid) > 8 {
-		sid = sid[:8]
-	}
-	name := strings.Join([]string{orWord(vault.Slug(v.Host), "host"), orWord(vault.Slug(ev.Agent), "agent"),
-		orWord(vault.Slug(project), "project"), orWord(vault.Slug(sid), "session")}, "--") + ".md"
-	rel := v.Unique(path.Join(v.AgentsRel(v.Day(now)), name))
-	r := newReport()
-	branch, head := gitState(ev.Cwd)
-	for _, f := range []field{{"type", "agent-report"}, {"schema", "1"}, {"date", v.Day(now).Format("2006-01-02")},
-		{"created", stamp(now)}, {"updated", stamp(now)}, {"agent", ev.Agent}, {"host", v.Host}, {"session", ev.Session},
-		{"project", project}, {"cwd", ev.Cwd}, {"git_branch", branch}, {"git_head", head}, {"status", "in-progress"}} {
-		r.Set(f.key, f.value)
-	}
-	return rel, r
-}
-
-// endStatus is the status a session that ended without one of its own gets: abandoned when
-// it never finished a turn, failed when it ended on an error, else done.
-func endStatus(r *Report, reason string) string {
-	switch {
-	case r.LogLines() <= 1:
-		return "abandoned"
-	case reason == "error":
-		return "failed"
-	}
-	return "done"
+	return rel, entry{rel: rel}.write(stateDir, agent, session)
 }
 
 // projectName is the name of the git repository around cwd, else of cwd itself.
@@ -318,21 +204,22 @@ func find(v *vault.Vault, stateDir string, sel Selector) (rel, file string, err 
 
 // Write puts the agent's own account into a report: the Done, Decisions and Open sections of
 // text (markdown under those headings; text without them is Done), and status and summary when
-// given. With no report for the selector it makes one, so an agent without hooks can report too.
+// given. With no report for the selector it makes one, so an agent flok does not follow can
+// report too.
 func Write(v *vault.Vault, stateDir string, sel Selector, text, status, summary string, now time.Time) (string, error) {
 	if status != "" && !valid(status) {
 		return "", fmt.Errorf("status is one of %s, not %q", strings.Join(Statuses, ", "), status)
 	}
 	rel, file, err := find(v, stateDir, sel)
 	if errors.Is(err, ErrNoReport) {
-		ev := Event{Kind: "start", Agent: orWord(sel.Agent, "agent"), Session: sel.Session, Cwd: sel.Cwd}
-		if ev.Session == "" {
-			ev.Session = fmt.Sprintf("w%x", now.UnixNano())[:9]
+		agent, session := orWord(sel.Agent, "agent"), sel.Session
+		if session == "" {
+			session = fmt.Sprintf("w%x", now.UnixNano())[:9]
 		}
-		if rel, err = Apply(v, stateDir, ev, now); err != nil {
+		if rel, err = start(v, stateDir, agent, session, sel.Cwd, now); err != nil {
 			return "", err
 		}
-		file = sessionFile(stateDir, ev.Agent, ev.Session)
+		file = sessionFile(stateDir, agent, session)
 	} else if err != nil {
 		return "", err
 	}

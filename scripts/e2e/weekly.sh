@@ -58,11 +58,6 @@ expect "the other machine's summary is its own, with its own tool" "^wrote $(dir
 expect "with its own week" 'Billing migration' "$(cat "$T/tools/copilot.args")"
 B sync >/dev/null 2>&1; A sync >/dev/null 2>&1; A sync >/dev/null 2>&1
 expect "the weekly digest shows both summaries" '### a · claude.*### b · copilot' "$(tr '\n' ' ' < "$T/a/$week")"
-reports() { find "$T/a/agents" -name "*--$1*" 2>/dev/null | wc -l | tr -d ' '; }
-expect "nt's own call to an agent is not reported as a session" '^0$' \
-  "$(printf '{"session_id":"s1abcdef","cwd":"/tmp"}' | NT_NO_REPORT=1 A agent start; reports s1abcdef)"
-expect "while the same hook without it is" '^1$' \
-  "$(printf '{"session_id":"s2abcdef","cwd":"/tmp"}' | A agent start; reports s2abcdef)"
 expect "nt doctor names the tool" 'summary +claude writes' "$(PATH="$T/tools:$PATH" A doctor 2>&1)"
 
 expect "nt week compiles a week by hand; an empty one gets none" '^$' "$(B week last --json | json 'd["rel"]')"

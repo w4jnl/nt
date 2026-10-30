@@ -11,67 +11,43 @@ import (
 	"github.com/w4jnl/nt/internal/agents"
 )
 
-func TestHookChecks(t *testing.T) {
+func TestReportChecks(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("NT_STATE", filepath.Join(dir, "state"))
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
 	t.Setenv("COPILOT_HOME", filepath.Join(dir, "copilot"))
-	nt := filepath.Join(dir, "bin", "nt")
-	if err := os.MkdirAll(filepath.Dir(nt), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(nt, []byte("#!/bin/sh\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	check := func() string {
 		var got []string
-		hookChecks(func(name, state, format string, a ...any) {
+		reportChecks(func(name, state, format string, a ...any) {
 			got = append(got, state+" "+name+" "+fmt.Sprintf(format, a...))
 		})
 		return strings.Join(got, "\n")
 	}
-	if got := check(); !strings.HasPrefix(got, "warn reports agent sessions get no reports: no report imported yet") {
-		t.Errorf("no hooks: %s", got)
+	if got := check(); got != "warn reports agent sessions get no reports: none imported yet, is flok's [notes] on?" {
+		t.Errorf("nothing imported: %s", got)
 	}
-	if _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := agents.CopilotHooks(agents.CopilotHooksPath(), nt, false); err != nil {
-		t.Fatal(err)
-	}
-	if got := check(); got != "ok hooks Claude Code and Copilot CLI sessions get reports" {
-		t.Errorf("both hooked: %s", got)
-	}
-	// flok imports reports: the hooks leave its sessions to it, and without them all is well
 	if err := agents.MarkImported(filepath.Join(dir, "state"), time.Date(2026, 10, 29, 14, 5, 0, 0, time.Local)); err != nil {
 		t.Fatal(err)
 	}
-	if got := check(); got != "ok reports imported by flok, last at Thu 29 Oct 14:05\nok hooks Claude Code and Copilot CLI; they leave the sessions flok imports to flok" {
-		t.Errorf("imported and hooked: %s", got)
+	if got := check(); got != "ok reports imported by flok, last at Thu 29 Oct 14:05" {
+		t.Errorf("imported: %s", got)
 	}
-	for _, remove := range []func() error{
-		func() error { _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, true); return err },
-		func() error { _, err := agents.CopilotHooks(agents.CopilotHooksPath(), nt, true); return err },
+	// nt's hooks of nt 0.7 and before, left behind
+	for path, body := range map[string]string{
+		agents.ClaudeSettingsPath(): `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/opt/homebrew/bin/nt agent turn"}]}]}}`,
+		agents.CopilotHooksPath():   `{"version":1,"hooks":{"agentStop":[{"type":"command","bash":"nt agent turn --agent copilot-cli"}]}}`,
 	} {
-		if err := remove(); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := check(); got != "ok reports imported by flok, last at Thu 29 Oct 14:05" {
-		t.Errorf("imported, no hooks: %s", got)
-	}
-	if _, err := agents.ClaudeHooks(agents.ClaudeSettingsPath(), nt, false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := agents.CopilotHooks(agents.CopilotHooksPath(), nt, false); err != nil {
-		t.Fatal(err)
-	}
-	// the binary the hooks run goes away, as when ~/.local/bin/nt is removed for Homebrew's
-	if err := os.Remove(nt); err != nil {
-		t.Fatal(err)
-	}
-	if got := check(); !strings.HasPrefix(got, "fail hooks they run "+nt+", which is not there") {
-		t.Errorf("a missing binary: %s", got)
+	want := "warn hooks nt's old hooks are still in " + filepath.Join(dir, "claude", "settings.json") + " and " + filepath.Join(dir, "copilot", "hooks", "nt.json") +
+		"; flok writes the reports now: nt uninstall --hooks\nok reports imported by flok, last at Thu 29 Oct 14:05"
+	if got := check(); got != want {
+		t.Errorf("hooks left:\n%s\nwant\n%s", got, want)
 	}
 }
 

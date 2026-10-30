@@ -24,7 +24,7 @@ func TestParseRecord(t *testing.T) {
 
 // TestImport follows one session through flok's records: the report made at the first, its
 // frontmatter and Log rewritten from each, the agent's own account and status kept, the status
-// at the end, turns flok no longer holds kept, and nt's own hooks leaving the session alone.
+// at the end, and turns flok no longer holds kept.
 func TestImport(t *testing.T) {
 	v, state := testVault(t)
 	cwd := t.TempDir()
@@ -96,14 +96,6 @@ func TestImport(t *testing.T) {
 	r = read()
 	if r.Section("Done") != "- reworked it" || r.Get("summary") != "Reworked the reports" || r.Get("status") != "done" {
 		t.Errorf("the agent's own: done %q summary %q status %q", r.Section("Done"), r.Get("summary"), r.Get("status"))
-	}
-
-	// nt's own hooks leave a session flok imports alone
-	if _, err := Apply(v, state, Event{Kind: "turn", Agent: "claude-code", Session: rec.Session, Cwd: cwd, Message: "from the hook"}, at("2026-10-29 14:04")); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(read().Section("Log"), "from the hook") {
-		t.Error("the hook wrote into a session flok imports")
 	}
 
 	// flok drops the oldest turn: its line stays; the end comes

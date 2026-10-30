@@ -47,11 +47,13 @@ for faster search; details under [Requirements](#requirements).
    ```sh
    nt install --sync
    ```
-4. Optional: the nvim plugin, and the agent hooks and skill:
+4. Optional: the nvim plugin, and the agent skill:
    ```sh
-   nt install --nvim            # lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
-   nt install --hooks --skill   # a report for every Claude Code and Copilot CLI session
+   nt install --nvim    # lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
+   nt install --skill   # teach Claude Code and Copilot CLI your notes
    ```
+   A report for every agent session comes from [flok](https://github.com/w4jnl/flok), with its
+   `[notes]` on.
 5. Open the browser with `nt`, or one folder with `nt <folder>`; `?` lists the keys.
 6. Optional, on macOS 26 or later: nt for Mac, the note in live preview, nt's mark in the menu
    bar and ⌥⌘Space to add a line from anywhere. Signed and notarized, with its own nt inside:
@@ -60,7 +62,7 @@ for faster search; details under [Requirements](#requirements).
    ```
 
 `nt doctor` checks every step: the repository, git and the remote, the sync timer, the tools nt
-uses, the nvim plugin, the hooks and the skill, images, and the links in the notes.
+uses, the nvim plugin, the agent reports and the skill, images, and the links in the notes.
 
 ### More install options
 
@@ -118,9 +120,9 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   With a summary tool set, each machine adds its own week in three short lists, Done, Decided and
   Open, written by Claude Code or Copilot CLI: what was written at work goes only to the work
   machine's tool.
-- **Agents.** `nt install --hooks` gives every Claude Code and Copilot CLI session a report in
-  `agents/YYYY/YYYY-MM-DD/`, or [flok](https://github.com/w4jnl/flok) does, with what each turn
-  ran and where it waited, through `nt agent import`; the skill teaches them to search your notes, add to the journal and
+- **Agents.** [flok](https://github.com/w4jnl/flok) gives every Claude Code and Copilot CLI
+  session a report in `agents/YYYY/YYYY-MM-DD/`, with what each turn ran and where it waited,
+  through `nt agent import`; the skill teaches them to search your notes, add to the journal and
   write their own Done, Decisions and Open.
 - **Sync.** `nt sync` commits, fetches, merges and pushes: on a timer, when the browser starts,
   and when nvim exits after a note was written. It never rebases, and it does not merge while a
@@ -149,7 +151,7 @@ Every command that prints data takes `--json`.
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
 | `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
 | `nt sync`, `nt doctor` | sync now; check the setup |
-| `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent hooks and skill |
+| `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent skill |
 | `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |
 | `nt import obsidian <vault>` | bring an Obsidian vault over once |
 | `nt completion bash\|zsh` | shell completion |

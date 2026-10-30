@@ -156,11 +156,10 @@ type: daily
 ## 6. Agent reports
 
 - **One file per agent session.**
-  - nt is the only writer: of flok's records of the session (`nt agent import`), of its own hooks' events until flok imports the session, and of the agent's own account (`nt agent write`).
-  - The path is fixed by the date of the session's first event and never changes. A session that runs past midnight stays in its first day's folder.
-  - A session flok imports stays in one file: each record is the whole session.
-  - A session resumed after it ended, or on a later day, starts a new file, which links to the earlier one (`continues`). If the earlier one never ended, the writer ends it then: `ended` is its `updated`, its status is set as at an end, and its last log line links to the new file.
-  - A writer that finds no report for the session (no hooks, or hooks added mid-session) starts one.
+  - nt is the only writer: of flok's records of the session (`nt agent import`) and of the agent's own account (`nt agent write`). nt 0.7 and before also wrote its own hooks' events.
+  - The path is fixed by the day the session was created and never changes. A session that runs past midnight stays in its first day's folder, and in one file: each of flok's records is the whole session.
+  - Reports nt's hooks wrote can continue an earlier one: a session resumed after it ended, or on a later day, started a new file that links to the earlier one (`continues`), and ended the earlier one at its `updated` when it never ended.
+  - `nt agent write` that finds no report for the session, one flok does not follow, starts one.
   - A session in a temporary folder (`/tmp`, `/var/tmp`, the system's temp folder) gets no report: it is a throwaway, such as a script's `claude -p` in a scratch folder.
 - **The host comes first in the name** (§3), so two machines never write the same file, also for the same project, agent and day. Clients show a report's host beside its title, which is the project's, so the reports of one project from two machines read apart.
 
@@ -192,8 +191,7 @@ type: daily
 | `blocked_minutes` | number | optional, the minutes it waited on a person: a permission, a question |
 | `waited_minutes` | number | optional, the minutes it waited on background work |
 
-- The hooks set `in-progress` at the start. At the end a report still `in-progress` becomes `abandoned` when it never finished a turn, `failed` when the session ended on an error, else `done`; a status the agent wrote stays.
-- From flok's records: `blocked` while the session waits on a person, else `in-progress`; at the end as above, `abandoned` when no turn ended.
+- From flok's records: `blocked` while the session waits on a person, else `in-progress`. At the end `failed` when the session ended on an error, `abandoned` when no turn ended, else `done`. A status the agent wrote stays.
 - Once `ended` is set, nothing sets `in-progress` again; a late turn still adds its log line.
 
 **Body.**
@@ -210,7 +208,7 @@ type: daily
 ```
 
 - `## Done`, `## Decisions` and `## Open` belong to the agent: `nt agent write` replaces them.
-- `## Log` holds `started in <cwd> (<branch>)`, one line per turn, and `ended`. From flok's records a turn's line has what happened in it on indented lines under it: the tools it ran (`  - Bash ×12, Read ×3`) and its events with their times (`  - 13:48 blocked: permission: Bash`, `asked: …`, `waited 12 min for …`, `error: …`, `compacted`), every line at most 200 characters. A line is a single line of at most 200 characters: the first line of the agent's last message that has text, or `turn ended` when the hook carries no message (Copilot CLI's `agentStop` does not). A line that would repeat the log's last line, its minute included, is not added. Secrets and full transcripts do not belong in a report.
+- `## Log` holds `started in <cwd> (<branch>)`, one line per turn, and `ended`. A turn's line is at the time its reply came, with the first line of the reply that has text, or `turn ended` without one; what happened in the turn is on indented lines under it: the tools it ran (`  - Bash ×12, Read ×3`) and its events with their times (`  - 13:48 blocked: permission: Bash`, `asked: …`, `waited 12 min for …`, `error: …`, `compacted`). Every line is a single line of at most 200 characters. Reports nt's hooks wrote have the turn lines alone. Secrets and full transcripts do not belong in a report.
 
 ## 7. Digest
 
