@@ -235,8 +235,8 @@ func TestImportContinues(t *testing.T) {
 		t.Errorf("the hooks' lines stay:\n%s", earlier.Section("Log"))
 	}
 
-	// the same day: flok still has the session ended, so a late turn adds its line; run again,
-	// it goes on in a new report beside it
+	// the same day: flok still has the session ended, so a late turn adds its line; run again
+	// (flok drops ended at a resume's start), it goes on in a new report beside it
 	for _, c := range []struct {
 		name, ended string
 		apart       bool
@@ -245,11 +245,16 @@ func TestImportContinues(t *testing.T) {
 			Updated: "2026-10-29T14:06:00+01:00", Ended: "2026-10-29T14:06:00+01:00", EndReason: "exit", Turns: 1,
 			Log: []Turn{turn("2026-10-29", "13:48", "14:05", "Shipped.")}}
 		rel := imp(rec, "2026-10-29 14:06")
-		rec.Ended, rec.EndReason, rec.Updated, rec.Turns = c.ended, "", "2026-10-29T14:20:00+01:00", 2
+		rec.Ended, rec.EndReason, rec.Updated = c.ended, "", "2026-10-29T14:09:00+01:00"
+		resumedAt := imp(rec, "2026-10-29 14:09") // the resume's start, before a turn
+		if (resumedAt != rel) != c.apart {
+			t.Errorf("%s: the start went to %s after %s", c.name, resumedAt, rel)
+		}
+		rec.Updated, rec.Turns = "2026-10-29T14:20:00+01:00", 2
 		rec.Log = append(rec.Log, turn("2026-10-29", "14:10", "14:20", "Once more."))
 		got := imp(rec, "2026-10-29 14:20")
-		if (got != rel) != c.apart {
-			t.Errorf("%s: %s after %s", c.name, got, rel)
+		if got != resumedAt {
+			t.Errorf("%s: the turn went to %s, the start to %s", c.name, got, resumedAt)
 		}
 		if !c.apart {
 			if !strings.Contains(read(rel).Section("Log"), "- 14:20 Once more.") || read(rel).Get("status") != "done" {
@@ -260,7 +265,7 @@ func TestImportContinues(t *testing.T) {
 		if !strings.HasSuffix(got, "-2.md") || path.Dir(got) != path.Dir(rel) || read(got).Get("continues") != path.Base(rel) {
 			t.Errorf("%s: %s continues %q", c.name, got, read(got).Get("continues"))
 		}
-		if l := read(got).Section("Log"); strings.Contains(l, "Shipped.") || !strings.Contains(l, "- 14:20 Once more.") {
+		if l := read(got).Section("Log"); !strings.HasPrefix(l, "- 14:09 started in ") || strings.Contains(l, "Shipped.") || !strings.Contains(l, "- 14:20 Once more.") {
 			t.Errorf("%s: the new report's Log:\n%s", c.name, l)
 		}
 		if l := read(rel).Section("Log"); !strings.HasSuffix(l, "- 14:06 ended\n- 14:06 continued in [2026-10-29]("+path.Base(got)+")") {
