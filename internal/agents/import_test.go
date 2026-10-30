@@ -3,6 +3,7 @@ package agents
 import (
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -125,6 +126,161 @@ func TestImport(t *testing.T) {
 	}
 	if got, err := Find(v, state, Selector{Cwd: cwd}); err != nil || got != rel {
 		t.Errorf("nt agent write finds %q, %v", got, err)
+	}
+}
+
+// TestImportContinues follows sessions that go on past their report: on a later day, or running
+// again after their report ended. Each part gets a report of its own, in its day's folder, that
+// links the one before; the one before is closed and links on.
+func TestImportContinues(t *testing.T) {
+	v, state := testVault(t)
+	cwd := t.TempDir()
+	read := func(rel string) *Report {
+		t.Helper()
+		b, err := os.ReadFile(v.Abs(rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ParseReport(b)
+	}
+	imp := func(rec Record, now string) string {
+		t.Helper()
+		rel, _, err := Import(v, state, rec, at(now))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rel
+	}
+	turn := func(day, start, end, text string) Turn {
+		return Turn{Started: day + "T" + start + ":00+01:00", Ended: day + "T" + end + ":00+01:00", Text: text}
+	}
+	expect := func(r *Report, want map[string]string) {
+		t.Helper()
+		for k, w := range want {
+			if got := r.Get(k); got != w {
+				t.Errorf("%s = %q, want %q", k, got, w)
+			}
+		}
+	}
+
+	// a session on the 28th, left open, then resumed on the 30th: its start, before a turn
+	rec := Record{Version: 1, Agent: "claude-code", Session: "8c3d0bdf-55ee", Cwd: cwd, Created: "2026-10-28T12:59:00+01:00",
+		Updated: "2026-10-28T13:05:00+01:00", State: "idle", Turns: 1, Tools: 4, Log: []Turn{turn("2026-10-28", "13:00", "13:05", "Morning work.")}}
+	first := imp(rec, "2026-10-28 13:05")
+	rec.Updated = "2026-10-30T20:09:30+01:00"
+	next := imp(rec, "2026-10-30 20:09")
+	if !strings.HasPrefix(next, "agents/2026/2026-10-30/") || path.Base(next) != path.Base(first) {
+		t.Fatalf("the 30th's report is %s, after %s", next, first)
+	}
+	expect(read(next), map[string]string{"date": "2026-10-30", "created": "2026-10-30T20:09:30+01:00", "status": "in-progress",
+		"continues": "../2026-10-28/" + path.Base(first), "turns": "1", "tools": "4", "ended": ""})
+	if got := read(next).Section("Log"); got != "- 20:09 started in "+cwd {
+		t.Errorf("the 30th's Log: %q", got)
+	}
+	earlier := read(first)
+	expect(earlier, map[string]string{"ended": "2026-10-28T13:05:00+01:00", "status": "done", "created": "2026-10-28T12:59:00+01:00"})
+	if want := "- 12:59 started in " + cwd + "\n- 13:05 Morning work.\n- 13:05 continued in [2026-10-30](../2026-10-30/" + path.Base(next) + ")"; earlier.Section("Log") != want {
+		t.Errorf("the 28th's Log:\n%s\nwant\n%s", earlier.Section("Log"), want)
+	}
+	closed, _ := os.ReadFile(v.Abs(first))
+
+	// three records of the 30th's turns fill the one report, and leave the 28th's alone
+	for _, end := range []string{"20:15", "20:40", "21:48"} {
+		rec.Turns++
+		rec.Log = append(rec.Log, turn("2026-10-30", "20:10", end, "Until "+end+"."))
+		rec.Updated = "2026-10-30T" + end + ":00+01:00"
+		if rel := imp(rec, "2026-10-30 "+end); rel != next {
+			t.Fatalf("a record at %s went to %s", end, rel)
+		}
+	}
+	if b, _ := os.ReadFile(v.Abs(first)); string(b) != string(closed) {
+		t.Errorf("the 28th's report changed:\n%s", b)
+	}
+	if got, want := read(next).Section("Log"), "- 20:09 started in "+cwd+"\n- 20:15 Until 20:15.\n- 20:40 Until 20:40.\n- 21:48 Until 21:48."; got != want {
+		t.Errorf("the 30th's Log:\n%s\nwant\n%s", got, want)
+	}
+	if got, err := Find(v, state, Selector{Cwd: cwd}); err != nil || got != next {
+		t.Errorf("nt agent write finds %q, %v", got, err)
+	}
+	rec.Ended, rec.EndReason, rec.Updated = "2026-10-30T21:50:00+01:00", "exit", "2026-10-30T21:50:00+01:00"
+	if rel := imp(rec, "2026-10-30 21:50"); rel != next || read(next).Get("status") != "done" || read(next).Get("ended") != rec.Ended {
+		t.Errorf("the end: %s, status %q ended %q", rel, read(next).Get("status"), read(next).Get("ended"))
+	}
+
+	// flok first saw a session at its resume: nt's old hooks wrote the 28th's report
+	old, err := start(v, state, "claude-code", "a1b2c3d4-hooks", cwd, at("2026-10-28 13:43"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := read(old)
+	r.SetSection("Log", r.Section("Log")+"\n- 13:50 From the hooks.")
+	r.Set("updated", "2026-10-28T13:50:00+01:00")
+	r.Set("model", "claude-fable-5")
+	if err := os.WriteFile(v.Abs(old), r.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hooked := Record{Version: 1, Agent: "claude-code", Session: "a1b2c3d4-hooks", Cwd: cwd, Created: "2026-10-30T20:09:30+01:00",
+		Updated: "2026-10-30T20:20:00+01:00", Turns: 1, Log: []Turn{turn("2026-10-30", "20:10", "20:20", "Tonight.")}}
+	resumed := imp(hooked, "2026-10-30 20:20")
+	if !strings.HasPrefix(resumed, "agents/2026/2026-10-30/") {
+		t.Fatalf("the resumed part is at %s", resumed)
+	}
+	expect(read(resumed), map[string]string{"created": "2026-10-30T20:09:30+01:00", "date": "2026-10-30", "model": "claude-fable-5"})
+	if got := read(resumed).Section("Log"); got != "- 20:09 started in "+cwd+"\n- 20:20 Tonight." {
+		t.Errorf("the resumed part's Log: %q", got)
+	}
+	earlier = read(old)
+	expect(earlier, map[string]string{"created": stamp(at("2026-10-28 13:43")), "ended": "2026-10-28T13:50:00+01:00", "status": "done"})
+	if !strings.Contains(earlier.Section("Log"), "\n- 13:50 From the hooks.\n- 13:50 continued in [2026-10-30]") {
+		t.Errorf("the hooks' lines stay:\n%s", earlier.Section("Log"))
+	}
+
+	// the same day: flok still has the session ended, so a late turn adds its line; run again
+	// (flok drops ended at a resume's start), it goes on in a new report beside it
+	for _, c := range []struct {
+		name, ended string
+		apart       bool
+	}{{"ended000", "2026-10-29T14:06:00+01:00", false}, {"running0", "", true}} {
+		rec := Record{Version: 1, Agent: "claude-code", Session: c.name + "-same-day", Cwd: cwd, Created: "2026-10-29T13:47:00+01:00",
+			Updated: "2026-10-29T14:06:00+01:00", Ended: "2026-10-29T14:06:00+01:00", EndReason: "exit", Turns: 1,
+			Log: []Turn{turn("2026-10-29", "13:48", "14:05", "Shipped.")}}
+		rel := imp(rec, "2026-10-29 14:06")
+		rec.Ended, rec.EndReason, rec.Updated = c.ended, "", "2026-10-29T14:09:00+01:00"
+		resumedAt := imp(rec, "2026-10-29 14:09") // the resume's start, before a turn
+		if (resumedAt != rel) != c.apart {
+			t.Errorf("%s: the start went to %s after %s", c.name, resumedAt, rel)
+		}
+		rec.Updated, rec.Turns = "2026-10-29T14:20:00+01:00", 2
+		rec.Log = append(rec.Log, turn("2026-10-29", "14:10", "14:20", "Once more."))
+		got := imp(rec, "2026-10-29 14:20")
+		if got != resumedAt {
+			t.Errorf("%s: the turn went to %s, the start to %s", c.name, got, resumedAt)
+		}
+		if !c.apart {
+			if !strings.Contains(read(rel).Section("Log"), "- 14:20 Once more.") || read(rel).Get("status") != "done" {
+				t.Errorf("%s: the late turn:\n%s", c.name, read(rel).Section("Log"))
+			}
+			continue
+		}
+		if !strings.HasSuffix(got, "-2.md") || path.Dir(got) != path.Dir(rel) || read(got).Get("continues") != path.Base(rel) {
+			t.Errorf("%s: %s continues %q", c.name, got, read(got).Get("continues"))
+		}
+		if l := read(got).Section("Log"); !strings.HasPrefix(l, "- 14:09 started in ") || strings.Contains(l, "Shipped.") || !strings.Contains(l, "- 14:20 Once more.") {
+			t.Errorf("%s: the new report's Log:\n%s", c.name, l)
+		}
+		if l := read(rel).Section("Log"); !strings.HasSuffix(l, "- 14:06 ended\n- 14:06 continued in [2026-10-29]("+path.Base(got)+")") {
+			t.Errorf("%s: the earlier Log:\n%s", c.name, l)
+		}
+	}
+
+	// past midnight, before day_starts, it is still the same day
+	late := Record{Version: 1, Agent: "claude-code", Session: "late-night", Cwd: cwd, Created: "2026-10-28T23:00:00+01:00",
+		Updated: "2026-10-28T23:30:00+01:00", Turns: 1, Log: []Turn{turn("2026-10-28", "23:00", "23:30", "Late.")}}
+	rel := imp(late, "2026-10-28 23:30")
+	late.Turns, late.Updated = 2, "2026-10-29T01:30:00+01:00"
+	late.Log = append(late.Log, turn("2026-10-29", "01:00", "01:30", "Later."))
+	if got := imp(late, "2026-10-29 01:30"); got != rel {
+		t.Errorf("a turn at 01:00 went to %s, not %s", got, rel)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -81,8 +82,10 @@ func ParseRecord(b []byte) (Record, error) {
 }
 
 // Import writes rec's session's report: made the first time, in the agents folder of the day it
-// was created, then its frontmatter and ## Log rewritten from the record on every call. The
-// agent's own sections, its summary and a status it wrote stay. The sessions map names the
+// was created, then its frontmatter and ## Log rewritten from the record on every call. A report
+// is the session's work on one day: when it goes on on a later day, or runs again after its
+// report ended, a new report in that day's folder continues it, and the earlier one is closed.
+// The agent's own sections, its summary and a status it wrote stay. The sessions map names the
 // report, so nt agent write finds it. ended says the session ended with this call.
 func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel string, ended bool, err error) {
 	unlock, err := v.Lock()
@@ -102,6 +105,16 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 			r = ParseReport(b)
 		}
 	}
+	earlier := ""
+	if r != nil {
+		if since, from, ok := resumed(v, r, rec, e.from, now); ok {
+			earlier, e = e.rel, entry{from: from}
+			model := r.Get("model") // the record names one only once the agent did
+			e.rel, r = newImported(v, rec, host, r.Get("project"), since)
+			r.Set("continues", vault.RelLink(e.rel, earlier))
+			r.Set("model", model)
+		}
+	}
 	if r == nil {
 		project := filepath.Base(rec.Cwd)
 		if rec.Host == "" {
@@ -116,11 +129,10 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 			r.Set(f.key, f.value)
 		}
 	}
-	if rec.Created != "" {
-		r.Set("created", stamp(created))
-	}
-	if r.Get("ended") == "" && rec.Ended != "" {
-		r.Set("ended", stamp(parseTime(rec.Ended, now))) // set once: a session resumed after its end still adds its turns
+	// ended is set once: a session flok still has ended adds its turns all the same; an end before
+	// the report began is the earlier report's
+	if end := parseTime(rec.Ended, now); r.Get("ended") == "" && rec.Ended != "" && !end.Before(parseTime(r.Get("created"), end)) {
+		r.Set("ended", stamp(end))
 	}
 	r.Set("updated", later(r.Get("updated"), parseTime(rec.Updated, now)))
 	if !e.agentStatus {
@@ -130,9 +142,14 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 	r.Set("tools", strconv.Itoa(rec.Tools))
 	r.Set("blocked_minutes", minutes(rec.BlockedS))
 	r.Set("waited_minutes", minutes(rec.WaitedS))
-	r.SetSection("Log", importLog(r, rec))
+	r.SetSection("Log", importLog(r, rec, e.from))
 	if err := vault.WriteFile(v.Abs(e.rel), r.Bytes()); err != nil {
 		return "", false, err
+	}
+	if earlier != "" {
+		if err := closeEarlier(v, earlier, e.rel); err != nil {
+			return "", false, err
+		}
 	}
 	if err := e.write(stateDir, rec.Agent, rec.Session); err != nil {
 		return "", false, err
@@ -140,7 +157,81 @@ func Import(v *vault.Vault, stateDir string, rec Record, now time.Time) (rel str
 	return e.rel, !wasEnded && r.Get("ended") != "", nil
 }
 
-// newImported is a new report for rec's session, in the agents folder of the day it was created.
+// resumed says whether rec goes on past r, the report the sessions map names: a turn of r's
+// part of the session (from on) that began on a later day, or after r ended while flok has the
+// session running again; with no such turn yet, a record still running last updated then.
+// since is when the new report begins, at the number of the session's turns before it.
+func resumed(v *vault.Vault, r *Report, rec Record, from int, now time.Time) (since time.Time, at int, ok bool) {
+	day := r.Get("date")
+	later := func(t time.Time) bool { return v.Day(t).Format("2006-01-02") > day }
+	end, err := time.Parse(time.RFC3339, r.Get("ended"))
+	again := err == nil && rec.Ended == "" // flok's end is final: a session it runs again was resumed
+	first := rec.Turns - len(rec.Log)      // the session's number for rec.Log[0]
+	for i, t := range rec.Log {
+		s, err := time.Parse(time.RFC3339, t.Started)
+		if err == nil && first+i >= from && (later(s) || again && s.After(end)) {
+			return begin(r, rec, s), first + i, true
+		}
+	}
+	u := parseTime(rec.Updated, now)
+	if rec.Ended != "" || !later(u) && !(again && u.After(end)) {
+		return time.Time{}, 0, false
+	}
+	at = rec.Turns
+	if n := len(rec.Log); n > 0 && rec.Log[n-1].Ended == "" {
+		at-- // the turn still open goes on in the new report
+	}
+	return begin(r, rec, u), max(at, from), true
+}
+
+// begin is when a report that continues r begins: at t, or when flok's record began, when that
+// came after r's last update (flok first saw the session at its resume).
+func begin(r *Report, rec Record, t time.Time) time.Time {
+	if c, err := time.Parse(time.RFC3339, rec.Created); err == nil && c.Before(t) && c.After(parseTime(r.Get("updated"), c)) {
+		return c
+	}
+	return t
+}
+
+// closeEarlier closes the report a session went on from: ended at its last update when it never
+// ended, done (abandoned without a turn) when it still read running, and a last Log line that
+// links the report the session went on in.
+func closeEarlier(v *vault.Vault, rel, next string) error {
+	b, err := os.ReadFile(v.Abs(rel))
+	if err != nil {
+		return nil // gone meanwhile: nothing to close
+	}
+	r := ParseReport(b)
+	at := r.Get("ended")
+	if at == "" {
+		at = orWord(r.Get("updated"), r.Get("created"))
+		r.Set("ended", at)
+		if s := r.Get("status"); s == "" || s == "in-progress" || s == "blocked" {
+			r.Set("status", "done")
+			if !turnLogged(r.Section("Log")) {
+				r.Set("status", "abandoned")
+			}
+		}
+	}
+	log := strings.TrimRight(r.Section("Log"), "\n")
+	if log != "" {
+		log += "\n"
+	}
+	r.SetSection("Log", log+line(clock(at)+"continued in ["+path.Base(path.Dir(next))+"]("+vault.RelLink(rel, next)+")"))
+	return vault.WriteFile(v.Abs(rel), r.Bytes())
+}
+
+// turnLogged says whether a Log has a line for a turn: anything but its start, end and link on.
+func turnLogged(log string) bool {
+	for _, l := range strings.Split(log, "\n") {
+		if strings.HasPrefix(l, "- ") && !startLine.MatchString(l) && !endLine.MatchString(l) && !nextLine.MatchString(l) {
+			return true
+		}
+	}
+	return false
+}
+
+// newImported is a new report for rec's session, in the agents folder of the day it begins.
 func newImported(v *vault.Vault, rec Record, host, project string, created time.Time) (string, *Report) {
 	day := v.Day(created)
 	rel := reportPath(v, day, host, rec.Agent, project, rec.Session)
@@ -195,12 +286,14 @@ func minutes(s int) string {
 var (
 	startLine = regexp.MustCompile(`^- (\d\d:\d\d )?started in `)
 	endLine   = regexp.MustCompile(`^- (\d\d:\d\d )?ended$`)
+	nextLine  = regexp.MustCompile(`^- (\d\d:\d\d )?continued in \[`)
 )
 
-// importLog is ## Log from the record: the start, one line per turn with its tools and events
-// under it, and the end. The turns the record no longer holds (flok keeps the latest) keep the
-// lines they were given: as many of the oldest turn lines as turns - len(log).
-func importLog(r *Report, rec Record) string {
+// importLog is ## Log from the record: the start, one line per turn of the report's part of the
+// session (the turns from on) with its tools and events under it, and the end. The report's
+// turns the record no longer holds (flok keeps the latest) keep the lines they were given: as
+// many of the oldest turn lines as there are such turns.
+func importLog(r *Report, rec Record, from int) string {
 	var turns [][]string // the turn lines already there, each with the lines under it
 	for _, l := range strings.Split(r.Section("Log"), "\n") {
 		switch {
@@ -209,7 +302,7 @@ func importLog(r *Report, rec Record) string {
 			if len(turns) > 0 {
 				turns[len(turns)-1] = append(turns[len(turns)-1], l)
 			}
-		case startLine.MatchString(l) || endLine.MatchString(l):
+		case startLine.MatchString(l) || endLine.MatchString(l) || nextLine.MatchString(l):
 		default:
 			turns = append(turns, []string{l})
 		}
@@ -218,12 +311,15 @@ func importLog(r *Report, rec Record) string {
 	if rec.Branch != "" {
 		where += " (" + rec.Branch + ")"
 	}
+	first := rec.Turns - len(rec.Log) // the session's number for rec.Log[0]
 	out := []string{line(clock(r.Get("created")) + "started in " + where)}
-	for _, t := range turns[:min(len(turns), max(0, rec.Turns-len(rec.Log)))] {
+	for _, t := range turns[:min(len(turns), max(0, first-from))] {
 		out = append(out, t...)
 	}
-	for _, t := range rec.Log {
-		out = append(out, turnLines(t)...)
+	for i, t := range rec.Log {
+		if first+i >= from {
+			out = append(out, turnLines(t)...)
+		}
 	}
 	if e := r.Get("ended"); e != "" {
 		out = append(out, line(clock(e)+"ended"))

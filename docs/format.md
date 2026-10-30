@@ -155,10 +155,10 @@ type: daily
 
 ## 6. Agent reports
 
-- **One file per agent session.**
+- **One file per agent session and day.**
   - nt is the only writer: of flok's records of the session (`nt agent import`) and of the agent's own account (`nt agent write`). nt 0.7 and before also wrote its own hooks' events.
-  - The path is fixed by the day the session was created and never changes. A session that runs past midnight stays in its first day's folder, and in one file: each of flok's records is the whole session.
-  - Reports nt's hooks wrote can continue an earlier one: a session resumed after it ended, or on a later day, started a new file that links to the earlier one (`continues`), and ended the earlier one at its `updated` when it never ended.
+  - A report is in the folder of the day it began, and its path never changes. A session that runs past midnight, before `day_starts`, stays in that day's report.
+  - A session that goes on on a later day, or runs again after its report ended (resumed), goes on in a new report in that day's folder, which links to the earlier one (`continues`) and holds that part's turns. The earlier report ends at its `updated` when it never ended, and its Log's last line links on: `- 13:05 continued in [2026-10-30](../2026-10-30/<file>)`. So each day's folder lists the sessions at work that day. nt's hooks did the same up to 0.7.
   - `nt agent write` that finds no report for the session, one flok does not follow, starts one.
   - A session in a temporary folder (`/tmp`, `/var/tmp`, the system's temp folder) gets no report: it is a throwaway, such as a script's `claude -p` in a scratch folder.
 - **The host comes first in the name** (§3), so two machines never write the same file, also for the same project, agent and day. Clients show a report's host beside its title, which is the project's, so the reports of one project from two machines read apart.
@@ -169,8 +169,8 @@ type: daily
 |---|---|---|
 | `type` | `agent-report` | |
 | `schema` | `1` | |
-| `date` | `YYYY-MM-DD` | the session's first day |
-| `created` | time | set once |
+| `date` | `YYYY-MM-DD` | the report's day: the session's first, or the day a continuing report began |
+| `created` | time | set once: when the session, or the part this report holds, began |
 | `updated` | time | never moves backwards |
 | `ended` | time | set once, when the session ends; final |
 | `agent` | slug | `claude-code`, `copilot-cli`, … |
@@ -186,7 +186,7 @@ type: daily
 | `summary` | string | one line, the outcome |
 | `tags` | list | optional |
 | `continues` | path | optional, the report this one resumes |
-| `turns` | number | optional, the turns the session took (from flok) |
+| `turns` | number | optional, the turns the session took (from flok); this and the next three count the whole session, also in a report that continues one |
 | `tools` | number | optional, the tools it ran |
 | `blocked_minutes` | number | optional, the minutes it waited on a person: a permission, a question |
 | `waited_minutes` | number | optional, the minutes it waited on background work |
