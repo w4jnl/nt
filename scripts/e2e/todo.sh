@@ -60,7 +60,7 @@ key x
 expect_soon "x shows the todos beside the folders" '6 open todos · 1 late' capture
 expect_soon "the overdue one first, late in words" '○ Send the slides .*[0-9]+d late' capture
 expect_soon "with the note it is in beside it" '○ Send the slides  Meeting' capture
-expect_soon "and the todo keys in the footer" 'x done +d due +a add +e edit +enter note +X fold done' footer
+expect_soon "and the todo keys in the footer" 'x done +d due +a add +e edit +enter note +f folder +X fold done' footer
 key x
 expect_soon "x checks it" 'done: Send the slides' footer
 expect_soon "it stays a moment with its tick, then goes under Done" '5 open todos' capture
