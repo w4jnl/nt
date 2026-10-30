@@ -4,6 +4,18 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.8.1 (2026-10-30)
+
+A session resumed on a later day is reported in that day's folder again.
+
+- **One report per session and day:** `nt agent import` wrote a session resumed on a later day
+  into the report of the day it began, so that day's digest left it out; nt's hooks had kept a
+  report per day, and the import now does too. A session that goes on on a later day, or runs
+  again after it ended, goes on in a new report in that day's folder: `continues` links the
+  earlier report, which is ended at its last update and links on from its Log. A session past
+  midnight, before `day_starts`, stays in one report. A report's `created` is no longer
+  overwritten by flok's.
+
 ## 0.8.0 (2026-10-30)
 
 New Todo in nt for Mac's menus, and flok writes every agent session's report.
