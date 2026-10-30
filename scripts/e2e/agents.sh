@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Agent reports: flok's records of a session into its report (nt agent import), nt agent write,
-# the digest, and 5 sessions reporting at once on two clones that sync all the while: every
-# report arrives whole on both sides, with no conflict copy. Then nt's old hooks, which do
-# nothing now and come out with nt uninstall --hooks, and the skill's installer.
+# Agent reports: flok's records of a session into its report (nt agent import), a session
+# resumed the next day going on in that day's folder, nt agent write, the digest, and 5 sessions
+# reporting at once on two clones that sync all the while: every report arrives whole on both
+# sides, with no conflict copy. Then nt's old hooks, which do nothing now and come out with
+# nt uninstall --hooks, and the skill's installer.
 source "$(dirname "$0")/lib.sh"
 
 git init --quiet --bare -b main "$T/remote.git"
@@ -57,6 +58,16 @@ expect "a late record does not reopen it" 'status: done' "$(cat "$R")"
 rec copilot-cli 7c1d0e2a 13:50 13:50 done 1 '{"started":"2026-10-29T13:48:00+01:00"}' | A agent import
 C=$(find "$T/a/agents" -name '*--copilot-cli--*7c1d0e2a.md')
 expect "a Copilot session gets its report" 'status: abandoned' "$(cat "$C" 2>/dev/null)"
+
+# --- a session resumed the next day goes on in a report in that day's folder
+before=$(turn 15:00 'Before the break.')
+rec claude-code 5e55a0aa-break 15:00 "" idle 1 "$before" | A agent import
+after=$(turn 15:00 'After the break.' | sed 's/2026-10-29T15:00/2026-10-30T09:20/g')
+rec claude-code 5e55a0aa-break 15:00 "" idle 2 "$before,$after" | A agent import
+E=$(find "$T/a/agents/2026/2026-10-29" -name '*--5e55a0aa.md'); N=$(find "$T/a/agents/2026/2026-10-30" -name '*--5e55a0aa.md' 2>/dev/null)
+expect "a session resumed the next day goes on in that day's folder" '^continues: \.\./2026-10-29/a--claude-code--notetaking--5e55a0aa\.md$' "$(cat "$N" 2>/dev/null)"
+expect "with that day's turns alone" '^- 09:20 After the break\.$' "$(grep -v 'Before the break' "$N" 2>/dev/null)"
+expect "and the day before links on to it" '^- 15:00 continued in \[2026-10-30\]\(\.\./2026-10-30/' "$(cat "$E")"
 
 rc=0; printf '{"version":1,"agent":"claude-code","session":"tmp1","cwd":"/tmp/x"}' | NT_REPORT_TEMP= A agent import || rc=$?
 expect "a throwaway session in /tmp is skipped, exit 0" '^0:$' "$rc:$(find "$T/a/agents" -name '*tmp1*')"

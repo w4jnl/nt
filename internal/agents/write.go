@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,8 +17,8 @@ import (
 // Statuses are the values of status, in the order a session moves through them.
 var Statuses = []string{"in-progress", "blocked", "done", "failed", "abandoned"}
 
-// sessionFile is where the state folder keeps a session's report path: the path is fixed when
-// the report is made, so a session that runs past midnight stays in one file.
+// sessionFile is where the state folder keeps a session's report path: the report flok's
+// imports fill, until the session goes on in a new one (Import).
 func sessionFile(stateDir, agent, session string) string {
 	clean := strings.Map(func(r rune) rune {
 		if r == '/' || r == '\\' || r == 0 {
@@ -29,11 +30,12 @@ func sessionFile(stateDir, agent, session string) string {
 }
 
 // entry is a session's line in the state folder's map: its report's path, then what nt knows of
-// who writes it, a word a line. Words it does not know, such as the "flok" of nt 0.7, are left
-// out when it is written again.
+// the report, a line each. Lines it does not know, such as the "flok" of nt 0.7, are left out
+// when it is written again.
 type entry struct {
 	rel         string
 	agentStatus bool // the agent wrote its status with nt agent write: an import keeps it
+	from        int  // the session's turns before the report's first: an earlier report's
 }
 
 func readEntry(file string) entry {
@@ -44,8 +46,11 @@ func readEntry(file string) entry {
 	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
 	e := entry{rel: strings.TrimSpace(lines[0])}
 	for _, l := range lines[1:] {
-		if strings.TrimSpace(l) == "agent-status" {
+		l = strings.TrimSpace(l)
+		if l == "agent-status" {
 			e.agentStatus = true
+		} else if n, ok := strings.CutPrefix(l, "from "); ok {
+			e.from, _ = strconv.Atoi(n)
 		}
 	}
 	return e
@@ -58,6 +63,9 @@ func (e entry) writeTo(file string) error {
 	s := e.rel + "\n"
 	if e.agentStatus {
 		s += "agent-status\n"
+	}
+	if e.from > 0 {
+		s += "from " + strconv.Itoa(e.from) + "\n"
 	}
 	return vault.WriteFile(file, []byte(s))
 }
