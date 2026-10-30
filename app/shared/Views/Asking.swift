@@ -1,5 +1,5 @@
 // The questions before nt writes a note or a folder: a name for a new one or a new name, a new
-// todo for a folder's todo.md, the folder to move to, and whether to delete, saying what goes
+// todo for a folder's todo.md or the root's, the folder to move to, and whether to delete, saying what goes
 // along and how many notes link to it. ItemMenu is what can be done to a note or a folder, for
 // its menus.
 import SwiftUI
@@ -58,7 +58,7 @@ struct Asking: ViewModifier {
         switch ws.ask {
         case .newNote(let f): f.isEmpty ? "New note" : "New note in \(f)"
         case .newFolder(let f): f.isEmpty ? "New folder" : "New folder in \(f)"
-        case .newTodo(let f): "New todo in \(f)"
+        case .newTodo(let f): f.isEmpty ? "New todo" : "New todo in \(f)"
         case .rename(let p): p.hasSuffix(".md") ? "Rename the note" : "Rename \((p as NSString).lastPathComponent)"
         case .delete(let p): "Delete \(removal?.title.map { "“\($0)”" } ?? (p as NSString).lastPathComponent)?"
         default: ""
@@ -78,10 +78,15 @@ struct Asking: ViewModifier {
         return "Create"
     }
 
+    /// todoFile is the todo.md a new todo for folder goes to; "" is the root's.
+    private static func todoFile(_ folder: String) -> String {
+        folder.isEmpty ? "todo.md" : folder + "/todo.md"
+    }
+
     private var message: String {
         switch ws.ask {
         case .newNote: return "Its title; the file is named after it, with today's date."
-        case .newTodo(let f): return "It goes under Inbox in \(f)/todo.md; due:fri in the text sets its date."
+        case .newTodo(let f): return "It goes under Inbox in \(Self.todoFile(f)); due:fri in the text sets its date."
         case .rename(let p): return p.hasSuffix(".md") ? "The title and the file name change; the links to it are fixed." : "The links into it are fixed."
         case .delete:
             guard let r = removal else { return "" }
@@ -106,7 +111,7 @@ struct Asking: ViewModifier {
             case .newFolder(let f): await ws.makeFolder(name, in: f)
             case .newTodo(let f):
                 let text = name.trimmingCharacters(in: .whitespaces)
-                if !text.isEmpty, await ws.addTodo(text, in: f) { ws.say("Added to \(f)/todo.md · Inbox") }
+                if !text.isEmpty, await ws.addTodo(text, in: f) { ws.say("Added to \(Self.todoFile(f)) · Inbox") }
             case .rename(let p): if !name.trimmingCharacters(in: .whitespaces).isEmpty { await ws.rename(p, to: name) }
             case .delete(let p): await ws.remove(p)
             default: break

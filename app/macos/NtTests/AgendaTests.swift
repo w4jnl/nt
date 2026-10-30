@@ -150,6 +150,14 @@ struct TodoActionTests {
         #expect(read("todo.md").contains("- [ ] Renew the domain due:2026-11-06"))
         #expect(await ws.addTodo("Order a spare disk", in: "homelab"))
         #expect(read("homelab/todo.md").contains("- [ ] Order a spare disk"))
+
+        // File › New Todo… goes to the folder selected, never the agents' folder, else the root
+        #expect(ws.todoFolder == "")
+        ws.selection = .folder("homelab")
+        #expect(ws.todoFolder == "homelab")
+        ws.selection = .folder("agents/2026")
+        #expect(ws.todoFolder == "")
+        ws.selection = nil
         let domain = try #require(ws.todos.first { $0.text == "Renew the domain" })
         await ws.setDue(domain, "none")
         #expect(read("todo.md").contains("- [ ] Renew the domain\n"))

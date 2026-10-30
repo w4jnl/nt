@@ -462,6 +462,10 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
   the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
+- The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search
+  notes… and Sync now. New Todo… asks for the text and adds it under Inbox in the `todo.md` of
+  the folder ⌘N would use, or the root's when that is the journals', the agents' or the weekly
+  folder (added 2026-10-30).
 - New note (⌘N) is the same field for a title: `nt n` makes the note in the folder selected in
   the sidebar, else in the folder of the one on screen (nt's default folder from a journal, an
   agent report, a digest or the root), links it from today's journal and opens it with the
@@ -469,8 +473,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - **Notes and folders** (added 2026-10-28). A folder in the sidebar selects, as the place for
   ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, New
   Todo… (into its `todo.md`; not in the journals', agents' or weekly folder), Rename…, Move… and
-  Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note… and
-  New Folder… at the root. They ask first, in an alert or a sheet of folders (a name that is no
+  Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note…, New
+  Folder… and New Todo… at the root. They ask first, in an alert or a sheet of folders (a name that is no
   folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
   a delete says what goes with it and how many notes link to it. The journals, the agents'
   reports and the digests are not renamed or moved.
@@ -711,7 +715,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - Settings shows the repository's settings (`.nt/config.toml`); the phone's own machine
     settings are its name and its key, which a new key replaces at once.
   - Notes and folders, as on the Mac: + on the home list (New Note at nt's default folder, New
-    Folder at the root) and in a folder screen; a long press on a row has Rename, Move and
+    Folder and New Todo at the root) and in a folder screen; a long press on a row has Rename, Move and
     Delete, and a note's ⋯ the same. A row swipes as in Mail: to the right Move and Rename, to
     the left Delete, a full swipe the first of them (a delete still asks). On the iPhone a new note opens on a
     screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not

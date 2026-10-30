@@ -41,6 +41,7 @@ struct SidebarView: View {
                     .contextMenu {
                         Button("New Note…") { ws.ask = .newNote("") }
                         Button("New Folder…") { ws.ask = .newFolder("") }
+                        Button("New Todo…") { ws.ask = .newTodo("") }
                     }
             }
         }
