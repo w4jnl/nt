@@ -474,8 +474,9 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   agent report, a digest or the root), links it from today's journal and opens it with the
   cursor at its end.
 - **Notes and folders** (added 2026-10-28). A folder in the sidebar selects, as the place for
-  ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, Rename…,
-  Move… and Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note… and
+  ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, New
+  Todo… (into its `todo.md`; not in the journals', agents' or weekly folder), Rename…, Move… and
+  Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note… and
   New Folder… at the root. They ask first, in an alert or a sheet of folders (a name that is no
   folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
   a delete says what goes with it and how many notes link to it. The journals, the agents'
@@ -853,6 +854,9 @@ change.
   - The browser: `f` opens a picker of every note and the top-level folders with open todos,
     with how many; the summary says `from <folder>/`.
   - The Mac and iOS apps: "from every note" in the summary is a menu of the same.
+  - A todo for a folder at any depth: New Todo… in the folder's menu (its + on the iPhone, a
+    right-click or a long press elsewhere) asks for the text and adds it under Inbox in that
+    folder's `todo.md`, as the browser's `a` does in the folder it is in (added 2026-10-30).
   - A todo added while a folder is kept to goes to that folder's `todo.md` (`nt todo add
     --in`), and the add field says so. The choice is not remembered: the view starts at every
     note, and nothing about it is written to the notes.
