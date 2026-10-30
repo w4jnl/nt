@@ -230,7 +230,7 @@ func TestImportContinues(t *testing.T) {
 		t.Errorf("the resumed part's Log: %q", got)
 	}
 	earlier = read(old)
-	expect(earlier, map[string]string{"created": "2026-10-28T13:43:00" + at("2026-10-28 13:43").Format("-07:00"), "ended": "2026-10-28T13:50:00+01:00", "status": "done"})
+	expect(earlier, map[string]string{"created": stamp(at("2026-10-28 13:43")), "ended": "2026-10-28T13:50:00+01:00", "status": "done"})
 	if !strings.Contains(earlier.Section("Log"), "\n- 13:50 From the hooks.\n- 13:50 continued in [2026-10-30]") {
 		t.Errorf("the hooks' lines stay:\n%s", earlier.Section("Log"))
 	}
