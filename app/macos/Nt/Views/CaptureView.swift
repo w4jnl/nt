@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 /// CapturePanel is the small floating field the capture shortcut opens, wherever the person is:
 /// it takes the keys without bringing nt's window forward, says where the text went, and goes.
@@ -11,6 +12,8 @@ final class CapturePanel: NSObject, NSWindowDelegate {
     private var closing: Task<Void, Never>?
     private var top: CGFloat? // where the panel's top edge stays while it grows and shrinks
     private var keys: Any? // the folder list's keys, ahead of the field (keys(_:))
+    private var activated = false // settle had to bring nt forward; hide gives the keys back
+    private let log = Logger(subsystem: "nl.w4j.nt", category: "capture")
 
     init(capture: Capture) {
         self.capture = capture
@@ -28,12 +31,51 @@ final class CapturePanel: NSObject, NSWindowDelegate {
             p.setFrameTopLeftPoint(NSPoint(x: f.midX - p.frame.width / 2, y: top ?? 0))
         }
         p.makeKeyAndOrderFront(nil)
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(60))
+            self?.settle(p)
+        }
     }
 
     func hide() {
         closing?.cancel()
         panel?.orderOut(nil)
         capture.added = nil
+        if activated {
+            activated = false
+            NSApp.deactivate() // back to the app the person was in
+        }
+    }
+
+    /// settle makes sure, a moment after the panel shows, that the keys go to its field, so
+    /// typing never only beeps. When they do not, it says why in the log (log show --predicate
+    /// 'subsystem == "nl.w4j.nt"') and puts them there: the panel key again, bringing nt forward
+    /// when it has to, and the field the first responder.
+    func settle(_ p: KeyPanel) {
+        guard p.isVisible, capture.added == nil else { return }
+        if !p.isKeyWindow {
+            let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+            log.notice("the panel is not key; nt active \(NSApp.isActive), in front \(front, privacy: .public), key \(String(describing: NSApp.keyWindow), privacy: .public)")
+            p.makeKeyAndOrderFront(nil)
+            if !p.isKeyWindow {
+                NSApp.activate()
+                activated = true
+                p.makeKeyAndOrderFront(nil)
+            }
+        }
+        if !(p.firstResponder is NSTextView), let f = p.contentView.flatMap(Self.field) {
+            log.notice("the field had no keys; first responder \(String(describing: p.firstResponder), privacy: .public)")
+            p.makeFirstResponder(f)
+        }
+    }
+
+    /// field is the panel's text field, where the keys go.
+    private static func field(in v: NSView) -> NSTextField? {
+        if let f = v as? NSTextField, f.isEditable { return f }
+        for s in v.subviews {
+            if let f = field(in: s) { return f }
+        }
+        return nil
     }
 
     /// done shows what was added for a moment, then closes the panel.
