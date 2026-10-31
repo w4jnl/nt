@@ -127,6 +127,49 @@ struct CaptureActionTests {
         #expect(await !c.submit(alternate: false), "nothing to add")
     }
 
+    @Test func tabPicksTheFolderOfATodo() async throws {
+        for (dir, file) in [("homelab/rack", "2026-10-01-ups.md"), ("work", "plan.md"), ("assets", "x.md")] {
+            try FileManager.default.createDirectory(at: root.appending(path: dir), withIntermediateDirectories: true)
+            try "# \(file)\n".write(to: root.appending(path: "\(dir)/\(file)"), atomically: true, encoding: .utf8)
+        }
+        #expect(await ws.prepare())
+        let c = Capture(workspace: ws)
+        c.began(.today)
+        #expect(c.places.first == "" && c.places.contains("homelab/rack") && c.places.contains("work"))
+        #expect(!c.places.contains("assets"), "no todos among the images")
+
+        // Tab, a few letters, Return: the line is a todo in that folder's todo.md
+        c.text = "Order patch cables due:fri"
+        c.openPlaces()
+        #expect(c.picking && c.pick == 0)
+        c.query = "rack"
+        #expect(c.target == "homelab/rack/todo.md · Inbox", "the footer names the folder chosen in the list")
+        c.choose()
+        #expect(!c.picking && c.mode == .todo && c.folder == "homelab/rack")
+        #expect(c.target == "homelab/rack/todo.md · Inbox")
+        #expect(await c.submit(alternate: false))
+        #expect(read("homelab/rack/todo.md").contains("- [ ] Order patch cables due:"))
+        #expect(c.added?.place == "homelab/rack/todo.md" && c.open(in: "homelab/rack") == 1)
+
+        // the list opens at the folder chosen, and esc leaves it there
+        c.openPlaces()
+        #expect(c.places[c.pick] == "homelab/rack")
+        c.movePick(-1)
+        c.closePlaces()
+        #expect(c.folder == "homelab/rack")
+        // the next panel starts at the root's todo.md again
+        c.began(.todo)
+        #expect(c.folder == "" && c.target == "todo.md · Inbox")
+    }
+
+    @Test func placesMatchLikeOpen() {
+        let dirs = ["homelab", "homelab/rack", "work", "work/q3"]
+        #expect(Capture.places("", in: dirs) == ["", "homelab", "homelab/rack", "work", "work/q3"])
+        #expect(Capture.places("q3", in: dirs).first == "work/q3")
+        #expect(Capture.places("hl", in: dirs).first == "homelab")
+        #expect(Capture.places("zz", in: dirs).isEmpty)
+    }
+
     @Test func settingsChangeThroughNtConfig() async throws {
         #expect(await ws.prepare())
         await ws.loadSettings()
