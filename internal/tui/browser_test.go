@@ -322,6 +322,7 @@ func TestTodoList(t *testing.T) {
 // folders with open todos; a todo added there goes to that folder's todo.md.
 func TestTodoScope(t *testing.T) {
 	b := testBrowser(t, 200, t.TempDir())
+	b.v.Now = func() time.Time { return time.Date(2026, 10, 29, 10, 0, 0, 0, time.Local) }
 	for f, body := range map[string]string{
 		"todo.md":                 "# Todo\n\n## Inbox\n\n- [ ] Renew passport\n",
 		"homelab/todo.md":         "# Todo\n\n## Inbox\n\n- [ ] Replace the fan\n",
