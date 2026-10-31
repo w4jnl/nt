@@ -8,7 +8,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         if ws.needsYou && !ws.active {
-            TimelineView(.periodic(from: .now, by: 1.15)) { ctx in
+            TimelineView(.periodic(from: Badge.launched, by: 1.15)) { ctx in
                 let on = Int(ctx.date.timeIntervalSinceReferenceDate / 1.15) % 2 == 0
                 Image(nsImage: MarkImage.mark(alert: on))
             }
@@ -28,7 +28,7 @@ struct MenuBarMenu: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+        TimelineView(.everyMinute) { ctx in // a schedule that stays the same (Badge.launched)
             let b = Badge.of(ws.status, syncing: ws.syncing, now: ctx.date)
             Text(b.detail.isEmpty ? "\(b.glyph) \(b.word)" : "\(b.glyph) \(b.word) · \(b.detail)")
         }

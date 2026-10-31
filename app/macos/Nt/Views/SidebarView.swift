@@ -3,11 +3,22 @@ import SwiftUI
 /// SidebarView is the left column: Open, Today, the views (Todos, Calendar, Weekly, Agents) and the
 /// folders, pinned first, with the sync state at its foot. The sync state stays out of the
 /// toolbar, which would draw it as a glass button and fold it into the overflow menu when the
-/// sidebar is hidden.
+/// sidebar is hidden, and out of the list, whose rows would scroll under it.
 struct SidebarView: View {
     @Environment(Workspace.self) private var ws
 
     var body: some View {
+        VStack(spacing: 0) {
+            list
+            SyncBadgeView()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+        }
+    }
+
+    private var list: some View {
         List(selection: Binding(get: { ws.selection }, set: { ws.select($0) })) {
             Label("Today", systemImage: "sun.max")
                 .tag(Workspace.Selection.today)
@@ -50,12 +61,6 @@ struct SidebarView: View {
             OpenField()
                 .padding(.horizontal, 10)
                 .padding(.bottom, 6)
-        }
-        .safeAreaInset(edge: .bottom) {
-            SyncBadgeView()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.bottom, 8)
         }
     }
 }
