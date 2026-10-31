@@ -2,10 +2,12 @@
 
 The notes repository on the phone: a full clone, synced with git over ssh, written by nt's own
 Go code running inside the app. A third client of the same repository; docs/design.md §9 is the
-spec, and phase 7 lists its steps. Steps 1 to 5 are in: the first run makes the phone's key and
-clones the notes; then the home list (Today, Todos, Calendar, Weekly, Agents, the pinned folders
-and the folders, search, the sync state), notes in live preview that are written as on the Mac,
-the views, the capture sheet and Settings, voice, and Shortcuts and Siri.
+spec, and phase 7 lists its steps, all built: the first run makes the phone's key and clones the
+notes; then the home list (Today, Todos, Calendar, Weekly, Agents, the pinned folders and the
+folders, search, the sync state), notes in live preview that are written as on the Mac, the
+views, notes and folders made, renamed, moved and deleted, the capture sheet and Settings,
+voice, and Shortcuts and Siri. It ships through TestFlight (`make ios-testflight`), not the App
+Store yet; `make ios-device` puts it on a connected phone.
 
 ## Build
 
@@ -88,7 +90,8 @@ own. A link followed in a note is a new screen, so Back returns; the one web vie
 screen on top. On an iPad, or in a window as wide, the sidebar beside the note, as on the Mac.
 Pull the list down, or tap the sync state, to sync. For screenshots, `-NTView todos|calendar|
 weekly|agents|settings`, `-NTFolder <path>` and `-NTOpen <path>` open a screen at launch, and
-`-NTCapture today` the capture sheet.
+`-NTCapture today` the capture sheet; `assets/demo/phone.sh` takes the README's phone pictures
+that way, in the simulator on the demo notes.
 
 ## Layout
 

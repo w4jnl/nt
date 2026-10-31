@@ -6,9 +6,10 @@ steps, all done and released with 0.5.1 (`brew install --cask w4jnl/tap/nt-app`,
 notarized DMG on the release). It shows notes in live preview, follows links, saves what is
 written in them through nt (`nt _editor save`) as the nvim plugin does, and has the Todos,
 Calendar, Weekly and Agents views. A folder selects as the place for a new note, and a
-right-click makes, renames, moves or deletes notes and folders, their links kept. It stays in
-the menu bar, where ⌥⌘Space opens a field that adds a line to today or a todo from anywhere, and
-Settings (⌘,) has nt's settings and its own.
+right-click makes, renames, moves or deletes notes and folders, their links kept, and New Todo…
+(⇧⌘N, or a folder's menu) adds a todo to a folder's `todo.md`. It stays in the menu bar, where
+⌥⌘Space opens a field that adds a line to today or a todo from anywhere, Tab picking the todo's
+folder, and Settings (⌘,) has nt's settings and its own.
 
 macOS keeps ⌥⌘Space for the Finder search window until it is turned off in System Settings ›
 Keyboard › Keyboard Shortcuts › Spotlight; Settings › App says so, or records another shortcut.
@@ -35,6 +36,12 @@ make build && D=$(assets/demo/scene.sh)
 NT_CONFIG=$D/config.toml NT_STATE=$D/state NT_REPO=$D/notes \
   app/macos/build/DerivedData/Build/Products/Debug/nt.app/Contents/MacOS/nt -NTAppearance dark
 ```
+
+For screenshots it also takes `-NTOpen <path>`, `-NTView todos|calendar|weekly|agents`,
+`-NTPalette open|text|new`, `-NTCapture today|todo` with `-NTQuery <text>` and `-NTPlaces 1`
+(the panel, the text typed, its folder list open) and `-NTShot <dir>` (the panel off screen,
+drawn to `<dir>/capture.png`). `assets/demo/mac.sh` takes the README's pictures that way, from
+a copy of the app with its own bundle id, so the nt for Mac you run is left alone.
 
 ## Layout
 

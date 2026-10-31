@@ -170,13 +170,16 @@ final class Workspace {
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || phase == .ready { return }
         guard await prepare() else { return }
         watch()
-        #if os(macOS)
-        await openToday()
-        #endif
-        // For screenshots: -NTOpen <repository path> opens a note after today, -NTView todos,
-        // calendar, weekly or agents a view, -NTPalette open, text or new the palette (and
-        // -NTQuery types into it).
-        if let path = UserDefaults.standard.string(forKey: "NTOpen") { await open(path) }
+        // For screenshots: -NTOpen <repository path> opens a note in place of today, -NTView
+        // todos, calendar, weekly or agents a view, -NTPalette open, text or new the palette
+        // (and -NTQuery types into it).
+        if let path = UserDefaults.standard.string(forKey: "NTOpen") {
+            await open(path)
+        } else {
+            #if os(macOS)
+            await openToday()
+            #endif
+        }
         switch UserDefaults.standard.string(forKey: "NTView") {
         case "todos": select(.todos)
         case "calendar": select(.calendar)
