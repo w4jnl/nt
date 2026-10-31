@@ -7,7 +7,7 @@ struct SyncBadgeView: View {
     private static let spinner = ["◐", "◓", "◑", "◒"]
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: ws.syncing ? 0.15 : 30)) { ctx in
+        TimelineView(.periodic(from: Badge.launched, by: ws.syncing ? 0.15 : 30)) { ctx in
             let b = Badge.of(ws.status, syncing: ws.syncing, now: ctx.date)
             let frame = Int(ctx.date.timeIntervalSinceReferenceDate / 0.15) % Self.spinner.count
             Button {

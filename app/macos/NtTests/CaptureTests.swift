@@ -221,6 +221,54 @@ struct CaptureActionTests {
         #expect(field() == "New todo", "the text field kept the keys")
     }
 
+    /// Each time the panel opens its field has the keys, also after a line was added: typing
+    /// into a panel without them only beeps.
+    @Test func theFieldHasTheKeysEachTimeThePanelOpens() async throws {
+        #expect(await ws.prepare())
+        let c = Capture(workspace: ws)
+        let panel = CapturePanel(capture: c)
+        NSApp.deactivate()
+        let w = panel.make()
+        w.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        defer { w.orderOut(nil) }
+        func open() {
+            c.began(.today) // what show() does, without putting the panel on the screen
+            w.orderFrontRegardless()
+            w.makeKey()
+        }
+        func field() -> String {
+            guard let f = (w.firstResponder as? NSTextView)?.delegate as? NSTextField else { return "" }
+            return f.placeholderString ?? f.placeholderAttributedString?.string ?? "?"
+        }
+        func until(_ what: String, _ ok: () -> Bool) async throws {
+            let end = ContinuousClock.now + .seconds(5)
+            while !ok() && ContinuousClock.now < end {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            #expect(ok(), "\(what)")
+        }
+        for round in 1...3 {
+            open()
+            try await until("round \(round): the field has the keys, not \(field())") { field() == "Add to today" }
+            c.text = "Line \(round)"
+            let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                     windowNumber: w.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)
+            NSApp.sendEvent(e!) // Return adds it, the panel says where and goes
+            try await until("round \(round): the line is added") { c.added != nil }
+            try await until("round \(round): the panel goes") { !w.isVisible }
+        }
+        #expect(read(ws.journalPath(ws.today)).contains("Line 3"))
+        // whatever took the keys while it was hidden, opening gives them back to the field
+        w.makeFirstResponder(nil)
+        open()
+        try await until("after the keys went elsewhere: the field has them, not \(field())") { field() == "Add to today" }
+        // and settle puts them back when the field has none a moment after the panel shows (a
+        // panel that is not key is not tried here: settle may then bring nt forward)
+        w.makeFirstResponder(nil)
+        panel.settle(w)
+        #expect(field() == "Add to today")
+    }
+
     @Test func placesMatchLikeOpen() {
         let dirs = ["homelab", "homelab/rack", "work", "work/q3"]
         #expect(Capture.places("", in: dirs) == ["", "homelab", "homelab/rack", "work", "work/q3"])
