@@ -513,7 +513,12 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - The capture shortcut, ⌥⌘Space unless changed, opens a field over whatever is in front, from a
   global hot key (Carbon's `RegisterEventHotKey`, no accessibility permission). Return adds the
   line to today's journal (`nt a`), Shift-Return makes it a todo (`nt todo add`; `due:fri` in the
-  text sets its date); New todo… opens it the other way round. Under the field: the file and
+  text sets its date); New todo… opens it the other way round. Tab opens the folders a todo
+  can go to under the field (added 2026-10-31): the root's `todo.md` first, then every folder
+  that takes todos (not the journals', agents' or weekly folder, assets or a hidden one), each
+  with its open todos; typing narrows them as Open does, ↑↓ chooses, Return or Tab takes one
+  and makes the line a todo there (`nt todo add --in`), esc goes back to the text and keeps the
+  folder. Each time the panel opens it starts at the root. Under the field: the file and
   section it goes to and the keys. Once added it says where, "Added to Tuesday 28 October at
   11:42 · Log", and goes after a moment; esc or a click elsewhere closes it. When nt cannot, it
   says why and keeps the text.

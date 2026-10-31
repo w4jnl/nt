@@ -565,6 +565,12 @@ final class Workspace {
         return [f.daily, f.agents, f.weekly].contains { !$0.isEmpty && (path == $0 || path.hasPrefix($0 + "/")) }
     }
 
+    /// placeable says whether a folder takes notes and todos the person adds: not assets or a
+    /// hidden folder, nor the journals', the agents' or the weekly folder.
+    func placeable(_ dir: String) -> Bool {
+        !fixed(dir) && !dir.split(separator: "/").contains { $0 == "assets" || $0.hasPrefix(".") }
+    }
+
     /// deletable says whether path may be deleted: anything but the root and the journals', the
     /// agents' and the weekly folder themselves.
     func deletable(_ path: String) -> Bool {

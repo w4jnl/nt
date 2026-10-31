@@ -160,8 +160,7 @@ struct MoveSheet: View {
         let here = (path as NSString).deletingLastPathComponent
         let dirs = [""] + (ws.index?.dirs ?? [])
         return dirs.filter { d in
-            d != here && d != path && !d.hasPrefix(path + "/") && !ws.fixed(d)
-                && !d.split(separator: "/").contains { $0 == "assets" || $0.hasPrefix(".") }
+            d != here && d != path && !d.hasPrefix(path + "/") && ws.placeable(d)
         }
     }
 
