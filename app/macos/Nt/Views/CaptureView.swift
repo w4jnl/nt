@@ -10,7 +10,7 @@ final class CapturePanel: NSObject, NSWindowDelegate {
     private var panel: KeyPanel?
     private var closing: Task<Void, Never>?
     private var top: CGFloat? // where the panel's top edge stays while it grows and shrinks
-    private var tab: Any? // Tab in the panel opens or takes the folder list; a field would move focus
+    private var keys: Any? // the folder list's keys, ahead of the field (keys(_:))
 
     init(capture: Capture) {
         self.capture = capture
@@ -45,7 +45,8 @@ final class CapturePanel: NSObject, NSWindowDelegate {
         }
     }
 
-    private func make() -> KeyPanel {
+    /// make builds the panel; the tests make it without showing it.
+    func make() -> KeyPanel {
         let p = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 104), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         p.isFloatingPanel = true
         p.level = .floating
@@ -61,14 +62,38 @@ final class CapturePanel: NSObject, NSWindowDelegate {
         host.sizingOptions = .preferredContentSize
         p.contentViewController = host
         panel = p
-        tab = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.keyCode == 48, event.window === self.panel,
-                  event.modifierFlags.isDisjoint(with: [.command, .control, .option]),
-                  self.capture.added == nil, !self.capture.busy else { return event }
-            self.capture.picking ? self.capture.choose() : self.capture.openPlaces()
-            return nil
+        keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.keys(event) == true ? nil : event
         }
         return p
+    }
+
+    /// keys takes the keys of the folder list, before the field sees them: Tab opens it, and
+    /// while it is open every key is the list's: typing and delete narrow it, ↑↓ choose, Return
+    /// or Tab take the folder, esc goes back. The field keeps the focus all the while, so
+    /// nothing hangs on moving it. It says whether it took the key.
+    func keys(_ e: NSEvent) -> Bool {
+        guard e.window === panel, capture.added == nil, !capture.busy,
+              e.modifierFlags.isDisjoint(with: [.command, .control]) else { return false }
+        guard capture.picking else {
+            guard e.keyCode == 48, !e.modifierFlags.contains(.option) else { return false } // Tab
+            capture.openPlaces()
+            return true
+        }
+        switch e.keyCode {
+        case 48, 36, 76: capture.choose() // Tab, Return, Enter
+        case 53: capture.closePlaces() // esc
+        case 125: capture.movePick(1)
+        case 126: capture.movePick(-1)
+        case 51, 117: capture.deleteBack() // delete, forward delete
+        default:
+            // letters; not arrows or function keys, which AppKit gives private-use characters
+            let typed = (e.characters ?? "").unicodeScalars.filter { u in
+                !CharacterSet.controlCharacters.contains(u) && !(0xF700...0xF8FF).contains(u.value)
+            }
+            capture.type(String(String.UnicodeScalarView(typed)))
+        }
+        return true
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -93,13 +118,12 @@ final class KeyPanel: NSPanel {
 
 /// CaptureView is the panel: nt's mark and the field, the file the text goes to and the keys
 /// under it; once added, where it went. Tab opens the folders a todo can go to, under the field:
-/// typing narrows them, ↑↓ chooses, Return or Tab takes one, esc goes back to the text.
+/// typing narrows them, ↑↓ chooses, Return or Tab takes one, esc goes back to the text (the
+/// panel's keys(_:) takes those keys).
 struct CaptureView: View {
     @Bindable var capture: Capture
     let panel: CapturePanel
-    @FocusState private var focus: Field?
-
-    private enum Field { case text, place }
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -129,8 +153,8 @@ struct CaptureView: View {
                     TextField(capture.mode == .today ? "Add to today" : "New todo", text: $capture.text)
                         .textFieldStyle(.plain)
                         .font(.system(size: 20))
-                        .foregroundStyle(Brand.ink)
-                        .focused($focus, equals: .text)
+                        .foregroundStyle(capture.picking ? Brand.muted : Brand.ink)
+                        .focused($focused)
                         .onSubmit(submit)
                         .onExitCommand { panel.hide() }
                         .disabled(capture.busy)
@@ -175,12 +199,10 @@ struct CaptureView: View {
         .frame(width: 620)
         .background(Brand.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Brand.line))
-        .onChange(of: capture.shown, initial: true) { focus = .text }
-        .onChange(of: capture.picking) { focus = capture.picking ? .place : .text }
-        .onChange(of: capture.query) { capture.pick = 0 }
+        .onChange(of: capture.shown, initial: true) { focused = true }
     }
 
-    /// places is the folder list: a field that narrows it, then the folders, the chosen one
+    /// places is the folder list: what was typed to narrow it, then the folders, the chosen one
     /// marked, each with its todo.md's open todos.
     private var places: some View {
         let rows = capture.places
@@ -191,15 +213,19 @@ struct CaptureView: View {
                     .foregroundStyle(Brand.muted)
                     .frame(width: 24)
                     .accessibilityHidden(true)
-                TextField("Folder", text: $capture.query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Brand.ink)
-                    .focused($focus, equals: .place)
-                    .onSubmit { capture.choose() }
-                    .onKeyPress(.downArrow) { capture.movePick(1); return .handled }
-                    .onKeyPress(.upArrow) { capture.movePick(-1); return .handled }
-                    .onExitCommand { capture.closePlaces() }
+                HStack(spacing: 1) {
+                    Text(capture.query)
+                        .foregroundStyle(Brand.ink)
+                    Rectangle().fill(Brand.accent).frame(width: 2, height: 18)
+                    if capture.query.isEmpty {
+                        Text(" Folder: type to narrow")
+                            .foregroundStyle(Brand.muted)
+                    }
+                }
+                .font(.system(size: 15))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(capture.query.isEmpty ? "Folder" : "Folder: \(capture.query)")
+                Spacer(minLength: 0)
             }
             .frame(height: 40)
             .padding(.horizontal, 20)
