@@ -4,6 +4,7 @@
 import AppKit
 import Carbon.HIToolbox
 import Foundation
+import SwiftUI
 import Testing
 @testable import Nt
 
@@ -160,6 +161,64 @@ struct CaptureActionTests {
         // the next panel starts at the root's todo.md again
         c.began(.todo)
         #expect(c.folder == "" && c.target == "todo.md · Inbox")
+    }
+
+    /// The folder list works from the keyboard alone, through the real panel: real key events,
+    /// with nt not the active app, as when the panel is over another one. The panel is off
+    /// screen and never takes the person's keyboard.
+    @Test func theFolderListWorksFromTheKeyboard() async throws {
+        for (dir, file) in [("homelab", "nas.md"), ("work", "plan.md")] {
+            try FileManager.default.createDirectory(at: root.appending(path: dir), withIntermediateDirectories: true)
+            try "# \(file)\n".write(to: root.appending(path: "\(dir)/\(file)"), atomically: true, encoding: .utf8)
+        }
+        #expect(await ws.prepare())
+        let c = Capture(workspace: ws)
+        let panel = CapturePanel(capture: c)
+        NSApp.deactivate()
+        let w = panel.make()
+        w.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        w.orderFrontRegardless()
+        w.makeKey()
+        defer { w.orderOut(nil) }
+        c.began(.today)
+        func press(_ code: UInt16, _ chars: String) {
+            let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                     windowNumber: w.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
+            NSApp.sendEvent(e!)
+        }
+        // the field that has the keys, by its placeholder
+        func field() -> String {
+            guard let f = (w.firstResponder as? NSTextView)?.delegate as? NSTextField else { return "" }
+            return f.placeholderString ?? f.placeholderAttributedString?.string ?? "?"
+        }
+        let end = ContinuousClock.now + .seconds(5)
+        while field() != "Add to today" && ContinuousClock.now < end {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(field() == "Add to today")
+        c.text = "Order cables"
+
+        press(48, "\t") // Tab
+        #expect(c.picking && c.places == ["", "homelab", "work"] && c.pick == 0)
+        press(125, "\u{F701}") // ↓
+        press(125, "\u{F701}")
+        press(126, "\u{F700}") // ↑
+        #expect(c.pick == 1 && c.target == "homelab/todo.md · Inbox")
+        press(13, "w") // typing narrows the list, and leaves the text alone
+        #expect(c.query == "w" && c.places == ["work"] && c.pick == 0)
+        press(51, "\u{7F}") // delete
+        press(4, "h")
+        press(31, "o")
+        #expect(c.query == "ho" && c.places == ["homelab"] && c.text == "Order cables")
+        press(36, "\r") // Return takes it
+        #expect(!c.picking && c.folder == "homelab" && c.mode == .todo && c.text == "Order cables")
+        press(48, "\t") // Tab opens it at the folder chosen; esc goes back and keeps it
+        #expect(c.picking && c.places[c.pick] == "homelab")
+        press(125, "\u{F701}")
+        press(53, "\u{1B}")
+        #expect(!c.picking && c.folder == "homelab")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(field() == "New todo", "the text field kept the keys")
     }
 
     @Test func placesMatchLikeOpen() {

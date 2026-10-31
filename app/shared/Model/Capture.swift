@@ -97,6 +97,17 @@ final class Capture {
         picking = true
     }
 
+    /// type narrows the folder list with what was typed; deleteBack takes the last letter off.
+    func type(_ s: String) {
+        query += s
+        pick = 0
+    }
+
+    func deleteBack() {
+        query = String(query.dropLast())
+        pick = 0
+    }
+
     /// movePick moves the choice in the folder list by one row up or down.
     func movePick(_ by: Int) {
         pick = min(max(0, pick + by), max(0, places.count - 1))
