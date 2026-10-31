@@ -22,10 +22,17 @@ struct NtApp: App {
                     }
                     await workspace.start()
                     // For screenshots: -NTCapture today or todo opens the capture panel, with
-                    // -NTQuery typed into it.
+                    // -NTQuery typed into it and, with -NTPlaces 1, its folder list open;
+                    // -NTShot <dir> keeps it off screen, for screencapture (CapturePanel.shot).
                     if let mode = UserDefaults.standard.string(forKey: "NTCapture") {
-                        app.capture.open(mode == "todo" ? .todo : .today)
+                        let m: Capture.Mode = mode == "todo" ? .todo : .today
+                        if let dir = UserDefaults.standard.string(forKey: "NTShot") {
+                            app.capture.panel?.shot(m, to: dir)
+                        } else {
+                            app.capture.open(m)
+                        }
                         app.capture.text = UserDefaults.standard.string(forKey: "NTQuery") ?? ""
+                        if UserDefaults.standard.bool(forKey: "NTPlaces") { app.capture.openPlaces() }
                     }
                 }
                 .frame(minWidth: 720, minHeight: 480)

@@ -827,8 +827,10 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 - Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
 
 **6. Mac app** (§8). Done: steps 0 to 5, released with 0.5.1 (2026-10-28) as its own cask,
-`brew install --cask w4jnl/tap/nt-app`, or the notarized DMG. What could follow is under §8,
-Later.
+`brew install --cask w4jnl/tap/nt-app`, or the notarized DMG. Since then: notes and folders made,
+renamed, moved and deleted (0.6.0), tags in the frontmatter line and todos by folder (0.7.0),
+New Todo… in the folder menus and File (0.8.0), and the capture panel's Tab for the folder a
+todo goes to (after 0.8.1). What could follow is under §8, Later.
 
 **7. iOS app** (moved after the Mac app, 2026-10-27; planned 2026-10-28, §9): libgit2 on the
 phone and nt's Go code inside the app; reading, capture, todos and editing, on iPhone and iPad.
@@ -916,6 +918,9 @@ change.
     `nt paste --from`.
   - Screenshots of each view in both themes on `assets/demo/scene.sh`'s notes; the app takes
     `-NTAppearance dark|light`, `-NTOpen <path>`, `-NTView todos|calendar|weekly|agents`,
-    `-NTPalette open|text|new`, `-NTCapture today|todo` (the capture panel) and `-NTQuery <text>`
-    (typed into either).
+    `-NTPalette open|text|new`, `-NTCapture today|todo` (the capture panel), `-NTQuery <text>`
+    (typed into either), `-NTPlaces 1` (the panel's folder list open) and `-NTShot <dir>` (the
+    panel kept off screen, drawing itself to `<dir>/capture.png`). `assets/demo/mac.sh` takes
+    the README's pictures that way, from a copy of the app with its own bundle id, and
+    `assets/demo/phone.sh` the phone's in the simulator (`-NTOpen`, `-NTView`).
 - **Manual.** In Ghostty + tmux, go through `nt` → `t a n e / i`, once with a dark terminal background and once with a light one. Then check on github.com that links, images, the README hero and the agents `README.md` digest render.

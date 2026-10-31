@@ -78,6 +78,26 @@ final class CapturePanel: NSObject, NSWindowDelegate {
         return nil
     }
 
+    /// shot draws the panel for a screenshot (-NTShot <dir>): shown far off screen and never
+    /// key, so it takes nobody's keys, and a second later, once the text is in and the folder
+    /// list open, its view is written to <dir>/capture.png at the screen's scale, the corners
+    /// clear. assets/demo/mac.sh makes the README's.
+    func shot(_ mode: Capture.Mode, to dir: String) {
+        capture.began(mode)
+        let p = panel ?? make()
+        p.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        p.orderFrontRegardless()
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            if let t = p.firstResponder as? NSTextView { // the text as typed, not selected
+                t.setSelectedRange(NSRange(location: t.string.utf16.count, length: 0))
+            }
+            guard let v = p.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+            v.cacheDisplay(in: v.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: dir + "/capture.png"))
+        }
+    }
+
     /// done shows what was added for a moment, then closes the panel.
     func done() {
         closing?.cancel()

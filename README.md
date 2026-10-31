@@ -2,10 +2,10 @@
 
 [![ci](https://github.com/w4jnl/nt/actions/workflows/ci.yml/badge.svg)](https://github.com/w4jnl/nt/actions/workflows/ci.yml)
 
-Plain markdown notes in a folder, synced by git, read and written from the terminal. A journal
-per day, dated topic notes in folders you name, todos in any note, a calendar, a weekly digest,
-and a folder where coding agents report what they did. Your editor edits, git syncs, `rg`
-searches; nt keeps them together and stays out of the way.
+Plain markdown notes in a folder, synced by git, read and written from the terminal, from a Mac
+window and from the phone. A journal per day, dated topic notes in folders you name, todos in
+any note, a calendar, a weekly digest, and a folder where coding agents report what they did.
+Your editor edits, git syncs, `rg` searches; nt keeps them together and stays out of the way.
 
 nt is a two-pane browser and a plain command line over the same folder. On the left the folders,
 notes, the todo list or the month; on the right the note, rendered, with its images in terminals
@@ -17,9 +17,20 @@ other editor.
 
 <p align="center"><img src="assets/readme/cli.gif" alt="An 18-second recording of the command line: nt a adds a timestamped line to today's journal, nt todo add adds a todo due Friday, nt todo lists the open todos overdue first with the note each is in, nt s restic shows the matching lines per note, nt ls homelab lists the folder's notes newest first" width="760"></p>
 
+The same folder is a Mac app and a phone app, both written through nt's own code so the files
+stay the same. **nt for Mac** has the sidebar beside the note in live preview, nt's mark in the
+menu bar, and a field ⌥⌘Space opens from anywhere for a line or a todo. **nt for iPhone and
+iPad** keeps a full clone on the phone, synced with git over ssh by a key the phone makes.
+
+<p align="center"><img src="assets/readme/mac.png" alt="nt for Mac in the dark theme: the sidebar with Today, Todos with 6 open, Calendar, Weekly and Agents, the homelab folder open on its three notes and the other folders below, synced at the foot; the NAS setup note on the right in live preview: its date and tags, the diagram drawn in place, a table in mono and the start of a code block" width="900"></p>
+
+<p align="center"><img src="assets/readme/mac-capture.png" alt="The menu under nt's mark in the menu bar: the sync state, Add to Today and New Todo with their keys, the notes opened last, Settings and Quit; beside it the capture panel ⌥⌘Space opens, in todo mode with a todo typed and its folder list open under the field, the root's todo.md first with 3 open, then the folders" width="900"></p>
+
+<p align="center"><img src="assets/readme/phone-screens.jpg" alt="Three iPhone screens of nt in the dark theme: the home list with Today, Todos with 6 open and 1 late, Calendar, Weekly and Agents, the pinned folders and every folder, synced at the foot; the NAS setup note in live preview with the diagram and the table; the Todos view, 6 open with one 2 days late, then Done" width="900"></p>
+
 ## Setup
 
-Current version: 0.7.0 · [release notes](CHANGELOG.md). Needs git, and `fzf` for find, `rg`
+Current version: 0.8.1 · [release notes](CHANGELOG.md). Needs git, and `fzf` for find, `rg`
 for faster search; details under [Requirements](#requirements).
 
 1. Install the binary. Homebrew, on macOS or Linux:
@@ -29,7 +40,7 @@ for faster search; details under [Requirements](#requirements).
    Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
    (Linux and macOS, `amd64` and `arm64`, no Go, no root):
    ```sh
-   ver=0.7.0; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+   ver=0.8.1; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
    curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
    shasum -a 256 -c --ignore-missing sha256sums.txt
@@ -56,10 +67,15 @@ for faster search; details under [Requirements](#requirements).
    `[notes]` on.
 5. Open the browser with `nt`, or one folder with `nt <folder>`; `?` lists the keys.
 6. Optional, on macOS 26 or later: nt for Mac, the note in live preview, nt's mark in the menu
-   bar and ⌥⌘Space to add a line from anywhere. Signed and notarized, with its own nt inside:
+   bar and ⌥⌘Space to add a line or a todo from anywhere. Signed and notarized, with its own nt
+   inside:
    ```sh
    brew install --cask w4jnl/tap/nt-app   # or the DMG from the releases page
    ```
+7. Optional, on an iPhone or iPad with iOS 26: nt for iPhone and iPad, the same notes as a full
+   clone on the phone, synced with git over ssh by a key the phone makes. It is in TestFlight
+   and not on the App Store yet; with Xcode 26, `make ios-device` builds it onto a connected
+   phone ([app/ios](app/ios/README.md)).
 
 `nt doctor` checks every step: the repository, git and the remote, the sync timer, the tools nt
 uses, the nvim plugin, the agent reports and the skill, images, and the links in the notes.
@@ -130,6 +146,18 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 - **nvim.** `<leader>ip` pastes the clipboard's image beside the note, `<leader>tx` checks the
   todo under the cursor, and notes changed on disk reload.
 - **`nt doctor`** checks the setup and lists the links that point at nothing.
+- **nt for Mac.** The same folder in a window: the sidebar with the views, the pins and every
+  folder, the note in live preview as Typora shows it (a line's markdown only while the cursor
+  is on it, images in place, tasks ticked with a click), saved through nt and never under a
+  sync's merge. ⌘P opens a note by its title, ⇧⌘F searches, ⌘N makes a note where a folder is
+  selected, ⇧⌘N a todo, and a right-click makes, renames, moves or deletes with the links kept.
+  nt's mark in the menu bar shows the sync state; ⌥⌘Space opens a field from anywhere that
+  adds a line to today, or with Shift-Return a todo, and Tab picks the folder the todo goes to.
+- **nt for iPhone and iPad.** A full clone on the phone, synced with git over ssh by a key the
+  phone makes and keeps in its Keychain, written by nt's own code inside the app. The home list,
+  the note in live preview with a bar above the keyboard (a task, a heading, a link, a photo,
+  the mic), the views, a capture sheet, and "Add to today" and "New todo" for Siri, Shortcuts
+  and the Action button. Dictation and "talk a note" run on the device; only the words are kept.
 
 ## Commands
 
@@ -195,8 +223,8 @@ follows them.
 
 - **The format** ([docs/format.md](docs/format.md)) is the contract for a notes repository:
   layout, names, frontmatter, journals, agent reports, digests, todos, moving and renaming, and
-  how clients write and sync. Any client can follow it: nt, nt for Mac, the agents, a script, or
-  the iPhone app in testing. A repository that follows it reads well without nt.
+  how clients write and sync. Any client can follow it: nt, nt for Mac, nt for iPhone and iPad,
+  the agents, a script. A repository that follows it reads well without nt.
 - **How nt works** ([docs/design.md](docs/design.md)): sync, agents, the CLI and the browser,
   images, the code layout and the phases it is built in. [docs/research.md](docs/research.md) is
   the survey of notes tools behind it.
@@ -216,6 +244,8 @@ follows them.
 - [docs/design.md](docs/design.md): how nt works, and its phases
 - [docs/design-system](docs/design-system/README.md): voice, colour, the mark, the terminal UI
 - [docs/research.md](docs/research.md): the notes tools surveyed before nt was designed
+- [app/macos](app/macos/README.md) and [app/ios](app/ios/README.md): building, testing and
+  releasing the Mac and the iPhone and iPad apps
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md)
 - [Release notes](CHANGELOG.md), newest first
 
@@ -231,11 +261,13 @@ What that means in practice:
 - Features are the ones I need. Requests that do not fit that workflow will probably be declined,
   politely.
 - macOS is the first-class platform; Linux works, and the end-to-end suites run on both in CI.
+  The Mac app needs macOS 26; the phone app is built from source or taken from TestFlight.
 - There is no compatibility promise between versions yet, beyond the repository format, which
   says how it changes. Read the release notes before `brew upgrade`.
 - Bug reports with a reproduction are welcome; support is best effort.
 
-nt is at 0.7.0 (2026-10-29): tags as a search filter, todos by folder, and reports from flok.
+nt is at 0.8.1 (2026-10-30): New Todo in nt for Mac's menus, every agent session's report
+written from flok's record, one report per session and day.
 [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release, newest first; the same text
 is on each GitHub release.
 
@@ -250,5 +282,7 @@ The browser uses [Bubble Tea](https://github.com/charmbracelet/bubbletea),
 configuration is read with [BurntSushi/toml](https://github.com/BurntSushi/toml). The README's
 browser recording comes from a real [Ghostty](https://ghostty.org) window, so the image in the
 note shows (`assets/demo/ghostty.sh`); the command-line one is made with
-[vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`).
+[vhs](https://github.com/charmbracelet/vhs) (`assets/demo/record.sh`). The Mac pictures are
+taken from a copy of the app on the same notes (`assets/demo/mac.sh`), the phone's in the
+simulator (`assets/demo/phone.sh`).
 JetBrains Mono, in `docs/design-system/fonts/`, is under the SIL Open Font License.
