@@ -556,8 +556,9 @@ rendered text.
 - An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
   `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
   line of its own at the cursor or where it was dropped.
-- Code blocks are mono on `surface-sunk`, the language at the top right. Tables stay their source,
-  in mono; a rendered table can come later.
+- Code blocks are mono on `surface-sunk`, the language at the top right. A table is drawn as one
+  while the cursor is outside it, its header set apart and its cells' code, emphasis and links
+  kept; with the cursor on it, its source in mono.
 - "Linked from" follows the note, as in the terminal browser.
 - esbuild builds the page into one file, `Nt/Resources/editor/editor.js`, committed with its
   `LICENSES.txt` (MIT, 21 packages), so building the app needs no Node. It is the app's one
@@ -585,7 +586,6 @@ rendered text.
 - **Typewriter scrolling and focus mode's defaults** in Settings; in the first plan, not built.
 - **The capture shortcut's default.** macOS keeps ⌥⌘Space for the Finder search window unless
   it is turned off; Settings says so. Another default may serve better once it has been used.
-- **Tables rendered** in the editor; they are their source in mono now.
 - **The calendar's day:** tick its todos there too, as in Todos.
 - **The DMG:** a background and the icons laid out.
 - **Tests:** the Swift tests run inside the app and write its UserDefaults (the notes opened

@@ -22,11 +22,11 @@ stay the same. **nt for Mac** has the sidebar beside the note in live preview, n
 menu bar, and a field ⌥⌘Space opens from anywhere for a line or a todo. **nt for iPhone and
 iPad** keeps a full clone on the phone, synced with git over ssh by a key the phone makes.
 
-<p align="center"><img src="assets/readme/mac.png" alt="nt for Mac in the dark theme: the sidebar with Today, Todos with 6 open, Calendar, Weekly and Agents, the homelab folder open on its three notes and the other folders below, synced at the foot; the NAS setup note on the right in live preview: its date and tags, the diagram drawn in place, a table in mono and the start of a code block" width="900"></p>
+<p align="center"><img src="assets/readme/mac.png" alt="nt for Mac in the dark theme: the sidebar with Today, Todos with 6 open, Calendar, Weekly and Agents, the homelab folder open on its three notes and the other folders below, synced at the foot; the NAS setup note on the right in live preview: its date and tags, the diagram drawn in place, a table and the start of a code block" width="900"></p>
 
 <p align="center"><img src="assets/readme/mac-capture.png" alt="The menu under nt's mark in the menu bar: the sync state, Add to Today and New Todo with their keys, the notes opened last, Settings and Quit; beside it the capture panel ⌥⌘Space opens, in todo mode with a todo typed and its folder list open under the field, the root's todo.md first with 3 open, then the folders" width="900"></p>
 
-<p align="center"><img src="assets/readme/phone-screens.jpg" alt="Three iPhone screens of nt in the dark theme: the home list with Today, Todos with 6 open and 1 late, Calendar, Weekly and Agents, the pinned folders and every folder, synced at the foot; the NAS setup note in live preview with the diagram and the table; the Todos view, 6 open with one 2 days late, then Done" width="900"></p>
+<p align="center"><img src="assets/readme/phone-screens.jpg" alt="Three iPhone screens of nt in the dark theme: the home list with Today, Todos with 6 open and 1 late, Calendar, Weekly and Agents, the pinned folders and every folder, synced at the foot; the NAS setup note in live preview with the diagram and the table drawn as one; the Todos view, 6 open with one 2 days late, then Done" width="900"></p>
 
 ## Setup
 

@@ -311,6 +311,124 @@ class FrontmatterWidget extends WidgetType {
   }
 }
 
+// TableWidget is a table drawn as one while the cursor is outside it; the cells keep their
+// code, emphasis and links, which click as elsewhere. A click on it puts the cursor in the
+// table, whose source then shows.
+class TableWidget extends WidgetType {
+  constructor(head, aligns, rows) {
+    super();
+    this.head = head;
+    this.aligns = aligns;
+    this.rows = rows;
+    this.key = JSON.stringify([head, aligns, rows]);
+  }
+  eq(o) {
+    return o.key === this.key;
+  }
+  toDOM() {
+    const t = document.createElement("table");
+    t.className = "cm-tbl";
+    const row = (cells, tag) => {
+      const tr = document.createElement("tr");
+      cells.forEach((parts, i) => {
+        const c = document.createElement(tag);
+        if (this.aligns[i]) c.style.textAlign = this.aligns[i];
+        for (const p of parts) {
+          if (p.t === "text") {
+            c.append(p.text);
+            continue;
+          }
+          const s = document.createElement(p.t === "link" ? "span" : p.t === "code" ? "code" : p.t);
+          s.textContent = p.text;
+          if (p.t === "code") s.className = "cm-icode";
+          if (p.t === "link") {
+            s.className = p.broken ? "cm-link cm-link-broken" : "cm-link";
+            s.dataset.href = p.href;
+            s.title = p.href;
+          }
+          c.append(s);
+        }
+        tr.append(c);
+      });
+      return tr;
+    };
+    const thead = document.createElement("thead");
+    thead.append(row(this.head, "th"));
+    const tbody = document.createElement("tbody");
+    for (const r of this.rows) tbody.append(row(r, "td"));
+    t.append(thead, tbody);
+    return t;
+  }
+  ignoreEvent() {
+    return false;
+  }
+  get estimatedHeight() {
+    return 32 * (this.rows.length + 1);
+  }
+}
+
+// cellParts is a table cell's content as the widget draws it: text, with code, em, strong,
+// del and link runs.
+function cellParts(doc, cell, broken) {
+  const parts = [];
+  let pos = cell.from;
+  const text = (a, b) => {
+    if (b > a) parts.push({ t: "text", text: doc.sliceString(a, b) });
+  };
+  const inner = (n, markName) => {
+    const m = n.getChildren(markName);
+    return doc.sliceString(m[0]?.to ?? n.from, m[1]?.from ?? n.to);
+  };
+  for (let c = cell.firstChild; c; c = c.nextSibling) {
+    text(pos, c.from);
+    switch (c.name) {
+      case "InlineCode":
+        parts.push({ t: "code", text: inner(c, "CodeMark") });
+        break;
+      case "Emphasis":
+        parts.push({ t: "em", text: inner(c, "EmphasisMark") });
+        break;
+      case "StrongEmphasis":
+        parts.push({ t: "strong", text: inner(c, "EmphasisMark") });
+        break;
+      case "Strikethrough":
+        parts.push({ t: "del", text: inner(c, "StrikethroughMark") });
+        break;
+      case "Link": {
+        const marks = c.getChildren("LinkMark");
+        const url = c.getChild("URL");
+        if (marks.length < 2 || !url) {
+          text(c.from, c.to);
+          break;
+        }
+        const href = cleanDest(doc.sliceString(url.from, url.to));
+        parts.push({ t: "link", text: doc.sliceString(marks[0].to, marks[1].from), href, broken: broken.has(href) });
+        break;
+      }
+      default:
+        text(c.from, c.to);
+    }
+    pos = c.to;
+  }
+  text(pos, cell.to);
+  return parts;
+}
+
+// alignsOf reads a table's delimiter row: `:---` left, `---:` right, `:---:` center, else none.
+export function alignsOf(delim) {
+  return delim
+    .replace(/^\s*\|/, "")
+    .replace(/\|\s*$/, "")
+    .split("|")
+    .map((c) => {
+      const s = c.trim();
+      if (s.startsWith(":") && s.endsWith(":")) return "center";
+      if (s.endsWith(":")) return "right";
+      if (s.startsWith(":")) return "left";
+      return null;
+    });
+}
+
 class BacklinksWidget extends WidgetType {
   constructor(items) {
     super();
@@ -641,6 +759,44 @@ export const frontmatterField = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+// A table is drawn as one while the cursor is outside it, its source in mono when the cursor
+// is on it (the plugin's cm-table lines); it is a block, so its decoration comes from a state
+// field.
+export function tableDecorations(state) {
+  const { broken } = state.field(noteField);
+  const active = activeLines(state);
+  const doc = state.doc;
+  const fm = frontmatterRange(doc);
+  const tree = ensureSyntaxTree(state, doc.length, 500) ?? syntaxTree(state);
+  const out = [];
+  tree.iterate({
+    enter(node) {
+      if (node.name !== "Table") return;
+      const { from, to } = node;
+      if ((fm && from < fm.to) || touches(state, active, from, to)) return false;
+      const n = node.node;
+      const cells = (r) => r.getChildren("TableCell").map((c) => cellParts(doc, c, broken));
+      const head = n.getChild("TableHeader");
+      const delim = n.getChild("TableDelimiter");
+      const w = new TableWidget(head ? cells(head) : [], delim ? alignsOf(doc.sliceString(delim.from, delim.to)) : [], n.getChildren("TableRow").map(cells));
+      out.push(Decoration.replace({ widget: w, block: true }).range(doc.lineAt(from).from, doc.lineAt(to).to));
+      return false;
+    },
+  });
+  return Decoration.set(out);
+}
+
+export const tablesField = StateField.define({
+  create: tableDecorations,
+  update(deco, tr) {
+    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus) || e.is(setBroken)) || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
+      return tableDecorations(tr.state);
+    }
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 // "Linked from" comes after the note, as in the terminal browser.
 export const backlinksField = StateField.define({
   create: () => Decoration.none,
@@ -726,6 +882,7 @@ export const livePreview = [
   focusPlugin,
   EditorView.editorAttributes.compute([noteField], (s) => (s.field(noteField).focusMode ? { class: "cm-focusmode" } : {})),
   frontmatterField,
+  tablesField,
   backlinksField,
   clicks,
   EditorView.focusChangeEffect.of((_state, focusing) => setFocus.of(focusing)),

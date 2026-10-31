@@ -19,6 +19,8 @@ import {
   resolve,
   setBroken,
   setFocus,
+  alignsOf,
+  tableDecorations,
 } from "../src/livepreview.js";
 
 function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [], touch = false } = {}) {
@@ -174,4 +176,26 @@ test("a link on the line being edited gets an open chip on a touch screen, and o
   assert.deepEqual(chips({ cursor: 2, focused: true, touch: true }), [33, 57]);
   assert.deepEqual(chips({ cursor: 2, focused: true, touch: false }), []);
   assert.deepEqual(chips({ cursor: 2, focused: false, touch: true }), []);
+});
+
+test("a table is drawn as one off the cursor, and is its source on it", () => {
+  const doc = "Disks:\n\n| Disk | Size | Role |\n|---|---:|:-:|\n| `sda` | 8 TB | [data](../x.md) |\n| sdb | 8 TB | **parity** |\n\nAfter.";
+  const ds = decos(tableDecorations(state(doc)));
+  assert.equal(ds.length, 1, "one block replaces the table");
+  assert.ok(ds[0].block && ds[0].widget === "TableWidget");
+  assert.equal(doc.slice(ds[0].from, ds[0].to), "| Disk | Size | Role |\n|---|---:|:-:|\n| `sda` | 8 TB | [data](../x.md) |\n| sdb | 8 TB | **parity** |");
+  const w = ds[0].w;
+  assert.deepEqual(w.head.map((c) => c.map((p) => p.text.trim()).join("")), ["Disk", "Size", "Role"]);
+  assert.deepEqual(w.aligns, [null, "right", "center"]);
+  assert.deepEqual(w.rows[0][0].filter((p) => p.t !== "text"), [{ t: "code", text: "sda" }]);
+  assert.deepEqual(w.rows[0][2].filter((p) => p.t !== "text"), [{ t: "link", text: "data", href: "../x.md", broken: false }]);
+  assert.deepEqual(w.rows[1][2].filter((p) => p.t !== "text"), [{ t: "strong", text: "parity" }]);
+  const on = decos(tableDecorations(state(doc, { cursor: doc.indexOf("sdb"), focused: true })));
+  assert.equal(on.length, 0, "the source shows while the cursor is in the table");
+  assert.ok(decos(buildDecorations(state(doc, { cursor: doc.indexOf("sdb"), focused: true }))).some((d) => d.cls.includes("cm-table")), "the source is mono");
+});
+
+test("table alignments follow the delimiter row", () => {
+  assert.deepEqual(alignsOf("| :--- | ---: | :---: | --- |"), ["left", "right", "center", null]);
+  assert.deepEqual(alignsOf("|---|---|"), [null, null]);
 });
