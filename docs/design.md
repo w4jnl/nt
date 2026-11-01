@@ -556,13 +556,23 @@ rendered text.
 - An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
   `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
   line of its own at the cursor or where it was dropped.
-- Code blocks are mono on `surface-sunk`, the language at the top right. A table is drawn as one
-  while the cursor is outside it, its header set apart and its cells' code, emphasis and links
-  kept; with the cursor on it, its source in mono.
+- Code blocks are mono on `surface-sunk`, the language at the top right. Code in a language the
+  page knows (shell, go, python, javascript and typescript, json, yaml, swift, sql, css, html,
+  rust, c and c++) is coloured as the terminal colours it (§5, Chroma): keywords and types in
+  `accent`, strings in `ok`, numbers in `warn`, comments and operators muted, functions bold;
+  another language, or none, stays plain. A table is drawn as one while the cursor is outside
+  it, its header set apart and its cells' code, emphasis and links kept; with the cursor on it,
+  its source in mono.
+- Math as pandoc writes it: `$x$` inline (a `$` with a character right after it opens, one with
+  a character before it and no digit after closes, so "$5 and $10" stays money) and `$$ … $$` on
+  lines of its own as a block, drawn by KaTeX in `ink`; with the cursor on it, its source in
+  mono. A mermaid fence is drawn as a diagram in nt's colours, light and dark, while the cursor
+  is outside it; on it, its source. The terminal shows both as their source.
 - "Linked from" follows the note, as in the terminal browser.
-- esbuild builds the page into one file, `Nt/Resources/editor/editor.js`, committed with its
-  `LICENSES.txt` (MIT, 21 packages), so building the app needs no Node. It is the app's one
-  third-party component: pinned, and reviewed on update.
+- esbuild builds the page into `Nt/Resources/editor`: `editor.js` (CodeMirror, its language
+  parsers and KaTeX), `mermaid.js` (loaded only when a note has a diagram), `katex.css` with its
+  fonts, and `LICENSES.txt` (MIT, every package bundled), all committed, so building the app
+  needs no Node. They are the app's third-party code: pinned, and reviewed on update.
 
 **Steps**, each usable and each ending at a review gate:
 0. **Design.** An HTML mockup of the views in both themes, iterated with the person. Done.

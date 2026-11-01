@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Nothing leaves the device: scripts and styles come from the app, images from the repository
-     (nt-asset:), and a remote image shows its alt text. -->
+<!-- Nothing leaves the device: scripts (editor.js, and mermaid.js when a note has a diagram) and
+     styles come from the app, images from the repository (nt-asset:), and a remote image shows
+     its alt text. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src file:; style-src file: 'unsafe-inline'; font-src file:; img-src nt-asset: data:">
+<link rel="stylesheet" href="katex.css">
 <link rel="stylesheet" href="editor.css">
 </head>
 <body>

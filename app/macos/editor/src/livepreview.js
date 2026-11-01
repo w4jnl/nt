@@ -6,6 +6,9 @@ import { StateEffect, StateField } from "@codemirror/state";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { post } from "./bridge.js";
 import { paragraphAt } from "./edits.js";
+import { codeMarks } from "./code.js";
+import { MathWidget, mathSource } from "./math.js";
+import { DiagramWidget, isDiagram } from "./diagram.js";
 
 // setBroken names the link destinations, as written, that point at nothing (the app checks).
 export const setBroken = StateEffect.define();
@@ -588,6 +591,7 @@ export function buildDecorations(state) {
           }
           const info = node.node.getChild("CodeInfo");
           if (info) add(mark("cm-codeinfo"), info.from, info.to);
+          for (const c of node.node.getChildren("CodeText")) codeMarks(tree, c.from, c.to, (a, b, cls) => add(mark(cls), a, b));
           if (!open) {
             // the fences, hidden, become the block's top and bottom edge
             const first = doc.lineAt(from);
@@ -603,6 +607,22 @@ export function buildDecorations(state) {
         case "Table":
           lines(from, to, "cm-table");
           return false;
+        case "BlockMath": {
+          // drawn by blocksField off the cursor; its source in mono on it
+          if (!isActive(from, to)) return false;
+          lines(from, to, "cm-code");
+          const text = doc.sliceString(from, to);
+          add(mark("cm-syntax"), from, from + 2);
+          if (/\$\$\s*$/.test(text) && text.length > 4) add(mark("cm-syntax"), from + text.trimEnd().length - 2, from + text.trimEnd().length);
+          return false;
+        }
+        case "InlineMath": {
+          if (isActive(from, to)) {
+            add(mark("cm-math-src"), from, to);
+            for (const m of node.node.getChildren("MathMark")) add(mark("cm-syntax"), m.from, m.to);
+          } else add(Decoration.replace({ widget: new MathWidget(mathSource(doc.sliceString(from, to), false), false) }), from, to);
+          return false;
+        }
         case "Paragraph": {
           const l = doc.lineAt(from);
           if (l.to >= to && NAV.test(l.text)) add(line("cm-nav"), l.from);
@@ -759,38 +779,47 @@ export const frontmatterField = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-// A table is drawn as one while the cursor is outside it, its source in mono when the cursor
-// is on it (the plugin's cm-table lines); it is a block, so its decoration comes from a state
-// field.
-export function tableDecorations(state) {
+// A table, a block of math and a diagram (a mermaid fence) are drawn as one while the cursor is
+// outside them, and are their source in mono when the cursor is on them (the plugin's cm-table
+// and cm-code lines); they are blocks, so their decorations come from a state field.
+export function blockDecorations(state) {
   const { broken } = state.field(noteField);
   const active = activeLines(state);
   const doc = state.doc;
   const fm = frontmatterRange(doc);
   const tree = ensureSyntaxTree(state, doc.length, 500) ?? syntaxTree(state);
   const out = [];
+  const replace = (w, from, to) => out.push(Decoration.replace({ widget: w, block: true }).range(doc.lineAt(from).from, doc.lineAt(to).to));
   tree.iterate({
     enter(node) {
-      if (node.name !== "Table") return;
-      const { from, to } = node;
+      const { name, from, to } = node;
+      if (name !== "Table" && name !== "BlockMath" && name !== "FencedCode") return;
       if ((fm && from < fm.to) || touches(state, active, from, to)) return false;
       const n = node.node;
-      const cells = (r) => r.getChildren("TableCell").map((c) => cellParts(doc, c, broken));
-      const head = n.getChild("TableHeader");
-      const delim = n.getChild("TableDelimiter");
-      const w = new TableWidget(head ? cells(head) : [], delim ? alignsOf(doc.sliceString(delim.from, delim.to)) : [], n.getChildren("TableRow").map(cells));
-      out.push(Decoration.replace({ widget: w, block: true }).range(doc.lineAt(from).from, doc.lineAt(to).to));
+      if (name === "Table") {
+        const cells = (r) => r.getChildren("TableCell").map((c) => cellParts(doc, c, broken));
+        const head = n.getChild("TableHeader");
+        const delim = n.getChild("TableDelimiter");
+        replace(new TableWidget(head ? cells(head) : [], delim ? alignsOf(doc.sliceString(delim.from, delim.to)) : [], n.getChildren("TableRow").map(cells)), from, to);
+      } else if (name === "BlockMath") {
+        replace(new MathWidget(mathSource(doc.sliceString(from, to), true), true), from, to);
+      } else {
+        const info = n.getChild("CodeInfo");
+        if (!info || !isDiagram(doc.sliceString(info.from, info.to))) return false;
+        const code = n.getChild("CodeText");
+        replace(new DiagramWidget(code ? doc.sliceString(code.from, code.to) : ""), from, to);
+      }
       return false;
     },
   });
   return Decoration.set(out);
 }
 
-export const tablesField = StateField.define({
-  create: tableDecorations,
+export const blocksField = StateField.define({
+  create: blockDecorations,
   update(deco, tr) {
     if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus) || e.is(setBroken)) || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
-      return tableDecorations(tr.state);
+      return blockDecorations(tr.state);
     }
     return deco;
   },
@@ -882,7 +911,7 @@ export const livePreview = [
   focusPlugin,
   EditorView.editorAttributes.compute([noteField], (s) => (s.field(noteField).focusMode ? { class: "cm-focusmode" } : {})),
   frontmatterField,
-  tablesField,
+  blocksField,
   backlinksField,
   clicks,
   EditorView.focusChangeEffect.of((_state, focusing) => setFocus.of(focusing)),

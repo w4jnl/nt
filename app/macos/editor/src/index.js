@@ -7,10 +7,10 @@
 import { Annotation, ChangeSet, EditorState, Transaction } from "@codemirror/state";
 import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
 import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
-import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocusMode, setHearing } from "./livepreview.js";
+import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocus, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -34,7 +34,7 @@ function extensions(path, readOnly) {
     noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-    markdown({ base: markdownLanguage }),
+    noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
     drawSelection(),
@@ -164,7 +164,9 @@ window.nt = {
     base = view.state.doc.toString();
     pending = ChangeSet.empty(base.length);
     inflight = null;
-    view.dispatch({ effects: setBacklinks.of(backlinks) });
+    // The new state starts unfocused; when the editor already has the keyboard (another note was
+    // being edited) no focus event will come, so say so now, or no line would show its markdown.
+    view.dispatch({ effects: [setBacklinks.of(backlinks), setFocus.of(view.hasFocus)] });
     view.scrollDOM.scrollTop = 0;
     if (end) {
       view.dispatch({ selection: { anchor: view.state.doc.length }, scrollIntoView: true });
