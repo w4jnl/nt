@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EditorState } from "@codemirror/state";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { noteMarkdown } from "../src/syntax.js";
 import {
   anchorOf,
   assetURL,
@@ -20,14 +20,18 @@ import {
   setBroken,
   setFocus,
   alignsOf,
-  tableDecorations,
+  blockDecorations,
 } from "../src/livepreview.js";
+import { mathSource, renderMath } from "../src/math.js";
+import { isDiagram } from "../src/diagram.js";
+import { codeLanguages } from "../src/code.js";
+import { LanguageDescription } from "@codemirror/language";
 
 function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [], touch = false } = {}) {
   let s = EditorState.create({
     doc,
     selection: { anchor: cursor },
-    extensions: [noteField.init(() => ({ path, broken: new Set(), focused: false, touch })), markdown({ base: markdownLanguage }), frontmatterField],
+    extensions: [noteField.init(() => ({ path, broken: new Set(), focused: false, touch })), noteMarkdown(), frontmatterField],
   });
   s = s.update({ effects: [setFocus.of(focused), setBroken.of(broken)] }).state;
   return s;
@@ -180,7 +184,7 @@ test("a link on the line being edited gets an open chip on a touch screen, and o
 
 test("a table is drawn as one off the cursor, and is its source on it", () => {
   const doc = "Disks:\n\n| Disk | Size | Role |\n|---|---:|:-:|\n| `sda` | 8 TB | [data](../x.md) |\n| sdb | 8 TB | **parity** |\n\nAfter.";
-  const ds = decos(tableDecorations(state(doc)));
+  const ds = decos(blockDecorations(state(doc)));
   assert.equal(ds.length, 1, "one block replaces the table");
   assert.ok(ds[0].block && ds[0].widget === "TableWidget");
   assert.equal(doc.slice(ds[0].from, ds[0].to), "| Disk | Size | Role |\n|---|---:|:-:|\n| `sda` | 8 TB | [data](../x.md) |\n| sdb | 8 TB | **parity** |");
@@ -190,7 +194,7 @@ test("a table is drawn as one off the cursor, and is its source on it", () => {
   assert.deepEqual(w.rows[0][0].filter((p) => p.t !== "text"), [{ t: "code", text: "sda" }]);
   assert.deepEqual(w.rows[0][2].filter((p) => p.t !== "text"), [{ t: "link", text: "data", href: "../x.md", broken: false }]);
   assert.deepEqual(w.rows[1][2].filter((p) => p.t !== "text"), [{ t: "strong", text: "parity" }]);
-  const on = decos(tableDecorations(state(doc, { cursor: doc.indexOf("sdb"), focused: true })));
+  const on = decos(blockDecorations(state(doc, { cursor: doc.indexOf("sdb"), focused: true })));
   assert.equal(on.length, 0, "the source shows while the cursor is in the table");
   assert.ok(decos(buildDecorations(state(doc, { cursor: doc.indexOf("sdb"), focused: true }))).some((d) => d.cls.includes("cm-table")), "the source is mono");
 });
@@ -198,4 +202,65 @@ test("a table is drawn as one off the cursor, and is its source on it", () => {
 test("table alignments follow the delimiter row", () => {
   assert.deepEqual(alignsOf("| :--- | ---: | :---: | --- |"), ["left", "right", "center", null]);
   assert.deepEqual(alignsOf("|---|---|"), [null, null]);
+});
+
+test("a fence names its language by name or alias; others stay plain", () => {
+  const name = (info) => LanguageDescription.matchLanguageName(codeLanguages, info, true)?.name ?? null;
+  assert.equal(name("go"), "Go");
+  assert.equal(name("py"), "Python");
+  assert.equal(name("sh"), "Shell");
+  assert.equal(name("bash"), "Shell");
+  assert.equal(name("ts"), "TypeScript");
+  assert.equal(name("c"), "C");
+  assert.equal(name("cpp"), "C++");
+  assert.equal(name("Swift"), "Swift");
+  assert.equal(name("ruby"), null);
+});
+
+test("code in a known language is coloured as the terminal colours it", () => {
+  const doc = "Setup:\n\n```go\nfunc main() {\n\tx := 42 // hi\n\tfmt.Println(\"s\")\n}\n```\n\n```\nplain := 1\n```";
+  const ds = decos(buildDecorations(state(doc)));
+  const at = (cls, text) => ds.some((d) => d.cls === cls && doc.slice(d.from, d.to) === text);
+  assert.ok(at("cm-kw", "func"), "keyword in accent");
+  assert.ok(at("cm-num", "42"), "number in warn");
+  assert.ok(at("cm-str", '"s"'), "string in ok");
+  assert.ok(at("cm-cmt", "// hi"), "comment muted");
+  assert.ok(at("cm-fn", "main"), "function bold");
+  assert.ok(!ds.some((d) => doc.slice(d.from, d.to) === "plain" && d.cls.startsWith("cm-")), "a fence without a language is plain");
+  const css = readFileSync(new URL("../src/editor.css", import.meta.url), "utf8");
+  for (const cls of ["cm-kw", "cm-type", "cm-str", "cm-num", "cm-cmt", "cm-fn", "cm-op", "cm-bad"]) assert.ok(css.includes(`.${cls} `), `${cls} styled`);
+});
+
+test("math is drawn off the cursor and is its source on it; money is not math", () => {
+  const doc = "Energy $E = mc^2$ here.\n\n$$\n\\int_0^1 x\\,dx\n$$\n\nIt costs $5 and $10 later; $5-$10 or so.";
+  const inline = decos(buildDecorations(state(doc))).filter((d) => d.widget === "MathWidget");
+  assert.deepEqual(inline.map((d) => [doc.slice(d.from, d.to), d.w.src, d.w.display]), [["$E = mc^2$", "E = mc^2", false]]);
+  const blocks = decos(blockDecorations(state(doc)));
+  assert.equal(blocks.length, 1);
+  assert.ok(blocks[0].block && blocks[0].widget === "MathWidget" && blocks[0].w.display);
+  assert.equal(blocks[0].w.src, "\\int_0^1 x\\,dx");
+  assert.equal(doc.slice(blocks[0].from, blocks[0].to), "$$\n\\int_0^1 x\\,dx\n$$");
+  const on = state(doc, { cursor: doc.indexOf("mc"), focused: true });
+  const ds = decos(buildDecorations(on));
+  assert.ok(!ds.some((d) => d.widget === "MathWidget"), "the source shows on the cursor line");
+  assert.ok(ds.some((d) => d.cls === "cm-math-src" && doc.slice(d.from, d.to) === "$E = mc^2$"));
+  const onBlock = state(doc, { cursor: doc.indexOf("int"), focused: true });
+  assert.equal(decos(blockDecorations(onBlock)).length, 0);
+  assert.ok(decos(buildDecorations(onBlock)).some((d) => d.cls.includes("cm-code")), "a block's source is mono");
+  assert.equal(mathSource("$$ a+b $$", true), "a+b");
+  assert.ok(renderMath("x^2", false).includes("katex"));
+  const one = decos(blockDecorations(state("$$ a = b $$\n\ntext")));
+  assert.equal(one.length, 1, "a one-line block");
+  assert.equal(one[0].w.src, "a = b");
+});
+
+test("a mermaid fence is a diagram off the cursor, its source on it", () => {
+  const doc = "Plan:\n\n```mermaid\ngraph LR\n  A --> B\n```\n\n```go\nx := 1\n```";
+  const ds = decos(blockDecorations(state(doc)));
+  assert.equal(ds.length, 1, "only the mermaid fence is a block widget");
+  assert.ok(ds[0].block && ds[0].widget === "DiagramWidget");
+  assert.equal(ds[0].w.text, "graph LR\n  A --> B");
+  assert.equal(doc.slice(ds[0].from, ds[0].to), "```mermaid\ngraph LR\n  A --> B\n```");
+  assert.equal(decos(blockDecorations(state(doc, { cursor: doc.indexOf("A -->"), focused: true }))).length, 0);
+  assert.ok(isDiagram("mermaid") && isDiagram(" Mermaid ") && !isDiagram("go") && !isDiagram("mermaidx"));
 });

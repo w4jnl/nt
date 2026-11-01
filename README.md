@@ -148,8 +148,8 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 - **`nt doctor`** checks the setup and lists the links that point at nothing.
 - **nt for Mac.** The same folder in a window: the sidebar with the views, the pins and every
   folder, the note in live preview as Typora shows it (a line's markdown only while the cursor
-  is on it, images in place, tasks ticked with a click), saved through nt and never under a
-  sync's merge. ⌘P opens a note by its title, ⇧⌘F searches, ⌘N makes a note where a folder is
+  is on it, images in place, tasks ticked with a click, code coloured, tables, math and mermaid
+  diagrams drawn as one), saved through nt and never under a sync's merge. ⌘P opens a note by its title, ⇧⌘F searches, ⌘N makes a note where a folder is
   selected, ⇧⌘N a todo, and a right-click makes, renames, moves or deletes with the links kept.
   nt's mark in the menu bar shows the sync state; ⌥⌘Space opens a field from anywhere that
   adds a line to today, or with Shift-Return a todo, and Tab picks the folder the todo goes to.

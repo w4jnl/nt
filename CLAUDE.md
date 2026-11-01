@@ -33,8 +33,9 @@ person's notes live in their own repository.
   colour alone. Errors say what is wrong and how to fix it.
 - Mac app (`app/macos`, docs/design.md §8) and iOS app (`app/ios`, §9), sharing `app/shared`
   (`#if os` where the platforms differ): Swift 6 with complete strict concurrency, SwiftUI,
-  `@MainActor @Observable` state, Apple frameworks only; the editor page's CodeMirror is the one
-  third-party component, and on iOS libgit2 with libssh2 and mbedTLS. Colours come only from
+  `@MainActor @Observable` state, Apple frameworks only; the editor page's CodeMirror (with its
+  language parsers), KaTeX and mermaid are the third-party components, and on iOS libgit2 with
+  libssh2 and mbedTLS. Colours come only from
   `Brand.swift` and `editor.css`, which mirror the tokens. The apps write only through nt; the Mac
   app never runs git, and the iOS app's git (libgit2) runs only when nt's sync asks for it.
 - Tests: table-driven, temp directories and temp git repositories; no mocks of git. `NT_CONFIG`,

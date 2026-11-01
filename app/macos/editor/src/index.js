@@ -7,7 +7,7 @@
 import { Annotation, ChangeSet, EditorState, Transaction } from "@codemirror/state";
 import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
 import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
 import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocusMode, setHearing } from "./livepreview.js";
@@ -34,7 +34,7 @@ function extensions(path, readOnly) {
     noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-    markdown({ base: markdownLanguage }),
+    noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
     drawSelection(),

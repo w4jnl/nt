@@ -199,6 +199,11 @@ t today  [ ] day  a append  n new  / search  ? help
 - **The text column.** 680 px wide and centred, 40 px inside its edges; the rest is ground.
 - **Markdown while editing.** Only on the line with the cursor, in `ink-faint`. A heading's `#`
   hangs in the left margin so the text does not move.
+- **Code, math and diagrams.** Code in a known language takes the preview's Chroma roles from
+  the tokens: keywords and types `accent`, strings `ok`, numbers `warn`, comments and operators
+  `ink-muted`, nothing else. Math (KaTeX) is `ink`. A mermaid diagram is drawn from the tokens
+  too: nodes on `accent-soft` with an `accent` edge, lines `line-strong`, text `ink`, and the
+  families' `ok`, `warn` and `alert` only where a diagram needs more than one colour.
 - **States.** Glyph and word, as everywhere. The sidebar's sync state is the terminal browser's
   badge, and a click on it syncs.
 - **Selection.** The system's, tinted with `accent` (the asset catalogue's AccentColor). In Open,

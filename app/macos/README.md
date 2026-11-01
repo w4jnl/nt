@@ -88,6 +88,8 @@ It needs, on the Mac that releases:
 
 ## Third-party code
 
-The editor page bundles CodeMirror 6 and its parsers, MIT-licensed; their licences are in
-`Nt/Resources/editor/LICENSES.txt`, which `make mac-editor` writes. The app has no other
-third-party code.
+The editor page bundles CodeMirror 6 with its markdown and language parsers, KaTeX for math
+(with its fonts) and mermaid for diagrams, all MIT-licensed; their licences are in
+`Nt/Resources/editor/LICENSES.txt`, which `make mac-editor` writes. mermaid is a file of its
+own, `mermaid.js`, loaded only when a note has a diagram. The app has no other third-party
+code.

@@ -165,6 +165,28 @@ html { -webkit-text-size-adjust: 100%; }
 #editor .cm-code-first.cm-code-last { border-radius: 6px; }
 #editor .cm-fence { line-height: 6px; }
 #editor .cm-codeinfo { position: absolute; top: 6px; right: 12px; font-size: 11px; color: var(--ink-muted); }
+/* Code in a language the page knows (code.js), coloured as the terminal colours it: few colours,
+   the same roles. */
+#editor .cm-kw { color: var(--accent); font-weight: 600; }
+#editor .cm-type { color: var(--accent); }
+#editor .cm-str { color: var(--ok); }
+#editor .cm-num { color: var(--warn); }
+#editor .cm-cmt { color: var(--ink-muted); }
+#editor .cm-fn { font-weight: 600; }
+#editor .cm-op { color: var(--ink-muted); }
+#editor .cm-bad { color: var(--alert); }
+
+/* Math (KaTeX, katex.css) in ink, a block of it on its own, centred; its source in mono. */
+#editor .cm-math .katex { font-size: 1.05em; }
+#editor .cm-math-block { padding: 8px 0; text-align: center; overflow-x: auto; }
+#editor .cm-math-block .katex-display { margin: 0; }
+#editor .cm-math-src { font-family: var(--mono); font-size: 0.85em; }
+
+/* A diagram (mermaid.js), never wider than the text; a mistake in its source shows mermaid's
+   message in place of it. */
+#editor .cm-diagram { padding: 8px 0; min-height: 40px; }
+#editor .cm-diagram svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+#editor .cm-diagram-error { font-family: var(--mono); font-size: 13px; line-height: 20px; color: var(--alert); white-space: pre-wrap; }
 #editor .cm-table { font-family: var(--mono); font-size: 13px; }
 #editor .cm-tbl {
   border-collapse: collapse;
