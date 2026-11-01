@@ -4,6 +4,33 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.0 (2026-11-01)
+
+Code coloured, math and diagrams drawn, and tables as tables in nt for Mac and on the phone;
+Tab in the capture panel picks a todo's folder.
+
+- **Code, math and diagrams in the apps:** a fenced block in shell, go, python, javascript or
+  typescript, json, yaml, swift, sql, css, html, rust, c or c++ is coloured as the terminal
+  colours it (keywords and types in accent, strings in ok, numbers in warn, comments muted);
+  another language, or none, stays plain. Math as pandoc writes it, `$x$` inline and `$$ … $$`
+  on its own lines, is drawn by KaTeX ("$5 and $10" stays money). A `mermaid` fence is drawn
+  as a diagram in nt's colours, light and dark. With the cursor on any of them, the source
+  shows. The terminal coloured code already; it shows math and diagrams as their source.
+- **Tables are drawn as tables** in the apps' live preview, the header set apart and the cells'
+  code, emphasis and links kept; the source shows with the cursor on them.
+- **A note opened while the editor had the keyboard** showed no line's markdown, so a click on
+  a table left it drawn with the cursor at its edge. Fixed.
+- **Tab in the capture panel** (⌥⌘Space) opens the folder list for a todo: the root's `todo.md`
+  first, then every folder that takes todos with its open count. Typing narrows the list, ↑↓
+  choose, Return or Tab take the folder, esc goes back; the field keeps the keyboard
+  throughout. The panel also makes itself key again shortly after it shows, so its field takes
+  the keys.
+- **nt for Mac no longer quits unexpectedly** when a sync finishes while the menu bar mark's
+  menu is open (an update loop in the menu's clock). The sidebar's sync state sits under the
+  list instead of over its last rows.
+- **README and docs:** pictures of the Mac app and the phone, retaken by `assets/demo/mac.sh`
+  and `assets/demo/phone.sh`; the setup covers both apps.
+
 ## 0.8.1 (2026-10-30)
 
 A session resumed on a later day is reported in that day's folder again.
