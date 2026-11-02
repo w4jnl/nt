@@ -67,6 +67,10 @@ func unstamp(text, key string) string {
 
 // Parse reads the todos in the note at rel. Lines in frontmatter and fenced code blocks are
 // not todos, nor is a checkbox with no text.
+// IsTask reports a line that is a task, open or done: what a todo search finds, and a note
+// search leaves out.
+func IsTask(line string) bool { return taskRe.MatchString(line) }
+
 func Parse(rel string, data []byte) []Item {
 	var items []Item
 	lines := strings.Split(string(data), "\n")

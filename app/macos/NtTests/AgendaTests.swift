@@ -26,6 +26,15 @@ struct AgendaTests {
         #expect(Todo.scopes(todos, keep: "Archive").map(\.folder) == ["Archive", "homelab", "work"], "the scope in use stays")
     }
 
+    @Test func taskLinesAreTodosNotSearchHits() {
+        for line in ["- [ ] Renew passport", "  - [x] done done:2026-10-01", "* [ ] a", "+ [X]", "3. [ ] third", "12) [x] x", "- [ ]"] {
+            #expect(Todo.isTask(line), Comment(rawValue: line))
+        }
+        for line in ["- [ ]x", "-[ ] a", "[ ] a", "- [] a", "- [y] a", "the fan is loud", "1234567890. [ ] too many digits"] {
+            #expect(!Todo.isTask(line), Comment(rawValue: line))
+        }
+    }
+
     @Test func reportsReadTheirFrontmatter() {
         let text = """
         ---

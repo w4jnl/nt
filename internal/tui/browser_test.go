@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/config"
+	"github.com/w4jnl/nt/internal/search"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
@@ -883,5 +884,103 @@ func TestDatesNewestFirst(t *testing.T) {
 		if got := names(dir); got != want {
 			t.Errorf("%s lists %s, want %s", dir, got, want)
 		}
+	}
+}
+
+func TestTodoSearch(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.v.Now = func() time.Time { return time.Date(2026, 10, 29, 10, 0, 0, 0, time.Local) }
+	for f, body := range map[string]string{
+		"todo.md":               "# Todo\n\n## Inbox\n\n- [ ] Renew passport\n- [ ] Replace the fan\n",
+		"work/2026-10-20-q3.md": "# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(b.v.Abs(f), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows := func() (out []string) {
+		for _, it := range b.tv.rows() {
+			out = append(out, it.Text)
+		}
+		return out
+	}
+	press(b, "x")
+	if len(rows()) != 4 {
+		t.Fatalf("every todo: %v", rows())
+	}
+	// / in the todo view keeps to the todos with the words typed, in their text or their note
+	press(b, "/")
+	if b.input == nil || b.inputKind != "todos" || b.input.prompt != "todos: " || b.pick != nil {
+		t.Fatalf("/ in the todos does not ask for their words: %v %q", b.input, b.inputKind)
+	}
+	press(b, "FAN")
+	if strings.Join(rows(), ",") != "Replace the fan" {
+		t.Fatalf("the filter does not keep to the matching todos, any case: %v", rows())
+	}
+	if s := b.todoSummary(b.tv); !strings.Contains(s, `matching "FAN"`) {
+		t.Fatalf("the summary does not say what the todos match: %q", s)
+	}
+	for range 3 {
+		run(b, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	press(b, "q3") // the note's name
+	if strings.Join(rows(), ",") != "Send the report,Book the room" {
+		t.Fatalf("the filter does not match a note's name: %v", rows())
+	}
+	// enter keeps the filter and gives the todos their keys back
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.input != nil || b.tv == nil || b.tv.filter != "q3" || len(rows()) != 2 {
+		t.Fatalf("enter does not keep the filter: %v %q", b.input, b.tv.filter)
+	}
+	press(b, "G")
+	if it := b.tv.selected(); it == nil || it.Text != "Book the room" {
+		t.Fatalf("the keys do not work on the matching todos: %v", b.tv.selected())
+	}
+	// esc in the prompt clears it
+	press(b, "/")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.input != nil || b.tv.filter != "" || len(rows()) != 4 {
+		t.Fatalf("esc does not clear the filter: %q %v", b.tv.filter, rows())
+	}
+	// from the home list's Todos row, / is the todos' search too
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape}) // back to the list
+	press(b, "~g")                               // the root; its top row is Today, Todos under it
+	for i := 0; i < 3 && !b.homeTodosShown(); i++ {
+		press(b, "j")
+	}
+	if !b.homeTodosShown() {
+		t.Fatal("the home list has no Todos row selected")
+	}
+	press(b, "/")
+	if b.tv == nil || b.input == nil || b.inputKind != "todos" {
+		t.Fatalf("/ on the Todos row does not search the todos: %v %q", b.tv, b.inputKind)
+	}
+	press(b, "fan")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if strings.Join(rows(), ",") != "Replace the fan" {
+		t.Fatalf("the todos' search from the home row: %v", rows())
+	}
+}
+
+func TestSearchLeavesTasksOut(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	press(b, "/")
+	if b.inputKind != "search" || b.pick == nil {
+		t.Fatalf("/ outside the todos does not search the notes: %q", b.inputKind)
+	}
+	b.searched(searchMsg{seq: b.searchSeq, matches: []search.Match{
+		{Path: "a.md", Line: 3, Text: "the fan is loud"},
+		{Path: "todo.md", Line: 5, Text: "- [ ] Replace the fan"},
+		{Path: "b.md", Line: 2, Text: "  - [x] fan done:2026-10-01"},
+	}})
+	var got []string
+	for _, it := range b.pick.items {
+		got = append(got, it.label)
+	}
+	if strings.Join(got, ",") != "the fan is loud" {
+		t.Fatalf("the note search keeps task lines: %v", got)
 	}
 }
