@@ -60,10 +60,8 @@ struct Badge: Equatable, Sendable {
     let tone: Tone
     var detail: String = ""
 
-    /// launched is when the app started: the timelines that redraw a badge count from it, a
-    /// schedule that stays the same on every update. One from .now is a new schedule each time,
-    /// and in an open menu the update it asks for runs at once, over and over, until the app
-    /// runs out of stack.
+    /// launched is when the app started: the sidebar badge's timeline counts from it, a schedule
+    /// that stays the same on every update. The menu bar has no timeline at all (MenuClock).
     static let launched = Date()
 
     /// of is the sidebar's sync badge, as the terminal browser shows it.
