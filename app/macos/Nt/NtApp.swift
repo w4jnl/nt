@@ -72,9 +72,11 @@ struct NtApp: App {
                 .environment(workspace)
                 .environment(app.capture)
                 .environment(app.captureKey)
+                .environment(app.clock)
         } label: {
             MenuBarLabel()
                 .environment(workspace)
+                .environment(app.clock)
         }
 
         Settings {
@@ -93,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var capture = Capture(workspace: workspace)
     private lazy var panel = CapturePanel(capture: capture)
     lazy var captureKey = CaptureKey { [weak self] in self?.capture.open(.today) }
+    let clock = MenuClock()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = panel

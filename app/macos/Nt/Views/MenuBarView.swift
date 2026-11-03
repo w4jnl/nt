@@ -1,20 +1,36 @@
 import SwiftUI
 
+/// MenuClock is the time the menu bar reads: the minute, for the age in the sync line, and the
+/// 1150 ms beat of the alert mark. It ticks on its own, and a view redraws only when the value it
+/// read changes. A TimelineView must not drive a menu bar item: the item's host renders it, the
+/// timeline asks for its next update, the host renders again at once, and so on until the stack
+/// overflows (crash reports 2026-10-31 and 2026-11-02, with .periodic and .everyMinute alike).
+@MainActor @Observable
+final class MenuClock {
+    private(set) var minute = Date()
+    private(set) var on = true
+
+    init() {
+        Task { [weak self] in
+            while let self {
+                try? await Task.sleep(for: .seconds(1.15))
+                self.on.toggle()
+                let m = Date(timeIntervalSinceReferenceDate: (Date().timeIntervalSinceReferenceDate / 60).rounded(.down) * 60)
+                if m != self.minute { self.minute = m }
+            }
+        }
+    }
+}
+
 /// MenuBarLabel is nt's mark in the menu bar: the template mark, and while sync needs you (a
 /// conflict, an error; offline is not one) the solid alert mark, alternating with it every
 /// 1150 ms until the app is in front.
 struct MenuBarLabel: View {
     @Environment(Workspace.self) private var ws
+    @Environment(MenuClock.self) private var clock
 
     var body: some View {
-        if ws.needsYou && !ws.active {
-            TimelineView(.periodic(from: Badge.launched, by: 1.15)) { ctx in
-                let on = Int(ctx.date.timeIntervalSinceReferenceDate / 1.15) % 2 == 0
-                Image(nsImage: MarkImage.mark(alert: on))
-            }
-        } else {
-            Image(nsImage: MarkImage.mark(alert: ws.needsYou))
-        }
+        Image(nsImage: MarkImage.mark(alert: ws.needsYou && (ws.active || clock.on)))
     }
 }
 
@@ -24,14 +40,13 @@ struct MenuBarMenu: View {
     @Environment(Workspace.self) private var ws
     @Environment(Capture.self) private var capture
     @Environment(CaptureKey.self) private var key
+    @Environment(MenuClock.self) private var clock
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        TimelineView(.everyMinute) { ctx in // a schedule that stays the same (Badge.launched)
-            let b = Badge.of(ws.status, syncing: ws.syncing, now: ctx.date)
-            Text(b.detail.isEmpty ? "\(b.glyph) \(b.word)" : "\(b.glyph) \(b.word) · \(b.detail)")
-        }
+        let b = Badge.of(ws.status, syncing: ws.syncing, now: clock.minute)
+        Text(b.detail.isEmpty ? "\(b.glyph) \(b.word)" : "\(b.glyph) \(b.word) · \(b.detail)")
         Divider()
         add
         Button("New todo…") { capture.open(.todo) }
