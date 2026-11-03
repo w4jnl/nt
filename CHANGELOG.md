@@ -4,6 +4,28 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.1 (2026-11-03)
+
+nt for Mac no longer crashes in the background; the todos have a search of their own in every
+client; selected text can be seen, and a code block has a copy glyph.
+
+- **nt for Mac crashed in the background** three minutes after launch, a stack overflow in the
+  menu bar's updates. The cause was a SwiftUI timeline inside the menu bar item, whatever its
+  schedule (0.9.0 had only made it rarer). The menu bar keeps time with a clock of its own now;
+  what it shows is unchanged.
+- **Search the todos:** in the terminal browser's todos, or on the home list's Todos row, `/`
+  asks `todos:` and keeps to the todos with the words typed, in their text or their note's name;
+  the summary says `matching "…"`, enter keeps them and gives the keys back, esc clears. On the
+  Mac and the phone the Todos view has a Search todos field (the Mac's in the toolbar; ⇧⌘F
+  goes to it while Todos is shown, and the File menu item is Search…). The note searches of all
+  three leave task lines out, since Todos finds them; `nt s` is unchanged.
+- **Selected text can be seen** in the apps' editor and in the terminal browser's note pane, in
+  a code block too: ink on accent at a third over the ground, the same colour in every client.
+  Before, the apps' selection hid under a code block's background and the terminal's tint was
+  near the ground.
+- **A code block has a copy glyph** at its top right beside the language: a click puts the code
+  on the pasteboard and shows a check for a moment.
+
 ## 0.9.0 (2026-11-01)
 
 Code coloured, math and diagrams drawn, and tables as tables in nt for Mac and on the phone;
