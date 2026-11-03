@@ -74,8 +74,11 @@ html, body { margin: 0; height: 100%; background: var(--ground); color: var(--in
 }
 html { -webkit-text-size-adjust: 100%; }
 #editor .cm-line { position: relative; padding: 0; }
-#editor .cm-cursor, #editor .cm-dropCursor { border-left: 2px solid var(--accent); }
-#editor .cm-selectionBackground, #editor .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: var(--accent-soft); }
+#editor .cm-dropCursor { border-left: 2px solid var(--accent); }
+/* The selection is the browser's own, as the Mac app's rule says (the system's, tinted with
+   accent): drawn over every background, a code block's too, where CodeMirror's own layer would
+   sit under it. */
+#editor .cm-content ::selection, #editor .cm-content::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 
 /* Headings: in ink, the size says the level. */
 .cm-h1 { font: 650 28px/36px var(--display); letter-spacing: -0.3px; padding: 4px 0 10px; }
@@ -164,7 +167,23 @@ html { -webkit-text-size-adjust: 100%; }
 #editor .cm-code-last { padding-bottom: 10px !important; border-radius: 0 0 6px 6px; }
 #editor .cm-code-first.cm-code-last { border-radius: 6px; }
 #editor .cm-fence { line-height: 6px; }
-#editor .cm-codeinfo { position: absolute; top: 6px; right: 12px; font-size: 11px; color: var(--ink-muted); }
+/* the language and copy at the block's top right: one set of metrics, so they sit on one line
+   whether the first line is the folded fence or the fence as written */
+#editor .cm-codeinfo, #editor .cm-copy {
+  position: absolute; top: 6px;
+  font-family: var(--mono); font-size: 11px; line-height: 16px; height: 16px;
+  color: var(--ink-muted);
+}
+#editor .cm-codeinfo { right: 38px; }
+/* the copy glyph puts the block's code on the clipboard; a check in ok for a moment after */
+#editor .cm-copy {
+  right: 10px; width: 20px; display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; border-radius: 4px; padding: 0; margin: 0;
+  cursor: pointer; -webkit-user-select: none; user-select: none;
+}
+#editor .cm-copy:hover { color: var(--ink); background: var(--surface); }
+#editor .cm-copy.cm-copied { color: var(--ok); }
+#editor .cm-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Code in a language the page knows (code.js), coloured as the terminal colours it: few colours,
    the same roles. */
 #editor .cm-kw { color: var(--accent); font-weight: 600; }

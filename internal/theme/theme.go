@@ -4,7 +4,9 @@
 package theme
 
 import (
+	"fmt"
 	"image/color"
+	"math"
 
 	"charm.land/lipgloss/v2"
 )
@@ -67,6 +69,7 @@ type Palette struct {
 	Ink, InkMuted, InkFaint                        color.Color
 	Accent, OnAccent, AccentSoft, Mark, Brand      color.Color
 	OK, Warn, Alert                                color.Color
+	Selection                                      color.Color // text selected in the note sits on it, in ink
 }
 
 // New returns the dark or the light palette.
@@ -80,7 +83,27 @@ func New(dark bool) Palette {
 		Accent: c("accent"), OnAccent: c("on-accent"), AccentSoft: c("accent-soft"),
 		Mark: c("mark"), Brand: c("brand"),
 		OK: c("ok"), Warn: c("warn"), Alert: c("alert"),
+		Selection: lipgloss.Color(SelectionHex(dark)),
 	}
+}
+
+// SelectionHex is the background of text selected in the note: accent at a third over ground,
+// the Mac and iOS editor page's selection (color-mix in editor.css) in a terminal, which cannot
+// blend; accent-soft, the search match's fill, is too near the ground to read as a selection.
+func SelectionHex(dark bool) string {
+	return mix(Hex("accent", dark), Hex("ground", dark), 0.32)
+}
+
+// mix blends two #rrggbb colours: f of a over 1-f of b.
+func mix(a, b string, f float64) string {
+	var out [3]int
+	for i := range out {
+		var x, y int
+		fmt.Sscanf(a[1+2*i:3+2*i], "%02x", &x)
+		fmt.Sscanf(b[1+2*i:3+2*i], "%02x", &y)
+		out[i] = int(math.Round(f*float64(x) + (1-f)*float64(y)))
+	}
+	return fmt.Sprintf("#%02X%02X%02X", out[0], out[1], out[2])
 }
 
 // State is a sync or agent-report state; its token name in tokens.json is the string.

@@ -224,6 +224,52 @@ class TextWidget extends WidgetType {
   }
 }
 
+// CopyWidget is the copy glyph (two squares) at a code block's top right: a click puts the code
+// on the clipboard, by the app when the page is in one (the pasteboard), else by the browser,
+// and shows a check for a moment. The block's text is its identity, so it is drawn again only
+// when the code changes.
+const copySVG =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>';
+const checkSVG =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3 8.5l3.2 3L13 4.5"/></svg>';
+
+class CopyWidget extends WidgetType {
+  constructor(text) {
+    super();
+    this.text = text;
+  }
+  eq(o) {
+    return o.text === this.text;
+  }
+  toDOM() {
+    const b = document.createElement("button");
+    b.className = "cm-copy";
+    b.type = "button";
+    b.innerHTML = copySVG;
+    b.title = "Copy the code";
+    b.setAttribute("aria-label", "Copy the code");
+    b.addEventListener("mousedown", (e) => e.preventDefault()); // the cursor stays where it is
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (globalThis.webkit?.messageHandlers?.nt) post({ type: "copy", text: this.text });
+      else navigator.clipboard?.writeText(this.text);
+      b.innerHTML = checkSVG;
+      b.classList.add("cm-copied");
+      clearTimeout(b.back);
+      b.back = setTimeout(() => {
+        b.innerHTML = copySVG;
+        b.classList.remove("cm-copied");
+      }, 1200);
+    });
+    return b;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
 // CheckWidget is a task's checkbox; a click asks the app to tick it (it knows the day for done:).
 class CheckWidget extends WidgetType {
   constructor(checked) {
@@ -591,7 +637,9 @@ export function buildDecorations(state) {
           }
           const info = node.node.getChild("CodeInfo");
           if (info) add(mark("cm-codeinfo"), info.from, info.to);
-          for (const c of node.node.getChildren("CodeText")) codeMarks(tree, c.from, c.to, (a, b, cls) => add(mark(cls), a, b));
+          const code = node.node.getChildren("CodeText");
+          for (const c of code) codeMarks(tree, c.from, c.to, (a, b, cls) => add(mark(cls), a, b));
+          add(Decoration.widget({ widget: new CopyWidget(code.map((c) => doc.sliceString(c.from, c.to)).join("")), side: -1 }), doc.lineAt(from).from);
           if (!open) {
             // the fences, hidden, become the block's top and bottom edge
             const first = doc.lineAt(from);

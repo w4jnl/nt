@@ -264,3 +264,13 @@ test("a mermaid fence is a diagram off the cursor, its source on it", () => {
   assert.equal(decos(blockDecorations(state(doc, { cursor: doc.indexOf("A -->"), focused: true }))).length, 0);
   assert.ok(isDiagram("mermaid") && isDiagram(" Mermaid ") && !isDiagram("go") && !isDiagram("mermaidx"));
 });
+
+test("a fenced code block has copy at its top right, with its code", () => {
+  const doc = "Before\n\n```go\nfunc main() {}\n// two\n```\n\nText\n\n    indented\n";
+  const copies = decos(buildDecorations(state(doc))).filter((d) => d.widget === "CopyWidget");
+  assert.equal(copies.length, 1, "one per fenced block, none for an indented one");
+  assert.equal(copies[0].from, doc.indexOf("```go"), "on the block's first line");
+  assert.equal(copies[0].w.text, "func main() {}\n// two");
+  const open = decos(buildDecorations(state(doc, { cursor: doc.indexOf("main"), focused: true }))).filter((d) => d.widget === "CopyWidget");
+  assert.equal(open.length, 1, "there with the cursor in the block too");
+});

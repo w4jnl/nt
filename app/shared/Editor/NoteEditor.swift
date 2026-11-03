@@ -15,6 +15,11 @@ import CryptoKit
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 @MainActor
 final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
@@ -301,6 +306,15 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
                     let day = await ws.day()
                     page("window.nt.toggle(n, d)", ["n": line, "d": day])
                 }
+            }
+        case "copy": // a code block's copy button
+            if let text = body["text"] as? String {
+                #if os(macOS)
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                #else
+                UIPasteboard.general.string = text
+                #endif
             }
         case "image":
             if let b64 = body["data"] as? String, let data = Data(base64Encoded: b64), let pos = body["pos"] as? Int {
