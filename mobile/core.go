@@ -39,6 +39,9 @@ type Git interface {
 	Forget(path string) error
 	Count(rng string) int
 	Files() (string, error)
+	// History is every commit but the merges, newest first: "<unix seconds>\t<subject>" and then
+	// one changed path per line, entries separated by NUL.
+	History() (string, error)
 }
 
 // version is nt's version, stamped by make ios-core.
@@ -134,6 +137,11 @@ func (a adapter) Take(path string, theirs bool) error { return a.g.Take(path, th
 func (a adapter) Status() ([]string, error) { return list(a.g.Status()) }
 func (a adapter) Staged() ([]string, error) { return list(a.g.Staged()) }
 func (a adapter) Files() ([]string, error)  { return list(a.g.Files()) }
+
+func (a adapter) History() ([]gitsync.Entry, error) {
+	s, err := a.g.History()
+	return gitsync.ParseHistory(s), err
+}
 
 func (a adapter) Stage(exclude []string) error { return a.g.Stage(Join(exclude)) }
 func (a adapter) Add(paths ...string) error    { return a.g.Add(Join(paths)) }

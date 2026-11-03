@@ -128,6 +128,7 @@ Decisions taken with the user (2026-10-26):
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
 | `nt todo on\|off <note>` | The note's task lines are todos, or a checklist: `todos:` in its frontmatter (docs/format.md §12) |
 | `nt paste <note> [--name words] [--from file]` | Save the clipboard's image, or the image file `--from` names, as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it, the Mac app pastes and drops through it |
+| `nt history <note>` | When the note changed and from which machine, newest first, by git's history: each commit that touched it, the host from sync's `nt: <host> · …` subject (`--json`: `at`, `by`). A change not yet synced is not in it |
 | `nt config [get\|set\|edit]` | Every setting with its value, its file and what it does; `set <key> <value>` changes one line of the right file, checked; `edit [--repo]` opens the whole file (Settings, below) |
 | `nt sync`, `nt doctor` | Sync now; check the setup, and list the links in the notes that point at nothing (`--json` lists every one) |
 | `nt init [--clone url]` | Set up a repo, or clone one on a second machine |
@@ -192,6 +193,7 @@ Decisions taken with the user (2026-10-26):
 
 - `l`, `o` and `i` come from `internal/mdparse`, a line scan that skips code and keeps source line numbers. Glamour has no way to map rendered lines back to the source.
 - Backlinks ("Linked from") come from an in-memory scan (`internal/scan`), with no persisted index. Titles for `ctrl-p` come from the same scan, matched by nt's own subsequence scorer.
+- Under the note, before "Linked from": `changed 2h ago · macbook`, when git's history last saw the note change and the host whose sync committed it (`gitsync.Changes` over `git log --name-only`, read only; `changed` and `by` in `nt _editor index`). Under a minute it is "just now", up to two days minutes or hours ago, then the date as todos say theirs; a commit nt did not make names no host; a note never synced shows nothing. The time is the sync's, not the save's: a note written since the last sync keeps its earlier line until sync commits it. No frontmatter stamp: one `updated` line changed on two devices would make every edit a conflict copy, and the journals' lines carry their own times.
 - The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
 - While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
 - `i` opens an image with `image_viewer`, else Quick Look, else `xdg-open` on a Linux desktop, else `nt _image` (chafa, full screen) in the terminal.
@@ -403,7 +405,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - It bundles the `nt` it was built with, universal, in `Contents/Helpers/nt`, so the app and the
   format cannot drift. `NT_BIN` points it at another one.
 - It reads files itself. `nt _editor index` gives it the folders, every note's title, the notes
-  that link to each, the day as nt counts it, the pins and where `status.json` is. FSEvents on the
+  that link to each, when each last changed and from which machine (`changed`, `by`: git's
+  history, §4), the day as nt counts it, the pins and where `status.json` is. FSEvents on the
   repository and on the state folder tell it when to read again.
 - Everything that writes goes through nt, with `--json`: `t`, `a`, `n`, `todo`, `paste`, `mv`,
   `config set`, `sync`, and `_editor save` for the note's text.
@@ -460,8 +463,9 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   out of the toolbar, which would draw it as a glass button. View › Hide Sidebar (⌃⌘S) or the
   toolbar's button hides the sidebar.
 - The note: a centred column, 680 px. The toolbar says where the note is (folders › title) and
-  searches. The word count sits at the bottom right, a message at the bottom left when something
-  did not work.
+  searches. At the bottom right, when the note last changed and from which machine, as the
+  terminal says it under the note (§4), then the word count, on the ground so the note's last
+  lines pass under it, not through it; a message at the bottom left when something did not work.
 - Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
@@ -640,6 +644,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - the sync state at the foot, as glyph and word; a tap syncs.
 - **The note** is the Mac app's editor page in a `WKWebView`.
   - It has a narrower column and margins under 600 pt.
+  - Under its title: on iPad its folders, then `changed 2h ago · macbook` as the terminal and
+    the Mac say it (§4); on iPhone the changed line alone.
   - A bar above the keyboard: a task, a heading, a link, a photo, undo, redo, done.
   - A tap follows a link. On the line being edited the link shows an "open" chip in place of
     the Mac's Command-click.
@@ -698,7 +704,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     - fetch, push;
     - merge with conflicts;
     - conflict stages, read blob, checkout stage;
-    - count, tracked files.
+    - count, tracked files, the history (each commit but the merges: when, its subject, the
+      paths it changed; what `changed` and `by` in the index and `nt history` read).
   - The CLI's `exec` wrapper is one implementation, libgit2 on iOS the other.
   - The policy stays in Go: the commit message, conflict copies, the digest rule, the journals'
     log sort.

@@ -343,7 +343,7 @@ func (r Runner) editor(args []string, stdin []byte) ([]byte, int, error) {
 	case "day":
 		return []byte(Day(v) + "\n"), 0, nil
 	case "index":
-		return answer(IndexOf(v, config.StateDir()), nil)
+		return answer(IndexOf(v, config.StateDir(), r.Git), nil)
 	case "kick":
 		return nil, 0, nil // the app syncs when it sees fit; there is no process to start
 	case "save":

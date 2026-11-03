@@ -6,6 +6,8 @@ struct RepoIndex: Codable, Sendable, Equatable {
         let path: String
         let title: String
         var created: String? = nil // the frontmatter's created: when an agent report's session began
+        var changed: String? = nil // when git's history last saw it change, RFC 3339; nil before its first sync
+        var by: String? = nil      // the host whose nt committed that change; nil when nt did not
     }
 
     struct Folders: Codable, Sendable, Equatable {

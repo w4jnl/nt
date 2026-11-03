@@ -43,6 +43,7 @@ notes
                        back [--theme auto|dark|light] [--images auto|on|off]
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
+  history <note>       when the note changed and from which machine, newest first, by git's history
 
 folders
   mv <from> <to>       move a note or a folder; to ending in / is a folder to move it into. The
@@ -127,6 +128,8 @@ func Main(args []string) int {
 		return runView(args[1:])
 	case "paste":
 		return runPaste(args[1:])
+	case "history":
+		return runHistory(args[1:])
 	case "todo":
 		return runTodo(args[1:])
 	case "mv", "move":

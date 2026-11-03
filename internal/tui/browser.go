@@ -567,13 +567,27 @@ func (b *browser) closePick() tea.Cmd {
 	return b.loadNow()
 }
 
-// linkedFrom is the "Linked from" section shown after a note: the notes that link to it.
+// linkedFrom is what follows a note: when it last changed and from which machine, by git's
+// history, then "Linked from", the notes that link to it. Nothing for a note never synced.
 func (b *browser) linkedFrom(rel string) string {
-	if b.ix == nil || len(b.ix.Back[rel]) == 0 {
+	if b.ix == nil {
+		return ""
+	}
+	changed := ""
+	if n := b.ix.Note(rel); n != nil && n.Changed != "" {
+		changed = changedLine(n.Changed, n.By, b.v.Now())
+	}
+	if changed == "" && len(b.ix.Back[rel]) == 0 {
 		return ""
 	}
 	var s strings.Builder
 	s.WriteString("\n\n  " + b.st.Rule.Render(strings.Repeat("─", 24)) + "\n")
+	if changed != "" {
+		s.WriteString("  " + b.st.Faint.Render(changed) + "\n")
+	}
+	if len(b.ix.Back[rel]) == 0 {
+		return s.String()
+	}
 	s.WriteString("  " + b.st.Muted.Render("Linked from") + "\n")
 	for _, from := range b.ix.Back[rel] { // hyperlinks, like the note's own links, so they follow
 		link := vault.RelLink(rel, from)
@@ -1843,7 +1857,11 @@ func (b *browser) synced(st gitsync.Status) tea.Cmd {
 func (b *browser) reindex() tea.Cmd {
 	b.indexSeq++
 	seq, root, v := b.indexSeq, b.v.Root, b.v
-	return func() tea.Msg { return indexMsg{seq, scan.Build(root), todo.Collect(v)} }
+	return func() tea.Msg {
+		ix := scan.Build(root)
+		ops.Stamp(ix, v, nil)
+		return indexMsg{seq, ix, todo.Collect(v)}
+	}
 }
 
 func modTime(p string) time.Time {

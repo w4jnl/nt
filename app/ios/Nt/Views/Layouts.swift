@@ -132,6 +132,7 @@ struct NoteScreen: View {
         }
         .background(Brand.ground)
         .navigationTitle(ws.title(path))
+        .navigationSubtitle(ws.changedLine(path) ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { NoteMenu(path: path) }
         .modifier(PhotoPicking())
@@ -186,7 +187,10 @@ struct NoteDetail: View {
         }
         .background(Brand.ground)
         .navigationTitle(ws.note.map { ws.title($0.path) } ?? "")
-        .navigationSubtitle(ws.note.map { SidebarTree.ancestors($0.path).map { ($0 as NSString).lastPathComponent }.joined(separator: " › ") } ?? "")
+        .navigationSubtitle(ws.note.map { n in
+            let folders = SidebarTree.ancestors(n.path).map { ($0 as NSString).lastPathComponent }.joined(separator: " › ")
+            return [folders, ws.changedLine(n.path) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+        } ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { if let n = ws.note { NoteMenu(path: n.path) } }
         .modifier(PhotoPicking())

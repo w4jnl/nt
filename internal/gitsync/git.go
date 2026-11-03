@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Git is the plumbing sync needs from a repository; everything else sync does (the commit
@@ -32,6 +33,72 @@ type Git interface {
 	Forget(path string) error                     // unstage and untrack path, when it is there
 	Count(rng string) int                         // commits in rng: "A..B", or "HEAD" for all of them
 	Files() ([]string, error)                     // the tracked paths
+	History() ([]Entry, error)                    // every commit but the merges, newest first: when, its subject, the paths it changed
+}
+
+// Entry is one commit of the history: when it was made, its subject and the paths it changed.
+// On the wire between the apps and nt it is "<unix seconds>\t<subject>" and then one path per
+// line, entries separated by NUL (ParseHistory), the shape git log --name-only prints.
+type Entry struct {
+	At      time.Time
+	Subject string
+	Files   []string
+}
+
+// Change is the last change git's history knows for a path: when, and the host whose nt
+// committed it ("" for a commit nt did not make).
+type Change struct {
+	At time.Time
+	By string
+}
+
+// Changes is the last change of every path in the history: the newest commit that touched it.
+// A note written since the last sync keeps its earlier change until sync commits it.
+func Changes(g Git) (map[string]Change, error) {
+	entries, err := g.History()
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]Change{}
+	for _, e := range entries {
+		for _, f := range e.Files {
+			if _, seen := out[f]; !seen {
+				out[f] = Change{At: e.At, By: HostOf(e.Subject)}
+			}
+		}
+	}
+	return out, nil
+}
+
+// HostOf is the host in a subject sync wrote, "nt: <host> · 3 files (daily)"; "" for any other.
+func HostOf(subject string) string {
+	rest, ok := strings.CutPrefix(subject, "nt: ")
+	if !ok {
+		return ""
+	}
+	host, _, _ := strings.Cut(rest, " · ")
+	return strings.TrimSpace(host)
+}
+
+// ParseHistory reads entries off the wire, newest first as they come.
+func ParseHistory(s string) []Entry {
+	var out []Entry
+	for _, chunk := range strings.Split(s, "\x00") {
+		lines := strings.Split(strings.Trim(chunk, "\n"), "\n")
+		head, subject, _ := strings.Cut(lines[0], "\t")
+		secs, err := strconv.ParseInt(strings.TrimSpace(head), 10, 64)
+		if err != nil {
+			continue
+		}
+		e := Entry{At: time.Unix(secs, 0), Subject: subject}
+		for _, l := range lines[1:] {
+			if l = strings.TrimSpace(l); l != "" {
+				e.Files = append(e.Files, l)
+			}
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // ErrOffline is a fetch or push that could not reach the remote, for the network or for
@@ -186,6 +253,19 @@ func (g execGit) Count(rng string) int {
 func (g execGit) Files() ([]string, error) {
 	out, err := g.bytes("ls-files", "-z")
 	return splitZ(out), err
+}
+
+// History is git log --name-only without the merges, in the wire shape; nothing before the
+// first commit.
+func (g execGit) History() ([]Entry, error) {
+	if !g.ok("rev-parse", "--verify", "--quiet", "HEAD") {
+		return nil, nil
+	}
+	out, err := g.bytes("log", "--no-merges", "--no-renames", "--name-only", "--format=%x00%ct%x09%s")
+	if err != nil {
+		return nil, err
+	}
+	return ParseHistory(string(out)), nil
 }
 
 // classify marks a failed fetch or push as offline or rejected, keeping git's message.

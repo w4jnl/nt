@@ -106,6 +106,29 @@ func (b *browser) syncBadge() string {
 	return badge
 }
 
+// changedLine is "changed 2h ago · macbook": when a note last changed (RFC 3339, from the
+// index) and the host that synced it, left out when the commit was not nt's. Under a minute it
+// is "just now"; older than two days it is the date, as todos say theirs.
+func changedLine(at, by string, now time.Time) string {
+	t, err := time.Parse(time.RFC3339, at)
+	if err != nil {
+		return ""
+	}
+	var when string
+	switch d := now.Sub(t); {
+	case d >= 0 && d < time.Minute:
+		when = "just now"
+	case d >= 0 && d < 48*time.Hour:
+		when = ago(d)
+	default:
+		when = todo.Ago(t.In(now.Location()).Format("2006-01-02"), now)
+	}
+	if by == "" {
+		return "changed " + when
+	}
+	return "changed " + when + " · " + by
+}
+
 func ago(d time.Duration) string {
 	switch {
 	case d < time.Hour:
