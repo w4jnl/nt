@@ -224,6 +224,40 @@ class TextWidget extends WidgetType {
   }
 }
 
+// CopyWidget is "copy" at a code block's top right: a click puts the code on the clipboard, by
+// the app when the page is in one (the pasteboard), else by the browser, and says "copied" for a
+// moment. The block's text is its identity, so it is drawn again only when the code changes.
+class CopyWidget extends WidgetType {
+  constructor(text) {
+    super();
+    this.text = text;
+  }
+  eq(o) {
+    return o.text === this.text;
+  }
+  toDOM() {
+    const b = document.createElement("button");
+    b.className = "cm-copy";
+    b.type = "button";
+    b.textContent = "copy";
+    b.title = "Copy the code";
+    b.setAttribute("aria-label", "Copy the code");
+    b.addEventListener("mousedown", (e) => e.preventDefault()); // the cursor stays where it is
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (globalThis.webkit?.messageHandlers?.nt) post({ type: "copy", text: this.text });
+      else navigator.clipboard?.writeText(this.text);
+      b.textContent = "copied";
+      clearTimeout(b.back);
+      b.back = setTimeout(() => (b.textContent = "copy"), 1200);
+    });
+    return b;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
 // CheckWidget is a task's checkbox; a click asks the app to tick it (it knows the day for done:).
 class CheckWidget extends WidgetType {
   constructor(checked) {
@@ -591,7 +625,9 @@ export function buildDecorations(state) {
           }
           const info = node.node.getChild("CodeInfo");
           if (info) add(mark("cm-codeinfo"), info.from, info.to);
-          for (const c of node.node.getChildren("CodeText")) codeMarks(tree, c.from, c.to, (a, b, cls) => add(mark(cls), a, b));
+          const code = node.node.getChildren("CodeText");
+          for (const c of code) codeMarks(tree, c.from, c.to, (a, b, cls) => add(mark(cls), a, b));
+          add(Decoration.widget({ widget: new CopyWidget(code.map((c) => doc.sliceString(c.from, c.to)).join("")), side: -1 }), doc.lineAt(from).from);
           if (!open) {
             // the fences, hidden, become the block's top and bottom edge
             const first = doc.lineAt(from);

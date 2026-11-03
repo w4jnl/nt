@@ -5,7 +5,7 @@
 // follow, a task to tick, an image to save, the word count. Nothing here touches the network or
 // the disk.
 import { Annotation, ChangeSet, EditorState, Transaction } from "@codemirror/state";
-import { EditorView, drawSelection, keymap } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
@@ -37,7 +37,6 @@ function extensions(path, readOnly) {
     noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
-    drawSelection(),
     EditorView.contentAttributes.of(
       touch ? { spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" } : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" },
     ),

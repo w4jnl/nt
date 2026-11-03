@@ -287,8 +287,8 @@ func (p *preview) showText(text string) bool {
 	return false
 }
 
-// View is the visible part of the note, the selected text on accent-soft and f's labels over
-// the links they follow.
+// View is the visible part of the note, the selected text in ink on the selection colour (accent
+// at a third over ground, theme.SelectionHex) and f's labels over the links they follow.
 func (p *preview) View() string {
 	v := p.vp.View()
 	if p.hints != nil {
@@ -308,7 +308,7 @@ func (p *preview) View() string {
 		return v
 	}
 	a, b := p.mark.ordered()
-	st := lipgloss.NewStyle().Foreground(p.pal.Ink).Background(p.pal.AccentSoft)
+	st := lipgloss.NewStyle().Foreground(p.pal.Ink).Background(p.pal.Selection)
 	rows := strings.Split(v, "\n")
 	for i, row := range rows {
 		n := p.vp.YOffset() + i

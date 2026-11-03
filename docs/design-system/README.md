@@ -67,7 +67,10 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 - Set text in `ink`, secondary text (dates, paths, footer verbs) in `ink-muted`, placeholders
   only in `ink-faint`.
 - `accent` is the only interactive colour: the selection bar, footer keys, links and headings
-  in the preview, the syncing spinner. A highlighted search match, and text selected in the note (in `ink`), sit on `accent-soft`.
+  in the preview, the syncing spinner. A highlighted search match sits on `accent-soft`. Text
+  selected in the note, in `ink`, sits on `accent` at a third over `ground`, in every client: the
+  apps' page blends it with `color-mix`, the terminal from the two tokens (`theme.SelectionHex`),
+  since `accent-soft` is too near the ground to read as a selection.
 - State colours mean state and nothing else: `ok`, `warn`, `alert`, with `-soft` fills where a
   fill is wanted (Mac app badges later). `alert` also marks destructive confirmations.
 - Every state has its own glyph shape and word, so the UI is readable in greyscale, to
@@ -206,7 +209,9 @@ t today  [ ] day  a append  n new  / search  ? help
   families' `ok`, `warn` and `alert` only where a diagram needs more than one colour.
 - **States.** Glyph and word, as everywhere. The sidebar's sync state is the terminal browser's
   badge, and a click on it syncs.
-- **Selection.** The system's, tinted with `accent` (the asset catalogue's AccentColor). In Open,
+- **Selection.** The system's, tinted with `accent` (the asset catalogue's AccentColor); in the
+  note the page's own, `accent` at a third over the text, drawn over a code block's background
+  too. In Open,
   the selected row is `accent-soft` with the family's accent bar at its left edge.
 - **No modals.** Open, Search and New note are one floating field over the window; Escape closes
   it.

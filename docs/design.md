@@ -193,7 +193,8 @@ Decisions taken with the user (2026-10-26):
 - The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
 - While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
 - `i` opens an image with `image_viewer`, else Quick Look, else `xdg-open` on a Linux desktop, else `nt _image` (chafa, full screen) in the terminal.
-- The mouse: dragging over the note selects its text, on `accent-soft`, within the note pane (the terminal's or tmux's own selection runs across both panes); `y` copies it without the margin, Escape clears it. Dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag still gives the terminal's own selection.
+- The mouse: dragging over the note selects its text, in `ink` on `accent` at a third over
+  `ground` (the apps' selection; `theme.SelectionHex` blends it, a terminal cannot), within the note pane (the terminal's or tmux's own selection runs across both panes); `y` copies it without the margin, Escape clears it. Dragging the `│` divider resizes the list, the wheel scrolls the pane under the pointer, a click selects a row and a second click opens it, a click on the note gives it the focus. The width is kept in `browser.json` in the state folder, not in the notes repository. With the mouse captured, Shift-drag still gives the terminal's own selection.
 - Deleting is plain: the files go, sync commits it, git keeps them. Other notes' links to a deleted note stay (the question says how many there are).
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
@@ -558,7 +559,10 @@ rendered text.
 - An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
   `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
   line of its own at the cursor or where it was dropped.
-- Code blocks are mono on `surface-sunk`, the language at the top right. Code in a language the
+- Code blocks are mono on `surface-sunk`, the language at the top right and, beside it, copy: a
+  click puts the block's code on the pasteboard and says "copied" for a moment. Text selected in
+  the note is the system's selection, `accent` at a third over the text, drawn over every
+  background, a code block's too. Code in a language the
   page knows (shell, go, python, javascript and typescript, json, yaml, swift, sql, css, html,
   rust, c and c++) is coloured as the terminal colours it (§5, Chroma): keywords and types in
   `accent`, strings in `ok`, numbers in `warn`, comments and operators muted, functions bold;

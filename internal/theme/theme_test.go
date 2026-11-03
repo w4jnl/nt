@@ -72,6 +72,9 @@ func TestTextContrast(t *testing.T) {
 				}
 			}
 		}
+		if r := contrast(Hex("ink", dark), SelectionHex(dark)); r < 4.5 {
+			t.Errorf("dark=%v ink on the selection %s: %.2f:1", dark, SelectionHex(dark), r)
+		}
 		if r := contrast(Hex("on-accent", dark), Hex("accent", dark)); r < 4.5 {
 			t.Errorf("dark=%v on-accent on accent: %.2f:1", dark, r)
 		}
@@ -93,6 +96,18 @@ func TestGlyphsDistinctPerDomain(t *testing.T) {
 				t.Errorf("%s and %s share the glyph %s", s, o, g)
 			}
 			seen[g] = s
+		}
+	}
+}
+
+func TestSelectionIsAccentOverGround(t *testing.T) {
+	if got := mix("#FF0000", "#000000", 0.5); got != "#800000" {
+		t.Errorf("mix: %s", got)
+	}
+	for _, dark := range []bool{true, false} {
+		s := SelectionHex(dark)
+		if s == Hex("accent-soft", dark) || s == Hex("ground", dark) || s == Hex("accent", dark) {
+			t.Errorf("dark=%v the selection %s is not a blend", dark, s)
 		}
 	}
 }
