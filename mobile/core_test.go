@@ -35,6 +35,15 @@ func (x viaExec) Status() (string, error) { l, err := x.g.Status(); return Join(
 func (x viaExec) Staged() (string, error) { l, err := x.g.Staged(); return Join(l), err }
 func (x viaExec) Files() (string, error)  { l, err := x.g.Files(); return Join(l), err }
 
+func (x viaExec) History() (string, error) {
+	entries, err := x.g.History()
+	var chunks []string
+	for _, e := range entries {
+		chunks = append(chunks, strings.Join(append([]string{strconv.FormatInt(e.At.Unix(), 10) + "\t" + e.Subject}, e.Files...), "\n"))
+	}
+	return strings.Join(chunks, "\x00"), err
+}
+
 func (x viaExec) Fetch() error { return prefixed(x.g.Fetch()) }
 
 func (x viaExec) Push(branch string, first bool) error { return prefixed(x.g.Push(branch, first)) }
@@ -136,6 +145,11 @@ func TestTheCoreSyncsThroughTheAppsGit(t *testing.T) {
 	}
 	if j := read("daily/2026/2026-10-28.md"); !strings.Contains(j, "from the mac") || !strings.Contains(j, "from the phone") || strings.Contains(j, "<<<<<<<") {
 		t.Errorf("the journal does not merge line by line:\n%s", j)
+	}
+
+	// the index says when each note changed and from which device, by the app's git
+	if r := core.Run(`["_editor","index"]`, nil); r.Status != 0 || !strings.Contains(string(r.Output), `"by": "iphone"`) || !strings.Contains(string(r.Output), `"changed": "`) {
+		t.Errorf("index: %d %s %s", r.Status, r.Message, r.Output)
 	}
 
 	// the other commands answer as nt does, and a broken command line says so

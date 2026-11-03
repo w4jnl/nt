@@ -127,6 +127,32 @@ struct LibGitTests {
         #expect(err?.localizedDescription.hasPrefix("rejected: ") == true, "\(err?.localizedDescription ?? "")")
     }
 
+    @Test func theHistoryIsEachCommitWithItsPathsNewestFirstWithoutMerges() throws {
+        let mac = try seed()
+        let phone = try clone(base.appending(path: "phone"), author: "iphone")
+        try write(mac.root, "tech/nas.md", "# NAS\n\nnew fan\n")
+        try commit(mac, "nt: mac · 1 file (tech)")
+        try mac.push("main", first: false)
+        try write(phone.root, "work/net.md", "# Network\n")
+        try commit(phone, "nt: iphone · 1 file (work)")
+        try phone.fetch()
+        try phone.merge("main") // a merge commit, which is no change of its own
+        #expect(phone.count("HEAD") == 4)
+
+        var err: NSError?
+        let entries = phone.history(&err).split(separator: "\0").map { $0.split(separator: "\n").map(String.init) }
+        #expect(err == nil)
+        #expect(entries.count == 3, "\(entries)")
+        #expect(entries.first?.first?.hasSuffix("\tnt: iphone · 1 file (work)") == true && entries.first?.dropFirst().sorted() == ["work/net.md"])
+        #expect(entries.dropFirst().first?.first?.hasSuffix("\tnt: mac · 1 file (tech)") == true && entries.dropFirst().first?.dropFirst().sorted() == ["tech/nas.md"])
+        #expect(entries.last?.dropFirst().sorted() == [".gitattributes", "daily/2026/2026-10-28.md", "tech/nas.md"], "the seed, against the empty tree")
+        #expect(Int(entries.first?.first?.split(separator: "\t").first ?? "") ?? 0 > 1_700_000_000, "the commit's time in unix seconds")
+
+        let empty = base.appending(path: "empty")
+        try LibGit.create(at: empty, bare: false)
+        #expect(LibGit(root: empty, author: "x", remote: plain).history(&err) == "" && err == nil, "no commit yet")
+    }
+
     @Test func stagingLeavesTempFilesAndTheExcludedOut() throws {
         let mac = try seed()
         try write(mac.root, "work/.nt-tmp-123", "half")

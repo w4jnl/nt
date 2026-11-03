@@ -20,6 +20,18 @@ type Note struct {
 	Path    string `json:"path"` // repository path
 	Title   string `json:"title"`
 	Created string `json:"created,omitempty"` // the frontmatter's created, as written: an agent report's start
+	Changed string `json:"changed,omitempty"` // when git's history last saw it change, RFC 3339; "" before its first sync
+	By      string `json:"by,omitempty"`      // the host whose nt committed that change; "" when nt did not
+}
+
+// Note is the note at path, nil when the index has none.
+func (ix *Index) Note(path string) *Note {
+	for i := range ix.Notes {
+		if ix.Notes[i].Path == path {
+			return &ix.Notes[i]
+		}
+	}
+	return nil
 }
 
 // Index is the repository's notes and links.

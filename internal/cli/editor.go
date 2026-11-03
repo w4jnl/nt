@@ -52,7 +52,7 @@ func runEditorHelper(args []string) int {
 	case "day":
 		fmt.Println(v.Day(v.Now()).Format("2006-01-02"))
 	case "index":
-		return printJSON(ops.IndexOf(v, config.StateDir()))
+		return printJSON(ops.IndexOf(v, config.StateDir(), nil))
 	case "save":
 		return fail(errors.New("_editor save: name the note: nt _editor save <note> [--base <sha256>] [--keep]"))
 	default:

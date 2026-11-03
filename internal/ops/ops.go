@@ -17,9 +17,11 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/gitsync"
@@ -354,9 +356,11 @@ type Index struct {
 	Back    map[string][]string `json:"back"`
 }
 
-// IndexOf reads every note of the repository for the index; state is where status.json is.
-func IndexOf(v *vault.Vault, state string) Index {
+// IndexOf reads every note of the repository for the index; state is where status.json is, g
+// the repository's git for when each note last changed (nil: git itself).
+func IndexOf(v *vault.Vault, state string, g gitsync.Git) Index {
 	ix := scan.Build(v.Root)
+	Stamp(ix, v, g)
 	notes := ix.Notes
 	if notes == nil {
 		notes = []scan.Note{}
@@ -437,6 +441,54 @@ func Save(v *vault.Vault, rel string, text []byte, base string, keep bool) (Save
 		}
 	}
 	return reply, nil
+}
+
+// Stamp writes into each note of ix when git's history last saw it change and by which host
+// (nil g: git itself). A repository without history, or without git, leaves the notes unstamped.
+func Stamp(ix *scan.Index, v *vault.Vault, g gitsync.Git) {
+	if g == nil {
+		g = gitsync.Exec(v.Root)
+	}
+	changes, err := gitsync.Changes(g)
+	if err != nil {
+		return
+	}
+	for i := range ix.Notes {
+		if c, ok := changes[ix.Notes[i].Path]; ok {
+			ix.Notes[i].Changed, ix.Notes[i].By = c.At.Format(time.RFC3339), c.By
+		}
+	}
+}
+
+// History is when a note changed, newest first, by git's history: each commit that touched it.
+func History(v *vault.Vault, g gitsync.Git, note string) ([]Change, error) {
+	rel, err := InRepo(v, note)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(rel, ".md") {
+		return nil, fmt.Errorf("%s is not a note", note)
+	}
+	if g == nil {
+		g = gitsync.Exec(v.Root)
+	}
+	entries, err := g.History()
+	if err != nil {
+		return nil, err
+	}
+	out := []Change{}
+	for _, e := range entries {
+		if slices.Contains(e.Files, rel) {
+			out = append(out, Change{At: e.At.Format(time.RFC3339), By: gitsync.HostOf(e.Subject)})
+		}
+	}
+	return out, nil
+}
+
+// Change is one commit that touched a note: when, and the host whose nt committed it.
+type Change struct {
+	At string `json:"at"`
+	By string `json:"by,omitempty"`
 }
 
 // SHA256 is the hex SHA-256 of b, as editors name the version of a note they read.

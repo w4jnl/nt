@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/config"
+	"github.com/w4jnl/nt/internal/scan"
 	"github.com/w4jnl/nt/internal/search"
 	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
@@ -1024,5 +1025,33 @@ func TestToggleTodos(t *testing.T) {
 	press(b, "T") // a folder is no note
 	if !strings.Contains(b.msg, "T works on a note") {
 		t.Fatalf("T on a folder: %q", b.msg)
+	}
+}
+
+// TestChangedLineUnderTheNote: the index's changed and by, from git's history, show under the
+// note as "changed 2h ago · mac", before Linked from; a note never synced shows nothing.
+func TestChangedLineUnderTheNote(t *testing.T) {
+	b := testBrowser(t, 120, t.TempDir())
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.Local)
+	b.v.Now = func() time.Time { return now }
+	ix := scan.Build(b.v.Root)
+	n := ix.Note("tech/2026-10-22-c.md")
+	n.Changed, n.By = now.Add(-2*time.Hour).Format(time.RFC3339), "mac"
+	ix.Note("tech/2026-10-21-b.md").Changed = now.AddDate(0, 0, -10).Format(time.RFC3339)
+	b.Update(indexMsg{seq: b.indexSeq, ix: ix})
+	b.show("tech/2026-10-22-c.md")
+	if got := ansi.Strip(b.p.extra); !strings.Contains(got, "changed 2h ago · mac") {
+		t.Errorf("under the note: %q", got)
+	}
+	b.show("tech/2026-10-21-b.md")
+	if got := ansi.Strip(b.p.extra); !strings.Contains(got, "changed 24 oct") || strings.Contains(got, "·") {
+		t.Errorf("a change not by nt names no host: %q", got)
+	}
+	b.show("tech/2026-10-20-a.md")
+	if b.p.extra != "" {
+		t.Errorf("a note never synced: %q", b.p.extra)
+	}
+	if got := changedLine(now.Add(-20*time.Second).Format(time.RFC3339), "iphone", now); got != "changed just now · iphone" {
+		t.Errorf("under a minute: %q", got)
 	}
 }

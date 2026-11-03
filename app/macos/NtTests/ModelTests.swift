@@ -40,6 +40,26 @@ private func index() throws -> RepoIndex {
         #expect(ix.back["homelab/2026-10-21-nas-setup.md"]?.count == 2)
     }
 
+    @Test func aNoteSaysWhenItChangedAndFromWhere() throws {
+        let json = """
+            {"root": "/r", "state": "/s", "day": "2026-11-03", "pins": [], "folders": {"daily": "daily", "agents": "agents", "weekly": "weekly"},
+             "dirs": ["work"], "notes": [
+               {"path": "work/a.md", "title": "a", "changed": "2026-11-03T10:00:00+01:00", "by": "macbook"},
+               {"path": "work/b.md", "title": "b", "changed": "2026-10-24T10:00:00+02:00"},
+               {"path": "work/c.md", "title": "c"}], "back": {}}
+            """
+        let ix = try JSONDecoder().decode(RepoIndex.self, from: Data(json.utf8))
+        #expect(ix.notes[0].changed == "2026-11-03T10:00:00+01:00" && ix.notes[0].by == "macbook")
+        #expect(ix.notes[1].by == nil && ix.notes[2].changed == nil)
+        let now = ISO8601DateFormatter().date(from: "2026-11-03T12:00:00+01:00")!
+        #expect(Workspace.changedWords(at: "2026-11-03T10:00:00+01:00", by: "macbook", now: now) == "changed 2h ago · macbook")
+        #expect(Workspace.changedWords(at: "2026-11-03T11:55:00+01:00", by: "iphone", now: now) == "changed 5m ago · iphone")
+        #expect(Workspace.changedWords(at: "2026-11-03T11:59:30+01:00", by: "iphone", now: now) == "changed just now · iphone")
+        #expect(Workspace.changedWords(at: "2026-10-24T10:00:00+02:00", by: nil, now: now) == "changed 24 oct", "a commit nt did not make names no host")
+        #expect(Workspace.changedWords(at: "2025-10-24T10:00:00+02:00", by: "", now: now) == "changed 24 oct 2025")
+        #expect(Workspace.changedWords(at: "not a time", by: "x", now: now) == nil)
+    }
+
     @Test func agentReportsShowTheirHost() {
         #expect(SidebarTree.reportHost("agents/2026/2026-10-28/work--copilot-cli--vuln-remediation--43fbe292.md", agents: "agents") == "work")
         #expect(SidebarTree.reportHost("agents/2026/2026-10-27/jaromac--claude-code--flok--f0ceca08.md", agents: "agents") == "jaromac")

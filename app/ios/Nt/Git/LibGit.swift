@@ -79,6 +79,46 @@ final class LibGit: NSObject, MobileGitProtocol, Sendable {
         }) ?? 0
     }
 
+    /// history is every commit but the merges, newest first, as nt reads it: the commit's time
+    /// and summary on one line, then the paths it changed, entries separated by NUL.
+    func history(_ err: NSErrorPointer) -> String {
+        answer(err) { repo in
+            var walk: OpaquePointer?
+            try check(git_revwalk_new(&walk, repo), "walk the history")
+            defer { git_revwalk_free(walk) }
+            git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL.rawValue | GIT_SORT_TIME.rawValue) // children before parents, as git log orders them
+            guard git_revwalk_push_head(walk) == 0 else { return "" } // no commit yet
+            var entries: [String] = []
+            var id = git_oid()
+            while git_revwalk_next(&id, walk) == 0 {
+                guard let c = try lookup(repo, id) else { continue }
+                defer { git_commit_free(c) }
+                if git_commit_parentcount(c) > 1 { continue }
+                var tree: OpaquePointer?
+                try check(git_commit_tree(&tree, c), "the commit's tree")
+                defer { git_tree_free(tree) }
+                var before: OpaquePointer?
+                if git_commit_parentcount(c) == 1 {
+                    var parent: OpaquePointer?
+                    try check(git_commit_parent(&parent, c, 0), "the parent")
+                    defer { git_commit_free(parent) }
+                    try check(git_commit_tree(&before, parent), "the parent's tree")
+                }
+                defer { git_tree_free(before) }
+                var diff: OpaquePointer?
+                try check(git_diff_tree_to_tree(&diff, repo, before, tree, nil), "diff the commit")
+                defer { git_diff_free(diff) }
+                var lines = ["\(git_commit_time(c))\t\(git_commit_summary(c).map { String(cString: $0) } ?? "")"]
+                for i in 0..<git_diff_num_deltas(diff) {
+                    guard let d = git_diff_get_delta(diff, i)?.pointee, let p = d.new_file.path ?? d.old_file.path else { continue }
+                    lines.append(String(cString: p))
+                }
+                entries.append(lines.joined(separator: "\n"))
+            }
+            return entries.joined(separator: "\0")
+        }
+    }
+
     // MARK: The index and the worktree
 
     func status(_ err: NSErrorPointer) -> String {

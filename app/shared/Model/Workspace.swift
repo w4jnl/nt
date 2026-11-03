@@ -375,6 +375,40 @@ final class Workspace {
         }
     }
 
+    /// changedLine is "changed 2h ago · macbook" for a note git's history knows: when it last
+    /// changed and the device that synced it; nil before its first sync.
+    func changedLine(_ path: String) -> String? {
+        guard let n = index?.notes.first(where: { $0.path == path }), let at = n.changed else { return nil }
+        return Self.changedWords(at: at, by: n.by, now: Date())
+    }
+
+    /// changedWords words a change as the terminal does: just now, then minutes and hours up to
+    /// two days, then the date, with the host after a middle dot when nt made the commit.
+    nonisolated static func changedWords(at: String, by: String?, now: Date) -> String? {
+        guard let t = ISO8601DateFormatter().date(from: at) else { return nil }
+        let since = now.timeIntervalSince(t)
+        var when: String
+        if since >= 0 && since < 60 {
+            when = "just now"
+        } else if since >= 0 && since < 48 * 3600 {
+            when = Badge.ago(since)
+        } else {
+            let cal = Calendar.current
+            if cal.isDateInToday(t) {
+                when = "today"
+            } else if cal.isDateInYesterday(t) {
+                when = "yesterday"
+            } else {
+                let f = DateFormatter()
+                f.locale = Locale(identifier: "en_US_POSIX")
+                f.dateFormat = cal.component(.year, from: t) == cal.component(.year, from: now) ? "d MMM" : "d MMM yyyy"
+                when = f.string(from: t).lowercased()
+            }
+        }
+        if let by, !by.isEmpty { return "changed \(when) · \(by)" }
+        return "changed \(when)"
+    }
+
     /// follow follows a link the person clicked in the note on screen.
     func follow(_ href: String) {
         guard let n = note, let root else { return }

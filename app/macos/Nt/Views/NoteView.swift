@@ -23,7 +23,7 @@ struct NoteView: View {
                 }
                 Spacer()
                 if let n = ws.note {
-                    Text((n.readOnly ? "read-only, nt writes it · " : "") + (ws.words == 1 ? "1 word" : "\(ws.words) words"))
+                    Text(status(n))
                         .font(Brand.mono(11))
                         .foregroundStyle(Brand.muted)
                         .help(n.readOnly ? "A digest: nt writes it again whenever its notes change, so edits would not last." : "")
@@ -54,6 +54,18 @@ struct NoteView: View {
 }
 
 /// Breadcrumb is the note's folders, then its title.
+extension NoteView {
+    /// status is the line at the bottom right: read-only when the note is, when it last changed
+    /// and from which machine (git's history, through the index), and the word count.
+    func status(_ n: Workspace.OpenNote) -> String {
+        var parts: [String] = []
+        if n.readOnly { parts.append("read-only, nt writes it") }
+        if let c = ws.changedLine(n.path) { parts.append(c) }
+        parts.append(ws.words == 1 ? "1 word" : "\(ws.words) words")
+        return parts.joined(separator: " · ")
+    }
+}
+
 struct Breadcrumb: View {
     let path: String
     let title: String
