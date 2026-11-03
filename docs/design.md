@@ -559,8 +559,9 @@ rendered text.
 - An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
   `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
   line of its own at the cursor or where it was dropped.
-- Code blocks are mono on `surface-sunk`, the language at the top right and, beside it, copy: a
-  click puts the block's code on the pasteboard and says "copied" for a moment. Text selected in
+- Code blocks are mono on `surface-sunk`, the language at the top right and, beside it, the copy
+  glyph (two squares): a click puts the block's code on the pasteboard and shows a check in
+  `ok` for a moment. Text selected in
   the note is the system's selection, `accent` at a third over the text, drawn over every
   background, a code block's too. Code in a language the
   page knows (shell, go, python, javascript and typescript, json, yaml, swift, sql, css, html,
