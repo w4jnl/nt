@@ -94,6 +94,7 @@ final class Workspace {
     var syncing = false
     var palette: PaletteMode?
     var searchAsked: String? // a search a note asked for, a tag in its frontmatter, for the search field to take
+    var todoSearch = false // Search asked while Todos is shown: its field takes the keys, then sets this back
     var sidebar = true // shown; the split view's toggle and View > Hide Sidebar change it
     var focusMode = false
     var todos: [Todo] = [] // every todo, open ones overdue first, as nt todo --all lists them
@@ -743,7 +744,18 @@ final class Workspace {
     func search(_ query: String) async -> [SearchHit] {
         guard let nt, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         guard let out = try? await nt.run(["s", "--json", query]), out.status == 0 else { return [] }
-        return (try? JSONDecoder().decode([SearchHit].self, from: out.stdout)) ?? []
+        let hits = (try? JSONDecoder().decode([SearchHit].self, from: out.stdout)) ?? []
+        return hits.filter { !Todo.isTask($0.text) } // a task line is Todos' to find
+    }
+
+    /// askSearch is Search (⇧⌘F, the toolbar's glass): the palette for the notes' lines, or,
+    /// while Todos is shown, its own field, which takes the keys.
+    func askSearch() {
+        if selection == .todos {
+            todoSearch = true
+        } else {
+            palette = .text
+        }
     }
 
     /// remember puts path first among the notes opened last, at most max of them.

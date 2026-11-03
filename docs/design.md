@@ -171,7 +171,7 @@ Decisions taken with the user (2026-10-26):
 | `1`–`9` | Pinned folders, so preselected subfolders are one key away |
 | `a` | One-line append (text input) |
 | `n` | Title prompt, then a note in the current folder, opened in nvim |
-| `/` | Live `rg --json` search; `#tag` keeps to the notes with that tag |
+| `/` | Live `rg --json` search over the notes' lines, task lines left out (they are the todos'); `#tag` keeps to the notes with that tag. In the todos, or on the home list's Todos row, `/` searches the todos instead |
 | `ctrl-p` | Fuzzy title search |
 | `e` | Open in nvim at the current line via `tea.ExecProcess`; reload on return. fsnotify also reloads live. |
 | `l` | Link picker; then follow the link |
@@ -204,7 +204,7 @@ Decisions taken with the user (2026-10-26):
 **Todos** (`internal/todo`, docs/format.md §12). A todo is a task line, `- [ ] text due:YYYY-MM-DD`, in any note; `nt todo add` and the browser add new ones to `## Inbox` in a `todo.md`: the root's, or a folder's (`--in work`, or the folder the browser is in). Like the backlinks they are read from the files each time, with no index: `todo.Collect` walks the notes (leaving out agent reports, conflict copies and hidden folders) and a change rewrites one line under the repository lock, only when the line is still as it was read.
 - **Order:** open todos by due date, the overdue first, then the undated ones (the todo lists in file order, the root's first, then other notes newest first); done ones by their `done:` date, latest first.
 - **Dates in words:** `2d late` (in `warn`, so it reads without colour too), `today`, `tomorrow`, a weekday within the week, else `3 nov`. Input takes `YYYY-MM-DD`, `today`, `tomorrow`, `mon`…`sun` (the next one), `+3d`, `+2w`, `+1m`, and `none` to clear.
-- **The browser's todos** (`x`, or the home list's Todos) are in the note's pane, the folder list staying as it was, as the Mac app's Todos view shows them: a line with how many are open and late, the open todos, then `▾ Done` and the done ones; each row `○` open or `✓` done in `done`, its text, the note it is in (a todo list by its path, any other by its title) in `ink-faint`, and the date at the right edge. Selecting the home list's Todos shows them there; enter, or `x` from anywhere, gives them the keys: `j` `k` move, `x`/space check or uncheck (the row stays in its list with its glyph turned until the ticks settle, 0.7 s after the last, so another `x` takes it back; then the list is read again and the selection is on the row that took its place, as in the Mac app), `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), or of the folder kept to, `f` keep to one top-level folder's todos (a picker of every note and the folders with open todos, with their counts; the summary says `from <folder>/`), `e` edit the note at the todo, enter open the note at it, `X` fold or unfold Done, `D` delete the line after asking, `r` read again, esc back to the list. A click selects a todo, a click on its glyph checks it, a second click opens its note. On a narrow screen they take the whole screen. A day's todos in the calendar (`x` there) stay a picker in the list pane.
+- **The browser's todos** (`x`, or the home list's Todos) are in the note's pane, the folder list staying as it was, as the Mac app's Todos view shows them: a line with how many are open and late, the open todos, then `▾ Done` and the done ones; each row `○` open or `✓` done in `done`, its text, the note it is in (a todo list by its path, any other by its title) in `ink-faint`, and the date at the right edge. Selecting the home list's Todos shows them there; enter, or `x` from anywhere, gives them the keys: `j` `k` move, `x`/space check or uncheck (the row stays in its list with its glyph turned until the ticks settle, 0.7 s after the last, so another `x` takes it back; then the list is read again and the selection is on the row that took its place, as in the Mac app), `d` the due date (a prompt on the footer line), `a` add one to the `todo.md` of the folder the browser is in (the root's from the journals and agent reports; the prompt names the file), or of the folder kept to, `f` keep to one top-level folder's todos (a picker of every note and the folders with open todos, with their counts; the summary says `from <folder>/`), `e` edit the note at the todo, enter open the note at it, `X` fold or unfold Done, `D` delete the line after asking, `r` read again, `/` keep to the todos with the words typed, in their text or their note's name (the prompt says `todos:`, the summary `matching "…"`; enter keeps them and gives the keys back, esc in the prompt clears them), esc back to the list. A click selects a todo, a click on its glyph checks it, a second click opens its note. On a narrow screen they take the whole screen. A day's todos in the calendar (`x` there) stay a picker in the list pane.
 - **nvim:** `<leader>tx` checks or unchecks the todo on the cursor line in the buffer, with the day from `nt _editor day`.
 - **The calendar** (`c`) shows a month in the list pane, Monday first, 7 days of 4 columns (`list-min`). A day with a journal is in `ink`, one without in `ink-faint`, today in `accent`; `•` after a day with open todos due, in `warn` when that day has passed. Under the month, the selected day: its date, whether it has a journal, its todos (due or done that day) and its agent sessions. The preview shows the day's journal, or says it has none. Keys: `h` `l` day, `j` `k` week, `[` `]` month, `t` today, enter goes to the journal in the list, `e` edits it (starting it when missing), `x` the todo list of that day (a todo added there is due that day), `tab` to the journal, esc back; a click selects a day, a second click opens it. Journals and agent sessions are read with a few stat calls on every move and poll, the todos with `todo.Collect` in the background. It writes nothing but a journal `e` starts.
 
@@ -462,9 +462,10 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
-  the same field for text only. Today is ⌘T, Sync now ⌥⌘S.
-- The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search
-  notes… and Sync now. New Todo… asks for the text and adds it under Inbox in the `todo.md` of
+  the same field for text only. Both leave task lines out: Todos finds those, and while Todos is
+  shown ⇧⌘F and the toolbar's glass go to its own field. Today is ⌘T, Sync now ⌥⌘S.
+- The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search…
+  and Sync now. New Todo… asks for the text and adds it under Inbox in the `todo.md` of
   the folder ⌘N would use, or the root's when that is the journals', the agents' or the weekly
   folder (added 2026-10-30).
 - New note (⌘N) is the same field for a title: `nt n` makes the note in the folder selected in
@@ -484,8 +485,9 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 
 **The views**, in the note's place; the note on screen is saved first.
 - **Todos** is the terminal browser's todo list: every open todo, overdue first, with its date in
-  words (`3d late` in `warn`, `fri`) and the note it is in, then the done ones under Done. A
-  field adds one to the root's `todo.md` (`due:fri` in the text sets its date). A click on `○`
+  words (`3d late` in `warn`, `fri`) and the note it is in, then the done ones under Done. Search
+  todos, in the toolbar, keeps to the todos with the words typed, in their text or their note's
+  name, as `/` does in the browser's todos. A field adds one to the root's `todo.md` (`due:fri` in the text sets its date). A click on `○`
   checks it: the glyph turns at once with a small pop and the text fades, and the row stays in
   its place until the ticks settle, 0.7 s after the last, so a slip can be taken back;
   then it moves to Done, or back up to the open ones (no movement with Reduce Motion). The
@@ -626,14 +628,15 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 - **The home list,** as the Mac sidebar:
   - Today, Todos with the open and late counts, Calendar, Weekly, Agents;
   - the pinned folders, then the folders;
-  - search;
+  - search: titles, then the lines that match, task lines left out (Todos finds those);
   - the sync state at the foot, as glyph and word; a tap syncs.
 - **The note** is the Mac app's editor page in a `WKWebView`.
   - It has a narrower column and margins under 600 pt.
   - A bar above the keyboard: a task, a heading, a link, a photo, undo, redo, done.
   - A tap follows a link. On the line being edited the link shows an "open" chip in place of
     the Mac's Command-click.
-- **Views:** Todos, Calendar, Weekly and Agents, shared with the Mac app.
+- **Views:** Todos, Calendar, Weekly and Agents, shared with the Mac app. Todos has Search todos
+  under its title, as the home list has its search.
 - **Capture:**
   - a + button opens a sheet: Return adds the line to today, and a switch makes it a todo
     (`due:fri` sets its date);

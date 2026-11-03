@@ -3,7 +3,9 @@ import SwiftUI
 /// TodosView is every todo in the notes, as the terminal browser's todo list shows them: the open
 /// ones overdue first with their dates in words, a field that adds one to todo.md, and the done
 /// ones below. "from every note" in the summary is a menu that keeps to one top-level folder's
-/// todos, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
+/// todos, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. Search todos,
+/// the view's own field, keeps to the todos with the words typed, in their text or their note's
+/// name. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
 /// Return opens the note at the todo.
 ///
 /// A tick shows at once: the glyph turns, with a small pop, and the text fades. The row stays
@@ -18,6 +20,8 @@ struct TodosView: View {
     @State private var dueText = ""
     @State private var showDone = true
     @State private var scope = "" // the top-level folder whose todos show; "" is every note
+    @State private var query = "" // Search todos: only the todos with these words show
+    @FocusState private var searching: Bool
     @State private var frozen: [Todo]? // the list as it stood at the first tick, while the ticks settle
     @State private var ticked: [String: Bool] = [:] // a todo just ticked → the state it was given
     @State private var after: [String: String] = [:] // a todo just ticked → the open one below it
@@ -41,10 +45,13 @@ struct TodosView: View {
     enum Field: Hashable { case add, list, due }
 
     /// shown is the list on screen: as it stood at the first tick while ticks settle, so a row
-    /// just ticked stays in its place, else as nt lists it; in the scope.
+    /// just ticked stays in its place, else as nt lists it; in the scope, with the words searched.
     private var shown: [Todo] {
         let all = frozen ?? ws.todos
-        return scope.isEmpty ? all : all.filter { $0.folder == scope }
+        let scoped = scope.isEmpty ? all : all.filter { $0.folder == scope }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return scoped }
+        return scoped.filter { $0.text.localizedCaseInsensitiveContains(q) || source($0).localizedCaseInsensitiveContains(q) }
     }
 
     private func isDone(_ t: Todo) -> Bool { ticked[t.id] ?? t.done }
@@ -60,7 +67,7 @@ struct TodosView: View {
                 addField
                     .padding(.bottom, 18)
                 if open.isEmpty {
-                    Text("Nothing open. Add a todo above, or write - [ ] in any note.")
+                    Text(query.isEmpty ? "Nothing open. Add a todo above, or write - [ ] in any note." : "No open todo matches.")
                         .font(.system(size: 14))
                         .foregroundStyle(Brand.muted)
                         .padding(.horizontal, 10)
@@ -104,7 +111,26 @@ struct TodosView: View {
         .onKeyPress(.space) { act { tick($0) } }
         .onKeyPress(.return) { act { t in ws.go(t.rel, line: t.line) } }
         .onKeyPress("d") { act { t in startDue(t) } }
-        .viewToolbar("Todos")
+        .viewToolbar("Todos", search: false)
+        .searchable(text: $query, placement: searchPlacement, prompt: "Search todos")
+        .searchFocused($searching)
+        .onChange(of: query) { selected = nil }
+        .onChange(of: ws.todoSearch) {
+            if ws.todoSearch {
+                searching = true
+                ws.todoSearch = false
+            }
+        }
+    }
+
+    /// searchPlacement puts Search todos in the Mac's toolbar and, on iPhone and iPad, under the
+    /// title, as the home list's search is.
+    private var searchPlacement: SearchFieldPlacement {
+        #if os(macOS)
+        .toolbar
+        #else
+        .navigationBarDrawer(displayMode: .automatic)
+        #endif
     }
 
     private func summary(_ open: [Todo]) -> some View {
@@ -357,8 +383,9 @@ struct TodosView: View {
 
 extension View {
     #if os(macOS)
-    /// viewToolbar is the toolbar of a view in the note's place: its name, and Search.
-    func viewToolbar(_ title: String, large: Bool = true) -> some View {
+    /// viewToolbar is the toolbar of a view in the note's place: its name, and Search, unless
+    /// the view has a search field of its own (Todos).
+    func viewToolbar(_ title: String, large: Bool = true, search: Bool = true) -> some View {
         // no bar behind the toolbar: the views sit on ground under it, as the note does
         scrollEdgeEffectHidden(true, for: .top)
             .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -371,15 +398,17 @@ extension View {
                         .padding(.horizontal, 6)
                 }
                 .sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .primaryAction) {
-                    SearchButton()
+                if search {
+                    ToolbarItem(placement: .primaryAction) {
+                        SearchButton()
+                    }
                 }
             }
     }
     #else
     /// viewToolbar names a view in the navigation bar: large, or small for a view that heads
-    /// itself (the calendar's month). Search is on the home list.
-    func viewToolbar(_ title: String, large: Bool = true) -> some View {
+    /// itself (the calendar's month). Search is on the home list, or the view's own (Todos).
+    func viewToolbar(_ title: String, large: Bool = true, search: Bool = true) -> some View {
         navigationTitle(title)
             .navigationBarTitleDisplayMode(large ? .large : .inline)
     }
@@ -429,7 +458,7 @@ struct SearchButton: View {
 
     var body: some View {
         Button {
-            ws.palette = .text
+            ws.askSearch()
         } label: {
             Image(systemName: "magnifyingglass")
         }

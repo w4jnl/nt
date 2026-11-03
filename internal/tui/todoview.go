@@ -17,8 +17,8 @@ import (
 // them: the open ones, overdue first, then the done ones under Done. The home list's Todos row
 // shows them there; enter, or x from anywhere, gives them the keys, the folder list staying as
 // it was. j and k move, x checks, d sets the due date, a adds one, e edits the line, D deletes
-// it, enter opens its note at it, X folds Done, f keeps to one top-level folder's todos, esc goes
-// back. A tick holds as in the todo list.
+// it, enter opens its note at it, X folds Done, f keeps to one top-level folder's todos, / keeps
+// to the todos with the words typed, esc goes back. A tick holds as in the todo list.
 
 // todoView is the todos in the note's pane while they have the keys.
 type todoView struct {
@@ -30,6 +30,7 @@ type todoView struct {
 	held    map[string]bool // a todo ticked since the list was read → the list it stays in, done or not
 	folder  string          // whose todo.md a todo added here goes to; "" is the root's
 	scope   string          // the top-level folder whose todos show; "" is every note
+	filter  string          // the words typed after /: only the todos with them, in their text or their note's name, show
 	clicked bool            // the last click selected a row; a second one opens its note
 	full    bool            // the pane was given the whole screen for it (narrow screens)
 }
@@ -48,6 +49,9 @@ func (tv *todoView) lists() (open, done []todo.Item) {
 		if tv.scope != "" && topFolder(it.Path) != tv.scope {
 			continue
 		}
+		if !tv.matches(it) {
+			continue
+		}
 		if tv.done(it) {
 			done = append(done, it)
 		} else {
@@ -55,6 +59,24 @@ func (tv *todoView) lists() (open, done []todo.Item) {
 		}
 	}
 	return open, done
+}
+
+// matches says whether a todo has the filter's words, in its text or in its note's name, any
+// case; every todo does with no filter.
+func (tv *todoView) matches(it todo.Item) bool {
+	q := strings.ToLower(strings.TrimSpace(tv.filter))
+	if q == "" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(it.Text), q) || strings.Contains(strings.ToLower(it.Path), q)
+}
+
+// setFilter keeps to the todos with the words typed, the selection staying in the rows.
+func (tv *todoView) setFilter(q string) {
+	tv.filter = q
+	if n := len(tv.rows()); tv.sel >= n {
+		tv.sel = max(0, n-1)
+	}
 }
 
 // rows are the todos that can be selected: the open ones, then the done ones unless folded.
@@ -226,6 +248,8 @@ func (b *browser) todoViewKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		b.pick = &picker{title: "todos from"}
 		b.prompt("scope", "todos from: ")
 		return b.scopeTargets(), true
+	case "/":
+		return b.prompt("todos", "todos: "), true
 	case "a":
 		list, err := todo.ListIn(b.v, tv.addTo())
 		if err != nil {
@@ -298,7 +322,9 @@ func (b *browser) todoViewLines(tv *todoView, active bool) []todoViewLine {
 	for i := range open {
 		lines = append(lines, todoViewLine{row: i})
 	}
-	if len(open) == 0 {
+	if len(open) == 0 && tv.filter != "" {
+		lines = append(lines, todoViewLine{row: -1, text: "no open todo matches"})
+	} else if len(open) == 0 {
 		lines = append(lines, todoViewLine{row: -1, text: "nothing open · a adds one"})
 	}
 	if len(done) > 0 {
@@ -380,6 +406,9 @@ func (b *browser) todoSummary(tv *todoView) string {
 	}
 	if tv.scope != "" {
 		s += b.st.Muted.Render(" · from " + tv.scope + "/")
+	}
+	if tv.filter != "" {
+		s += b.st.Muted.Render(" · matching " + strconv.Quote(tv.filter))
 	}
 	return s
 }

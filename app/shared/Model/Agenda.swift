@@ -17,6 +17,25 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
 
     var id: String { "\(rel):\(line)" }
 
+    /// isTask reports a line that is a task, open or done, as nt reads one: a list marker, a
+    /// space, `[ ]` or `[x]`. The note searches leave these lines out; Todos finds them.
+    nonisolated static func isTask(_ line: String) -> Bool {
+        var s = Substring(line.drop { $0 == " " || $0 == "\t" })
+        if let c = s.first, "-*+".contains(c) {
+            s = s.dropFirst()
+        } else {
+            let digits = s.prefix { $0.isASCII && $0.isNumber }
+            guard !digits.isEmpty, digits.count <= 9, let c = s.dropFirst(digits.count).first, c == "." || c == ")" else { return false }
+            s = s.dropFirst(digits.count + 1)
+        }
+        let gap = s.prefix { $0 == " " || $0 == "\t" }
+        guard !gap.isEmpty else { return false }
+        s = s.dropFirst(gap.count)
+        guard s.hasPrefix("[ ]") || s.hasPrefix("[x]") || s.hasPrefix("[X]") else { return false }
+        s = s.dropFirst(3)
+        return s.isEmpty || s.first == " " || s.first == "\t"
+    }
+
     enum CodingKeys: String, CodingKey {
         case rel, line, done, text, due, when, late
         case doneOn = "done_on"

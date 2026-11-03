@@ -59,7 +59,7 @@ struct NtApp: App {
                     .keyboardShortcut("t")
                 Button("Open…") { workspace.palette = .open }
                     .keyboardShortcut("p")
-                Button("Search notes…") { workspace.palette = .text }
+                Button("Search…") { workspace.askSearch() }
                     .keyboardShortcut("f", modifiers: [.command, .shift])
                 Divider()
                 Button("Sync now") { Task { await workspace.syncNow() } }

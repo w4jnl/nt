@@ -195,7 +195,7 @@ In the browser:
 | `t`, `[` `]`, `c`, `w`, `A` | today's journal, the day before or after, the calendar, the newest weekly digest, today's agent reports |
 | `,` | the settings: enter changes one, `e` edits its file |
 | `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
-| `/`, `ctrl-p` | search every note (`#tag` keeps to tagged notes), find a note by its title |
+| `/`, `ctrl-p` | search every note (`#tag` keeps to tagged notes; in the todos, `/` searches those), find a note by its title |
 | `f`, `b` | follow a link by its letters (a click works too), back to the note before |
 | `l`, `o`, `i` | the note's links, its outline, its images full size |
 | `x` | the todos beside the folders, open then done: `x` check, `d` due date, `a` add, `f` one folder's, `X` fold Done, enter its note |

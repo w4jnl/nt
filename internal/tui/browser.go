@@ -185,7 +185,7 @@ type browser struct {
 
 	pick       *picker
 	input      *lineInput
-	inputKind  string // add, new, search, find, due, todo, move, rename, mkdir
+	inputKind  string // add, new, search, find, due, todo, todos, move, rename, mkdir
 	searchSeq  int
 	searchStop context.CancelFunc
 
@@ -1094,6 +1094,11 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	case "n":
 		return b.prompt("new", "new note in "+firstNonEmpty(b.noteFolder(), "/")+": ")
 	case "/":
+		if b.homeTodosShown() { // the todos, not the notes: the view takes the keys and the words
+			cmd := b.openTodoView()
+			b.prompt("todos", "todos: ")
+			return cmd
+		}
 		b.pick = &picker{title: "search"}
 		return b.prompt("search", "search: ")
 	case "ctrl+p":
@@ -1400,6 +1405,9 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 		if kind == "search" || kind == "find" || kind == "move" || kind == "scope" {
 			return b.closePick()
 		}
+		if kind == "todos" && b.tv != nil {
+			b.tv.setFilter("")
+		}
 		return nil
 	case "up", "ctrl+k":
 		if b.pick != nil {
@@ -1440,6 +1448,8 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			}
 		case "search", "find":
 			return b.choose()
+		case "todos":
+			return nil // the filter stays, the todos have the keys again
 		case "due", "todo":
 			return b.todoInput(kind, text)
 		case "move":
@@ -1481,6 +1491,10 @@ func (b *browser) inputChanged() tea.Cmd {
 		return b.moveTargets()
 	case "scope":
 		return b.scopeTargets()
+	case "todos":
+		if b.tv != nil {
+			b.tv.setFilter(strings.TrimSpace(b.input.Value()))
+		}
 	}
 	return nil
 }
@@ -1514,6 +1528,9 @@ func (b *browser) searched(msg searchMsg) tea.Cmd {
 	}
 	var items []pickItem
 	for _, m := range msg.matches {
+		if todo.IsTask(m.Text) {
+			continue // a task line is the todo view's to find (/ there)
+		}
 		items = append(items, pickItem{label: strings.TrimSpace(m.Text), hint: m.Path, kind: "note", target: m.Path, line: m.Line})
 		if len(items) >= 500 {
 			break
