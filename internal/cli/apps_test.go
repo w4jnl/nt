@@ -25,7 +25,7 @@ func TestAppsReadOneJSON(t *testing.T) {
 			}
 		}
 		write := map[string]string{
-			filepath.Join(s.root, "homelab", "2026-10-21-nas.md"): "# NAS setup\n\n- [ ] Replace the fan due:2026-10-25\n\nSee [the network](../work/net.md).\n",
+			filepath.Join(s.root, "homelab", "2026-10-21-nas.md"): "---\ntodos: true\n---\n\n# NAS setup\n\n- [ ] Replace the fan due:2026-10-25\n\nSee [the network](../work/net.md).\n",
 			filepath.Join(s.root, "work", "net.md"):               "# Network\n\nThe NAS is on VLAN 10.\n",
 			filepath.Join(s.root, "work", "diagram.png"):          "\x89PNG\r\n\x1a\n",
 			s.config: "repo = \"" + s.root + "\"\nhost = \"mbp\"\n[sync]\nauto = false\n",
@@ -67,7 +67,7 @@ func TestAppsReadOneJSON(t *testing.T) {
 		{args: func(side) []string { return []string{"todo", "add", "--json", "--", "Renew the domain due:2026-11-06"} }},
 		{args: func(side) []string { return []string{"todo", "--all", "--json"} }},
 		{args: func(side) []string { return []string{"todo", "done", "Renew the domain", "--json"} }},
-		{args: func(side) []string { return []string{"todo", "due", "homelab/2026-10-21-nas.md:3", "none", "--json"} }},
+		{args: func(side) []string { return []string{"todo", "due", "homelab/2026-10-21-nas.md:7", "none", "--json"} }},
 		{args: func(side) []string { return []string{"_editor", "index"} }},
 		{args: func(side) []string { return []string{"_editor", "day"} }},
 		{args: func(side) []string { return []string{"s", "--json", "vlan"} }},

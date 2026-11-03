@@ -67,7 +67,7 @@ struct TodosView: View {
                 addField
                     .padding(.bottom, 18)
                 if open.isEmpty {
-                    Text(query.isEmpty ? "Nothing open. Add a todo above, or write - [ ] in any note." : "No open todo matches.")
+                    Text(query.isEmpty ? "Nothing open. Add a todo above, or write - [ ] in a todo.md or a note with todos: true." : "No open todo matches.")
                         .font(.system(size: 14))
                         .foregroundStyle(Brand.muted)
                         .padding(.horizontal, 10)

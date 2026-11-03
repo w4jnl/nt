@@ -69,13 +69,15 @@ func unstamp(text, key string) string {
 // search leaves out.
 func IsTask(line string) bool { return taskRe.MatchString(line) }
 
-// Parse reads the todos in the note at rel. Lines in frontmatter and fenced code blocks are
-// not todos, nor is a checkbox with no text; a note whose frontmatter says `todos: false` (a
-// checklist, a procedure) has none (docs/format.md §12).
+// Parse reads the todos in the note at rel: a todo.md's task lines, or those of a note whose
+// frontmatter says `todos: true`; any other note's are a checklist, not todos (docs/format.md
+// §12). Lines in frontmatter and fenced code blocks are not todos, nor is a checkbox with no
+// text.
 func Parse(rel string, data []byte) []Item {
 	var items []Item
 	lines := strings.Split(string(data), "\n")
 	start := 0
+	on := path.Base(rel) == File
 	if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == "---" {
 		for i := 1; i < len(lines); i++ {
 			l := strings.TrimRight(lines[i], "\r")
@@ -83,10 +85,13 @@ func Parse(rel string, data []byte) []Item {
 				start = i + 1
 				break
 			}
-			if k, val, ok := strings.Cut(l, ":"); ok && strings.TrimSpace(k) == "todos" && strings.TrimSpace(val) == "false" {
-				return nil
+			if k, val, ok := strings.Cut(l, ":"); ok && strings.TrimSpace(k) == "todos" {
+				on = strings.TrimSpace(val) == "true"
 			}
 		}
+	}
+	if !on {
+		return nil
 	}
 	fence, section := "", ""
 	for i := start; i < len(lines); i++ {
@@ -311,6 +316,10 @@ func ListIn(v *vault.Vault, folder string) (string, error) {
 	return folder + "/" + File, nil
 }
 
+// NewList is a todo.md as nt starts one: its frontmatter says the file holds todos, then the
+// title; Inbox follows with the first todo.
+const NewList = "---\ntodos: true\n---\n\n# Todo\n"
+
 // Add puts "- [ ] text", with " due:YYYY-MM-DD" when due is set, at the end of the Inbox
 // section of folder's todo.md ("" is the root's), making the file or the section when it is
 // missing. A due:<word> in the text counts as due when due is empty. It returns the todo as
@@ -339,7 +348,7 @@ func Add(v *vault.Vault, folder, text, due string, now time.Time) (Item, error) 
 	at := 0
 	err = v.Update(list, func(old []byte) ([]byte, error) {
 		if old == nil {
-			old = []byte("# Todo\n")
+			old = []byte(NewList)
 		}
 		doc := vault.AddToSection(old, "Inbox", line)
 		lines := strings.Split(string(doc), "\n")

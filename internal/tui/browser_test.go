@@ -12,6 +12,7 @@ import (
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/search"
+	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
@@ -217,7 +218,7 @@ func TestTodoList(t *testing.T) {
 	if err := os.WriteFile(b.v.Abs("todo.md"), []byte("# Todo\n\n## Inbox\n\n- [ ] Renew passport due:2026-11-03\n- [ ] Call the plumber due:2026-10-25\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(b.v.Abs("tech/2026-10-20-a.md"), []byte("# a\n\n- [ ] from a note\n"), 0o644); err != nil {
+	if err := os.WriteFile(b.v.Abs("tech/2026-10-20-a.md"), []byte("---\ntodos: true\n---\n\n# a\n\n- [ ] from a note\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	read := func() string { s, _ := os.ReadFile(b.v.Abs("todo.md")); return string(s) }
@@ -287,7 +288,7 @@ func TestTodoList(t *testing.T) {
 	press(b, "Buy milk")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
 	list, _ := os.ReadFile(b.v.Abs("tech/todo.md"))
-	if string(list) != "# Todo\n\n## Inbox\n\n- [ ] Buy milk\n" || selected() != "Buy milk" {
+	if string(list) != todo.NewList+"\n## Inbox\n\n- [ ] Buy milk\n" || selected() != "Buy milk" {
 		t.Fatalf("a does not add a todo to the folder's list (selected %q):\n%s", selected(), list)
 	}
 
@@ -327,8 +328,8 @@ func TestTodoScope(t *testing.T) {
 	for f, body := range map[string]string{
 		"todo.md":                 "# Todo\n\n## Inbox\n\n- [ ] Renew passport\n",
 		"homelab/todo.md":         "# Todo\n\n## Inbox\n\n- [ ] Replace the fan\n",
-		"work/2026-10-20-q3.md":   "# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
-		"work/team/2026-10-21.md": "# Team\n\n- [ ] Plan the offsite\n",
+		"work/2026-10-20-q3.md":   "---\ntodos: true\n---\n\n# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
+		"work/team/2026-10-21.md": "---\ntodos: true\n---\n\n# Team\n\n- [ ] Plan the offsite\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
 			t.Fatal(err)
@@ -907,7 +908,7 @@ func TestTodoSearch(t *testing.T) {
 	b.v.Now = func() time.Time { return time.Date(2026, 10, 29, 10, 0, 0, 0, time.Local) }
 	for f, body := range map[string]string{
 		"todo.md":               "# Todo\n\n## Inbox\n\n- [ ] Renew passport\n- [ ] Replace the fan\n",
-		"work/2026-10-20-q3.md": "# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
+		"work/2026-10-20-q3.md": "---\ntodos: true\n---\n\n# Q3\n\n- [ ] Send the report due:2026-10-30\n- [x] Book the room done:2026-10-20\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(b.v.Abs(f)), 0o755); err != nil {
 			t.Fatal(err)

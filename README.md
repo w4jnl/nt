@@ -124,7 +124,8 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 - **Journals.** `nt t` opens today's, `nt a "text"` adds a timestamped line, `nt n "Title"` makes a
   dated note and links it from the day. Journals from two machines merge line by line, and once
   a day is over its lines are put back in time order.
-- **Todos and the calendar.** A todo is a task line in any note, `- [ ] text due:2026-11-03`.
+- **Todos and the calendar.** A todo is a task line, `- [ ] text due:2026-11-03`, in a
+  `todo.md` or in a note with `todos: true` in its frontmatter (a checklist elsewhere stays one).
   `x` lists them all, overdue first; `x` checks one, `d` sets its due date. `c` shows the month,
   with the days that have a journal and the days with todos due marked. `nt todo` does the same
   from the shell.

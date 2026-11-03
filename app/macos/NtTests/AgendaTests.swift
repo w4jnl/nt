@@ -126,7 +126,7 @@ struct TodoActionTests {
         for dir in [".git", "homelab", "agents/2026/2026-10-27"] {
             try fm.createDirectory(at: root.appending(path: dir), withIntermediateDirectories: true)
         }
-        try "# NAS\n\n- [ ] Replace the fan due:2026-10-25\n".write(to: root.appending(path: "homelab/2026-10-21-nas.md"), atomically: true, encoding: .utf8)
+        try "---\ntodos: true\n---\n\n# NAS\n\n- [ ] Replace the fan due:2026-10-25\n".write(to: root.appending(path: "homelab/2026-10-21-nas.md"), atomically: true, encoding: .utf8)
         try "---\ntype: agent-report\nproject: infra\nhost: work\nstatus: blocked\ncreated: 2026-10-27T09:00:00+01:00\n---\n# infra\n"
             .write(to: root.appending(path: "agents/2026/2026-10-27/work--claude-code--infra--1a2b3c4d.md"), atomically: true, encoding: .utf8)
         try "---\ntype: agent-report\nproject: web\nhost: mbp\nstatus: done\ncreated: 2026-10-27T10:30:00+01:00\n---\n# web\n"
