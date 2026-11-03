@@ -26,6 +26,9 @@ struct NoteView: View {
                     Text(status(n))
                         .font(Brand.mono(11))
                         .foregroundStyle(Brand.muted)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Brand.ground, in: RoundedRectangle(cornerRadius: 6)) // over the note's last lines, not through them
                         .help(n.readOnly ? "A digest: nt writes it again whenever its notes change, so edits would not last." : "")
                 }
             }

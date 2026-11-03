@@ -464,8 +464,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   toolbar's button hides the sidebar.
 - The note: a centred column, 680 px. The toolbar says where the note is (folders › title) and
   searches. At the bottom right, when the note last changed and from which machine, as the
-  terminal says it under the note (§4), then the word count; a message at the bottom left when
-  something did not work.
+  terminal says it under the note (§4), then the word count, on the ground so the note's last
+  lines pass under it, not through it; a message at the bottom left when something did not work.
 - Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match. Search (⇧⌘F) is
