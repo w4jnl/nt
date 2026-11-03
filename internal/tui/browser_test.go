@@ -354,8 +354,8 @@ func TestTodoScope(t *testing.T) {
 		t.Fatalf("every note's todos: %v", rows())
 	}
 	press(b, "f")
-	if b.pick == nil || strings.Join(labels(), ", ") != "every note 4 open, homelab/ 1 open, work/ 2 open" {
-		t.Fatalf("f does not offer every note and the folders with open todos: %v", b.pick)
+	if b.pick == nil || strings.Join(labels(), ", ") != "every note 4 open, homelab/ 1 open, work/ 2 open, work/team/ 1 open" {
+		t.Fatalf("f does not offer every note and the folders with open todos, each counting what is under it: %v", labels())
 	}
 	press(b, "wo")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -385,6 +385,21 @@ func TestTodoScope(t *testing.T) {
 	if b.tv.scope != "" || len(rows()) != 6 {
 		t.Fatalf("every note again: %q %v", b.tv.scope, rows())
 	}
+	// a folder at any depth: its own todos only, and a adds to its todo.md
+	press(b, "f")
+	press(b, "team")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.tv.scope != "work/team" || strings.Join(rows(), ", ") != "Plan the offsite" {
+		t.Fatalf("the work/team scope: %q %v", b.tv.scope, rows())
+	}
+	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "1 open todo · from work/team/") {
+		t.Fatalf("the summary does not say the deep scope:\n%s", screen)
+	}
+	press(b, "a")
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/team/todo.md:") {
+		t.Errorf("a in the work/team scope does not add to work/team/todo.md: %s", f)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
 }
 
 func TestFolders(t *testing.T) {

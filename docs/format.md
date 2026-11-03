@@ -114,6 +114,7 @@ Frontmatter is optional. It is YAML between two `---` lines at the very top of t
 | `date` | `YYYY-MM-DD` | The day the note belongs to |
 | `tags` | list of strings | Lowercase. `/` makes a hierarchy: `work/q3` |
 | `type` | string | `note` (the default), `daily`, `agent-report`, `digest` or `weekly` |
+| `todos` | `false` | The note's task lines are a checklist, not todos (§12) |
 
 - Clients must keep keys they don't know, in their order, when they rewrite frontmatter.
 - **Title** is found in this order: the `title` key, then the first `#` heading, then the file stem.
@@ -434,7 +435,9 @@ A todo is a task list item in any note. A `todo.md` is where clients add new one
   (or `[X]`) is done. The bullet can be `-`, `*`, `+` or a number (`1.`); any indent is allowed.
   A checkbox with no text is not a todo.
 - **Not todos:** lines in frontmatter or in fenced code blocks, and task lines in the agents
-  folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`.
+  folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`. A note
+  whose frontmatter says `todos: false` has none: its task lines are a checklist or a procedure
+  (a runbook, a recipe), ticked in the note, never listed as work to do.
 - **Due date:** `due:YYYY-MM-DD` anywhere in the text. Clients accept words such as `fri` or
   `+3d` when a person types a date, and always write the date as `YYYY-MM-DD`.
 - **Done date:** checking a todo appends `done:YYYY-MM-DD`, the day it was done as `day_starts`

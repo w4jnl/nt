@@ -65,21 +65,26 @@ func unstamp(text, key string) string {
 	return stamps[key].ReplaceAllString(text, "")
 }
 
-// Parse reads the todos in the note at rel. Lines in frontmatter and fenced code blocks are
-// not todos, nor is a checkbox with no text.
 // IsTask reports a line that is a task, open or done: what a todo search finds, and a note
 // search leaves out.
 func IsTask(line string) bool { return taskRe.MatchString(line) }
 
+// Parse reads the todos in the note at rel. Lines in frontmatter and fenced code blocks are
+// not todos, nor is a checkbox with no text; a note whose frontmatter says `todos: false` (a
+// checklist, a procedure) has none (docs/format.md §12).
 func Parse(rel string, data []byte) []Item {
 	var items []Item
 	lines := strings.Split(string(data), "\n")
 	start := 0
 	if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == "---" {
 		for i := 1; i < len(lines); i++ {
-			if strings.TrimRight(lines[i], "\r") == "---" {
+			l := strings.TrimRight(lines[i], "\r")
+			if l == "---" {
 				start = i + 1
 				break
+			}
+			if k, val, ok := strings.Cut(l, ":"); ok && strings.TrimSpace(k) == "todos" && strings.TrimSpace(val) == "false" {
+				return nil
 			}
 		}
 	}

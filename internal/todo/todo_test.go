@@ -270,3 +270,15 @@ func TestCollectAndSort(t *testing.T) {
 		t.Errorf("order:\n got %q\nwant %q", got, want)
 	}
 }
+
+func TestChecklistIsNoTodo(t *testing.T) {
+	body := "# SOP\n\n- [ ] step one\n- [x] step two\n"
+	if got := Parse("sop.md", []byte("---\ntitle: SOP\ntodos: false\n---\n"+body)); len(got) != 0 {
+		t.Errorf("todos: false keeps %d task lines as todos", len(got))
+	}
+	for _, fm := range []string{"", "---\ntodos: true\n---\n", "---\ntitle: todos: false\n---\n"} {
+		if got := Parse("sop.md", []byte(fm+body)); len(got) != 2 {
+			t.Errorf("%q: %d todos, want 2", fm, len(got))
+		}
+	}
+}

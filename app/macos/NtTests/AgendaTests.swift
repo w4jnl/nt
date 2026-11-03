@@ -17,13 +17,15 @@ struct AgendaTests {
         #expect(old.todos[0].when == "" && !old.todos[0].late)
     }
 
-    @Test func todosKeepToATopLevelFolder() throws {
-        let json = #"{"todos": [{"rel": "todo.md", "line": 1, "done": false, "text": "a"}, {"rel": "work/q3/plan.md", "line": 2, "done": false, "text": "b"}, {"rel": "homelab/todo.md", "line": 3, "done": false, "text": "c"}, {"rel": "work/todo.md", "line": 4, "done": false, "text": "d"}, {"rel": "Archive/x.md", "line": 5, "done": true, "text": "e"}]}"#
+    @Test func todosKeepToAFolderAtAnyDepth() throws {
+        let json = #"{"todos": [{"rel": "todo.md", "line": 1, "done": false, "text": "a"}, {"rel": "work/q3/plan.md", "line": 2, "done": false, "text": "b"}, {"rel": "homelab/todo.md", "line": 3, "done": false, "text": "c"}, {"rel": "work/todo.md", "line": 4, "done": false, "text": "d"}, {"rel": "Archive/x.md", "line": 5, "done": true, "text": "e"}, {"rel": "work/shell/rars/todo.md", "line": 6, "done": false, "text": "f"}]}"#
         let todos = try JSONDecoder().decode(Todo.List.self, from: Data(json.utf8)).todos
-        #expect(todos.map(\.folder) == ["", "work", "homelab", "work", "Archive"])
+        #expect(todos.map(\.folder) == ["", "work/q3", "homelab", "work", "Archive", "work/shell/rars"])
         let scopes = Todo.scopes(todos)
-        #expect(scopes.map(\.folder) == ["homelab", "work"] && scopes.map(\.open) == [1, 2], "the folders with open todos, A to Z")
-        #expect(Todo.scopes(todos, keep: "Archive").map(\.folder) == ["Archive", "homelab", "work"], "the scope in use stays")
+        #expect(scopes.map(\.folder) == ["homelab", "work", "work/q3", "work/shell/rars"], "the folders with their own open todos, and the top-level ones; not work/shell, which has none of its own")
+        #expect(scopes.map(\.open) == [1, 3, 1, 1], "a folder counts everything under it")
+        #expect(Todo.scopes(todos, keep: "Archive").map(\.folder) == ["Archive", "homelab", "work", "work/q3", "work/shell/rars"], "the scope in use stays")
+        #expect(todos.filter { $0.under("work") }.map(\.text) == ["b", "d", "f"] && todos.filter { $0.under("work/shell/rars") }.map(\.text) == ["f"])
     }
 
     @Test func taskLinesAreTodosNotSearchHits() {
