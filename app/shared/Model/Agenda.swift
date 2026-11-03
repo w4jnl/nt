@@ -57,19 +57,40 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         let todos: [Todo]
     }
 
-    /// folder is the top-level folder the todo is in, "" for the root's todo.md.
-    var folder: String { rel.firstIndex(of: "/").map { String(rel[..<$0]) } ?? "" }
+    /// enabled says whether a note's task lines are todos (docs/format.md §12): a todo.md's by
+    /// its name, any note's by `todos: true` in its frontmatter, a todo.md's not by `todos: false`.
+    nonisolated static func enabled(_ rel: String, _ text: String) -> Bool {
+        if let v = Agenda.frontmatter(text)["todos"] { return v == "true" }
+        return (rel as NSString).lastPathComponent == "todo.md"
+    }
 
-    /// scopes are what the Todos view can keep to besides every note: the top-level folders with
-    /// open todos, with how many, A to Z, as `nt todo <folder>` reads them; keep stays, even with
+    /// folder is the folder the todo's note is in, at any depth; "" at the root.
+    var folder: String { (rel as NSString).deletingLastPathComponent }
+
+    /// under says the todo is in folder or below it, as `nt todo <folder>` counts.
+    func under(_ folder: String) -> Bool { folder.isEmpty || rel.hasPrefix(folder + "/") }
+
+    /// scopes are what the Todos view can keep to besides every note: the folders with open
+    /// todos, each counting everything under it: a top-level folder with any, a deeper one when
+    /// its own notes have some; A to Z, a folder before what is under it; keep stays, even with
     /// none left open.
     static func scopes(_ todos: [Todo], keep: String = "") -> [(folder: String, open: Int)] {
         var per: [String: Int] = [:]
+        var own: Set<String> = []
         for t in todos where !t.done && !t.folder.isEmpty {
-            per[t.folder, default: 0] += 1
+            own.insert(t.folder)
+            var f = t.folder
+            while !f.isEmpty {
+                per[f, default: 0] += 1
+                f = (f as NSString).deletingLastPathComponent
+            }
         }
-        if !keep.isEmpty, per[keep] == nil { per[keep] = 0 }
-        return per.keys.sorted { $0.lowercased() < $1.lowercased() }.map { ($0, per[$0] ?? 0) }
+        if !keep.isEmpty, per[keep] == nil {
+            per[keep] = 0
+            own.insert(keep)
+        }
+        let folders = per.keys.filter { own.contains($0) || !$0.contains("/") }
+        return folders.sorted { $0.lowercased() < $1.lowercased() }.map { ($0, per[$0] ?? 0) }
     }
 }
 

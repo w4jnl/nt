@@ -178,6 +178,12 @@ struct ItemMenu: View {
     let path: String
     let folder: Bool
 
+    /// inAgents: an agent report, which holds no todos.
+    private var inAgents: Bool {
+        guard let a = ws.index?.folders.agents, !a.isEmpty else { return false }
+        return path.hasPrefix(a + "/")
+    }
+
     var body: some View {
         if folder {
             Button("New Note…") { ws.ask = .newNote(path) }
@@ -189,6 +195,10 @@ struct ItemMenu: View {
         if !ws.fixed(path) {
             Button("Rename…") { ws.ask = .rename(path) }
             Button("Move…") { ws.ask = .move(path) }
+        }
+        if !folder && !inAgents {
+            // a tick: the note's task lines are todos; off, they are a checklist (format §12)
+            Toggle("Todos in this note", isOn: Binding(get: { ws.todosOn(path) }, set: { on in Task { await ws.setTodos(path, on) } }))
         }
         if ws.deletable(path) {
             Divider()

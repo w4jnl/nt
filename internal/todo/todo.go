@@ -65,23 +65,20 @@ func unstamp(text, key string) string {
 	return stamps[key].ReplaceAllString(text, "")
 }
 
-// Parse reads the todos in the note at rel. Lines in frontmatter and fenced code blocks are
-// not todos, nor is a checkbox with no text.
 // IsTask reports a line that is a task, open or done: what a todo search finds, and a note
 // search leaves out.
 func IsTask(line string) bool { return taskRe.MatchString(line) }
 
+// Parse reads the todos in the note at rel: a todo.md's task lines, or those of a note whose
+// frontmatter says `todos: true`; any other note's are a checklist, not todos (docs/format.md
+// §12). Lines in frontmatter and fenced code blocks are not todos, nor is a checkbox with no
+// text.
 func Parse(rel string, data []byte) []Item {
 	var items []Item
 	lines := strings.Split(string(data), "\n")
-	start := 0
-	if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == "---" {
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimRight(lines[i], "\r") == "---" {
-				start = i + 1
-				break
-			}
-		}
+	on, start := enabled(rel, lines)
+	if !on {
+		return nil
 	}
 	fence, section := "", ""
 	for i := start; i < len(lines); i++ {
@@ -306,6 +303,95 @@ func ListIn(v *vault.Vault, folder string) (string, error) {
 	return folder + "/" + File, nil
 }
 
+// enabled says whether the note's task lines are todos, and where its body starts: a todo.md's
+// are by its name, any note's when its frontmatter says `todos: true`, a todo.md's not when it
+// says `todos: false`.
+func enabled(rel string, lines []string) (on bool, start int) {
+	on = path.Base(rel) == File
+	if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == "---" {
+		for i := 1; i < len(lines); i++ {
+			l := strings.TrimRight(lines[i], "\r")
+			if l == "---" || l == "..." {
+				start = i + 1
+				break
+			}
+			if k, val, ok := strings.Cut(l, ":"); ok && strings.TrimSpace(k) == "todos" {
+				on = strings.TrimSpace(val) == "true"
+			}
+		}
+	}
+	return on, start
+}
+
+// Enabled reports whether the note's task lines are todos (docs/format.md §12).
+func Enabled(rel string, data []byte) bool {
+	on, _ := enabled(rel, strings.Split(string(data), "\n"))
+	return on
+}
+
+// SetEnabled makes the note's task lines todos (on), or a checklist, by its frontmatter: on
+// writes `todos: true`; off writes `todos: false` in a todo.md and takes the key out of any
+// other note, whose task lines are a checklist by default. The other keys stay as they are;
+// a note with no frontmatter gets one when a key is needed.
+func SetEnabled(v *vault.Vault, rel string, on bool) error {
+	return v.Update(rel, func(old []byte) ([]byte, error) {
+		if old == nil {
+			return nil, fmt.Errorf("%s: no such note", rel)
+		}
+		lines := strings.Split(string(old), "\n")
+		want := ""
+		if on {
+			want = "todos: true"
+		} else if path.Base(rel) == File {
+			want = "todos: false"
+		}
+		end := -1 // the closing line of the frontmatter
+		if len(lines) > 0 && strings.TrimRight(lines[0], "\r") == "---" {
+			for i := 1; i < len(lines); i++ {
+				if l := strings.TrimRight(lines[i], "\r"); l == "---" || l == "..." {
+					end = i
+					break
+				}
+			}
+		}
+		if end < 0 {
+			if want == "" {
+				return old, nil
+			}
+			return []byte("---\n" + want + "\n---\n\n" + string(old)), nil
+		}
+		var out []string
+		placed := false
+		for i, l := range lines {
+			if i > 0 && i < end {
+				if k, _, ok := strings.Cut(l, ":"); ok && strings.TrimSpace(k) == "todos" {
+					if want != "" && !placed {
+						out = append(out, want)
+						placed = true
+					}
+					continue
+				}
+			}
+			if i == end && want != "" && !placed {
+				out = append(out, want)
+				placed = true
+			}
+			out = append(out, l)
+		}
+		if closing := end - (len(lines) - len(out)); closing == 1 { // nothing left between the fences
+			out = out[closing+1:]
+			if len(out) > 0 && strings.TrimSpace(out[0]) == "" {
+				out = out[1:]
+			}
+		}
+		return []byte(strings.Join(out, "\n")), nil
+	})
+}
+
+// NewList is a todo.md as nt starts one: its frontmatter says the file holds todos, then the
+// title; Inbox follows with the first todo.
+const NewList = "---\ntodos: true\n---\n\n# Todo\n"
+
 // Add puts "- [ ] text", with " due:YYYY-MM-DD" when due is set, at the end of the Inbox
 // section of folder's todo.md ("" is the root's), making the file or the section when it is
 // missing. A due:<word> in the text counts as due when due is empty. It returns the todo as
@@ -334,7 +420,7 @@ func Add(v *vault.Vault, folder, text, due string, now time.Time) (Item, error) 
 	at := 0
 	err = v.Update(list, func(old []byte) ([]byte, error) {
 		if old == nil {
-			old = []byte("# Todo\n")
+			old = []byte(NewList)
 		}
 		doc := vault.AddToSection(old, "Inbox", line)
 		lines := strings.Split(string(doc), "\n")

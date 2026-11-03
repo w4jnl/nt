@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,7 +18,7 @@ import (
 // them: the open ones, overdue first, then the done ones under Done. The home list's Todos row
 // shows them there; enter, or x from anywhere, gives them the keys, the folder list staying as
 // it was. j and k move, x checks, d sets the due date, a adds one, e edits the line, D deletes
-// it, enter opens its note at it, X folds Done, f keeps to one top-level folder's todos, / keeps
+// it, enter opens its note at it, X folds Done, f keeps to one folder's todos, / keeps
 // to the todos with the words typed, esc goes back. A tick holds as in the todo list.
 
 // todoView is the todos in the note's pane while they have the keys.
@@ -46,7 +47,7 @@ func (tv *todoView) done(it todo.Item) bool {
 // lists are the open todos and the done ones, in the scope.
 func (tv *todoView) lists() (open, done []todo.Item) {
 	for _, it := range tv.items {
-		if tv.scope != "" && topFolder(it.Path) != tv.scope {
+		if tv.scope != "" && !strings.HasPrefix(it.Path, tv.scope+"/") {
 			continue
 		}
 		if !tv.matches(it) {
@@ -104,31 +105,52 @@ func topFolder(rel string) string {
 	return ""
 }
 
-// scopes are what the todos can keep to: every note, then each top-level folder with open
-// todos, with how many, in nt's folder order; the scope in use stays even with none left.
+// scopes are what the todos can keep to: every note, then the folders with open todos, each
+// counting everything under it: a top-level folder with any, a deeper one when its own notes
+// have some, in nt's folder order; the scope in use stays even with none left.
 func (tv *todoView) scopes() []pickItem {
 	all, per := 0, map[string]int{}
+	own := map[string]bool{}
 	for _, it := range tv.items {
 		if !tv.done(it) {
 			all++
-			if f := topFolder(it.Path); f != "" {
+			dir := path.Dir(it.Path)
+			if dir != "." {
+				own[dir] = true
+			}
+			for f := dir; f != "." && f != "/"; f = path.Dir(f) {
 				per[f]++
 			}
 		}
 	}
 	if _, ok := per[tv.scope]; !ok && tv.scope != "" {
 		per[tv.scope] = 0
+		own[tv.scope] = true
 	}
 	folders := make([]string, 0, len(per))
 	for f := range per {
-		folders = append(folders, f)
+		if own[f] || !strings.Contains(f, "/") {
+			folders = append(folders, f)
+		}
 	}
-	sort.Slice(folders, func(i, j int) bool { return vault.FolderBefore(folders[i], folders[j]) })
+	sort.Slice(folders, func(i, j int) bool { return pathBefore(folders[i], folders[j]) })
 	items := []pickItem{{label: "every note", hint: strconv.Itoa(all) + " open", kind: "scope"}}
 	for _, f := range folders {
 		items = append(items, pickItem{label: f + "/", hint: strconv.Itoa(per[f]) + " open", kind: "scope", target: f})
 	}
 	return items
+}
+
+// pathBefore orders folder paths as nt lists folders, part by part, a folder before what is
+// under it.
+func pathBefore(a, b string) bool {
+	pa, pb := strings.Split(a, "/"), strings.Split(b, "/")
+	for i := 0; i < len(pa) && i < len(pb); i++ {
+		if pa[i] != pb[i] {
+			return vault.FolderBefore(pa[i], pb[i])
+		}
+	}
+	return len(pa) < len(pb)
 }
 
 // scopeTargets fills the scope picker with the scopes whose names match what is typed.
@@ -153,7 +175,7 @@ func (b *browser) scopeTargets() tea.Cmd {
 	return nil
 }
 
-// setScope keeps the todos to a top-level folder's, or "" every note's.
+// setScope keeps the todos to a folder's, at any depth, or "" every note's.
 func (b *browser) setScope(folder string) {
 	tv := b.tv
 	tv.scope, tv.sel, tv.top = folder, 0, 0

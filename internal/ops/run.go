@@ -240,7 +240,7 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 	kind := ""
 	if len(args) > 0 {
 		switch args[0] {
-		case "add", "done", "undo", "due", "rm":
+		case "add", "done", "undo", "due", "rm", "on", "off":
 			kind, args = args[0], args[1:]
 		}
 	}
@@ -249,6 +249,19 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 		return nil, 1, err
 	}
 	switch kind {
+	case "on", "off":
+		pos, err := Positional("todo "+kind, args)
+		if err != nil {
+			return nil, 2, err
+		}
+		if len(pos) != 1 {
+			return nil, 2, errors.New("todo " + kind + ": name one note")
+		}
+		st, err := SetTodos(v, pos[0], kind == "on")
+		if err != nil {
+			return nil, 1, err
+		}
+		return answer(st, nil)
 	case "":
 		args, done := Flag(args, "--done")
 		args, all := Flag(args, "--all")

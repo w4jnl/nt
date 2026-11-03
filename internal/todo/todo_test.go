@@ -154,13 +154,13 @@ func TestAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if it.Line != 5 || it.Due != "2026-10-30" {
+	if it.Line != 9 || it.Due != "2026-10-30" { // after the frontmatter, the title and Inbox
 		t.Errorf("added %+v", it)
 	}
 	if _, err := Add(v, "", "Call the plumber due:tomorrow", "", now); err != nil {
 		t.Fatal(err)
 	}
-	want := "# Todo\n\n## Inbox\n\n- [ ] Renew passport due:2026-10-30\n- [ ] Call the plumber due:2026-10-28\n"
+	want := NewList + "\n## Inbox\n\n- [ ] Renew passport due:2026-10-30\n- [ ] Call the plumber due:2026-10-28\n"
 	if got := read(t, v, File); got != want {
 		t.Errorf("todo.md:\n%s\nwant:\n%s", got, want)
 	}
@@ -176,10 +176,10 @@ func TestAdd(t *testing.T) {
 	}
 
 	// a folder's own list
-	if it, err = Add(v, "work/../work/", "four", "", now); err != nil || it.Path != "work/todo.md" || it.Line != 5 {
+	if it, err = Add(v, "work/../work/", "four", "", now); err != nil || it.Path != "work/todo.md" || it.Line != 9 {
 		t.Fatalf("add in a folder: %+v %v", it, err)
 	}
-	if got := read(t, v, "work/todo.md"); got != "# Todo\n\n## Inbox\n\n- [ ] four\n" {
+	if got := read(t, v, "work/todo.md"); got != NewList+"\n## Inbox\n\n- [ ] four\n" {
 		t.Errorf("work/todo.md:\n%s", got)
 	}
 	for _, folder := range []string{"agents", "agents/2026", ".nt", "work/.hidden"} {
@@ -196,7 +196,8 @@ func TestAdd(t *testing.T) {
 
 func TestChange(t *testing.T) {
 	v := newVault(t)
-	write(t, v, "work/a.md", "# A\n\n  * [ ] Review the report due:2026-10-30\n- [ ] other\n")
+	const fm = "---\ntodos: true\n---\n\n" // a plain note's task lines are todos only when it says so
+	write(t, v, "work/a.md", fm+"# A\n\n  * [ ] Review the report due:2026-10-30\n- [ ] other\n")
 	items := Parse("work/a.md", []byte(read(t, v, "work/a.md")))
 	it := items[0]
 
@@ -227,7 +228,7 @@ func TestChange(t *testing.T) {
 	}
 
 	// a line added above: the todo is found by its text
-	write(t, v, "work/a.md", "# A\n\nnew line\n"+strings.TrimPrefix(read(t, v, "work/a.md"), "# A\n\n"))
+	write(t, v, "work/a.md", fm+"# A\n\nnew line\n"+strings.TrimPrefix(read(t, v, "work/a.md"), fm+"# A\n\n"))
 	if _, err := Uncheck(v, d); err != nil {
 		t.Errorf("after a line was added above: %v", err)
 	}
@@ -244,7 +245,7 @@ func TestChange(t *testing.T) {
 	if err := Remove(v, items[1]); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := read(t, v, "work/a.md"), "# A\n\nnew line\n  * [ ] Review the report\n"; got != want {
+	if got, want := read(t, v, "work/a.md"), fm+"# A\n\nnew line\n  * [ ] Review the report\n"; got != want {
 		t.Errorf("after remove:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -252,10 +253,11 @@ func TestChange(t *testing.T) {
 func TestCollectAndSort(t *testing.T) {
 	v := newVault(t)
 	write(t, v, File, "# Todo\n\n## Inbox\n\n- [ ] undated a\n- [ ] late due:2026-10-20\n- [x] done early done:2026-10-01\n- [ ] undated b\n")
-	write(t, v, "work/2026-10-01-x.md", "- [ ] old undated\n- [ ] soon due:2026-10-28\n")
+	write(t, v, "work/2026-10-01-x.md", "---\ntodos: true\n---\n- [ ] old undated\n- [ ] soon due:2026-10-28\n")
 	write(t, v, "work/todo.md", "- [ ] work list\n")
 	write(t, v, "home/todo.md", "- [ ] home list\n")
-	write(t, v, "work/2026-10-20-y.md", "- [ ] newer undated\n- [x] done late done:2026-10-26\n- [x] done, no date\n")
+	write(t, v, "work/2026-10-20-y.md", "---\ntodos: true\n---\n- [ ] newer undated\n- [x] done late done:2026-10-26\n- [x] done, no date\n")
+	write(t, v, "work/2026-10-21-sop.md", "- [ ] a step of a procedure, not a todo\n")
 	write(t, v, "agents/2026/2026-10-27/r.md", "- [ ] an agent's open item\n")
 	write(t, v, "work/2026-10-20-y.conflict-mbp-20261027.md", "- [ ] a conflict copy\n")
 	write(t, v, ".nt/templates/note.md", "- [ ] a template\n")
@@ -268,5 +270,55 @@ func TestCollectAndSort(t *testing.T) {
 	want := []string{"late", "soon", "undated a", "undated b", "home list", "work list", "newer undated", "old undated", "done late", "done early", "done, no date"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("order:\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestTodosOptIn(t *testing.T) {
+	body := "# SOP\n\n- [ ] step one\n- [x] step two\n"
+	for _, c := range []struct {
+		rel, fm string
+		want    int
+	}{
+		{"sop.md", "", 0},                               // a plain note's task lines are a checklist
+		{"sop.md", "---\ntodos: true\n---\n", 2},        // unless it says so
+		{"sop.md", "---\ntitle: todos: true\n---\n", 0}, // a value is not the key
+		{"work/todo.md", "", 2},                         // a todo.md holds todos by name
+		{"work/todo.md", "---\ntodos: false\n---\n", 0}, // and can say otherwise
+		{"work/todo.md", NewList[:len(NewList)-len("# Todo\n")], 2},
+	} {
+		if got := Parse(c.rel, []byte(c.fm+body)); len(got) != c.want {
+			t.Errorf("%s with %q: %d todos, want %d", c.rel, c.fm, len(got), c.want)
+		}
+	}
+}
+
+func TestSetEnabled(t *testing.T) {
+	v := newVault(t)
+	for _, c := range []struct {
+		name, rel, before string
+		on                bool
+		want              string
+	}{
+		{"a plain note gets frontmatter", "a.md", "# A\n\n- [ ] x\n", true, "---\ntodos: true\n---\n\n# A\n\n- [ ] x\n"},
+		{"the key joins the keys there", "b.md", "---\ntitle: B\ntags: [x]\n---\n# B\n", true, "---\ntitle: B\ntags: [x]\ntodos: true\n---\n# B\n"},
+		{"off takes the key out of a note", "c.md", "---\ntitle: C\ntodos: true\n---\n# C\n", false, "---\ntitle: C\n---\n# C\n"},
+		{"off takes an emptied frontmatter out too", "e.md", "---\ntodos: true\n---\n\n# E\n", false, "# E\n"},
+		{"off on a plain note without the key changes nothing", "d.md", "# D\n", false, "# D\n"},
+		{"off on a todo.md says so", "todo.md", NewList, false, "---\ntodos: false\n---\n\n# Todo\n"},
+		{"on replaces false in place", "work/todo.md", "---\ntodos: false\ntitle: W\n---\n", true, "---\ntodos: true\ntitle: W\n---\n"},
+	} {
+		write(t, v, c.rel, c.before)
+		if err := SetEnabled(v, c.rel, c.on); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := read(t, v, c.rel); got != c.want {
+			t.Errorf("%s:\n%q\nwant\n%q", c.name, got, c.want)
+		}
+		if Enabled(c.rel, []byte(read(t, v, c.rel))) != c.on {
+			t.Errorf("%s: Enabled does not read back %v", c.name, c.on)
+		}
+	}
+	if err := SetEnabled(v, "missing.md", true); err == nil {
+		t.Error("a missing note gave no error")
 	}
 }

@@ -2,8 +2,8 @@ import SwiftUI
 
 /// TodosView is every todo in the notes, as the terminal browser's todo list shows them: the open
 /// ones overdue first with their dates in words, a field that adds one to todo.md, and the done
-/// ones below. "from every note" in the summary is a menu that keeps to one top-level folder's
-/// todos, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. Search todos,
+/// ones below. "from every note" in the summary is a menu that keeps to one folder's todos, at
+/// any depth, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. Search todos,
 /// the view's own field, keeps to the todos with the words typed, in their text or their note's
 /// name. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
 /// Return opens the note at the todo.
@@ -19,7 +19,7 @@ struct TodosView: View {
     @State private var editingDue: String?
     @State private var dueText = ""
     @State private var showDone = true
-    @State private var scope = "" // the top-level folder whose todos show; "" is every note
+    @State private var scope = "" // the folder whose todos show, at any depth; "" is every note
     @State private var query = "" // Search todos: only the todos with these words show
     @FocusState private var searching: Bool
     @State private var frozen: [Todo]? // the list as it stood at the first tick, while the ticks settle
@@ -48,7 +48,7 @@ struct TodosView: View {
     /// just ticked stays in its place, else as nt lists it; in the scope, with the words searched.
     private var shown: [Todo] {
         let all = frozen ?? ws.todos
-        let scoped = scope.isEmpty ? all : all.filter { $0.folder == scope }
+        let scoped = scope.isEmpty ? all : all.filter { $0.under(scope) }
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return scoped }
         return scoped.filter { $0.text.localizedCaseInsensitiveContains(q) || source($0).localizedCaseInsensitiveContains(q) }
@@ -67,7 +67,7 @@ struct TodosView: View {
                 addField
                     .padding(.bottom, 18)
                 if open.isEmpty {
-                    Text(query.isEmpty ? "Nothing open. Add a todo above, or write - [ ] in any note." : "No open todo matches.")
+                    Text(query.isEmpty ? "Nothing open. Add a todo above, or write - [ ] in a todo.md or a note with todos: true." : "No open todo matches.")
                         .font(.system(size: 14))
                         .foregroundStyle(Brand.muted)
                         .padding(.horizontal, 10)
@@ -152,7 +152,7 @@ struct TodosView: View {
     }
 
     /// scopeMenu is "from every note", or the folder kept to, as a menu of every note and the
-    /// top-level folders with open todos.
+    /// folders with open todos, each with everything under it.
     private var scopeMenu: some View {
         let all = frozen ?? ws.todos
         return Menu {

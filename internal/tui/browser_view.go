@@ -374,7 +374,7 @@ func (b *browser) helpText(w, h int) string {
 		{"find", "/ ctrl-p", "search every note's lines (not its todos), find a title"},
 		{"todos", "x", "the todos beside the list, then:", "x space", "check, uncheck", "d", "its due date", "a", "add one to todo.md", "/", "only the todos with these words", "f", "only a folder's todos", "X", "fold the done ones", "e D", "edit, delete", "enter", "its note"},
 		{"in a note", "f", "follow a link: type its letters, or click it", "b", "back to the note before", "l o i", "its links, outline, images", "e", "edit in $EDITOR", "v", "read in glow", "y", "copy the selection, else its path", "D", "delete it, after asking"},
-		{"write", "a", "add a line to today", "n", "a new note here", "N", "a new folder here", "m R", "move, rename it", "s", "sync now", "r", "reload"},
+		{"write", "a", "add a line to today", "n", "a new note here", "N", "a new folder here", "m R", "move, rename it", "T", "its task lines: todos, or a checklist", "s", "sync now", "r", "reload"},
 		{"mouse", "drag text", "select it in the note", "drag │", "resize the list (< > too)", "click", "select; again opens", "wheel", "scroll"},
 		{"", "?", "this help", "q", "quit"},
 	}

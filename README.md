@@ -124,7 +124,8 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
 - **Journals.** `nt t` opens today's, `nt a "text"` adds a timestamped line, `nt n "Title"` makes a
   dated note and links it from the day. Journals from two machines merge line by line, and once
   a day is over its lines are put back in time order.
-- **Todos and the calendar.** A todo is a task line in any note, `- [ ] text due:2026-11-03`.
+- **Todos and the calendar.** A todo is a task line, `- [ ] text due:2026-11-03`, in a
+  `todo.md` or in a note with `todos: true` in its frontmatter (a checklist elsewhere stays one).
   `x` lists them all, overdue first; `x` checks one, `d` sets its due date. `c` shows the month,
   with the days that have a journal and the days with todos due marked. `nt todo` does the same
   from the shell.
@@ -174,7 +175,7 @@ Every command that prints data takes `--json`.
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
-| `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them |
+| `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them; `on`/`off <note>` make a note's task lines todos, or a checklist |
 | `nt mv`, `nt rename`, `nt mkdir`, `nt rm` | move and rename notes and folders with their links, make a folder, delete a note or an empty folder |
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
 | `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
@@ -202,6 +203,7 @@ In the browser:
 | `a`, `n`, `N` | add a line to today, a new note here, a new folder here |
 | `e`, `v`, `y` | edit in `$EDITOR`, read in glow, copy the selection or the path |
 | `m`, `R`, `D` | move, rename, delete (after asking) |
+| `T` | the note's task lines: todos, or a checklist again |
 | `s`, `r`, `?`, `q` | sync, reload, help, quit |
 
 The mouse selects text in the note, resizes the list by dragging the divider, and scrolls.

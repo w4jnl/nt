@@ -23,7 +23,7 @@ Rules are marked **must** or **should**. A client that cannot follow a must rule
   .gitignore                      §11
   AGENTS.md                       layout and rules for agents working in the repository
   README.md                       optional, owned by the person
-  todo.md                         the todo list; a folder can have its own, and todos can be in any note (§12)
+  todo.md                         the todo list; a folder can have its own, and a note with `todos: true` holds some (§12)
   daily/YYYY/YYYY-MM-DD.md        daily journal, one per day (§5)
   daily/YYYY/assets/              attachments pasted into journals
   agents/YYYY/YYYY-MM-DD/         agent reports for that day (§6)
@@ -114,6 +114,7 @@ Frontmatter is optional. It is YAML between two `---` lines at the very top of t
 | `date` | `YYYY-MM-DD` | The day the note belongs to |
 | `tags` | list of strings | Lowercase. `/` makes a hierarchy: `work/q3` |
 | `type` | string | `note` (the default), `daily`, `agent-report`, `digest` or `weekly` |
+| `todos` | `true` | The note's task lines are todos (§12); without it only a `todo.md`'s are |
 
 - Clients must keep keys they don't know, in their order, when they rewrite frontmatter.
 - **Title** is found in this order: the `title` key, then the first `#` heading, then the file stem.
@@ -415,9 +416,13 @@ todo.md merge=union
 
 ## 12. Todos
 
-A todo is a task list item in any note. A `todo.md` is where clients add new ones: the one at the root, or the one in a folder the person names.
+A todo is a task list item in a `todo.md`, or in a note whose frontmatter says `todos: true`. A `todo.md` is where clients add new ones: the one at the root, or the one in a folder the person names.
 
 ```markdown
+---
+todos: true
+---
+
 # Todo
 
 ## Inbox
@@ -433,6 +438,11 @@ A todo is a task list item in any note. A `todo.md` is where clients add new one
 - **A todo** is a list item whose text starts with a checkbox: `- [ ] text` is open, `- [x] text`
   (or `[X]`) is done. The bullet can be `-`, `*`, `+` or a number (`1.`); any indent is allowed.
   A checkbox with no text is not a todo.
+- **Which notes:** a `todo.md` holds todos by its name; any other note's task lines are a
+  checklist or a procedure (a runbook, a recipe), ticked in the note, never listed as work to
+  do, unless its frontmatter says `todos: true`. A `todo.md` can say `todos: false` to be read
+  as a checklist. Clients write `todos: true` into every `todo.md` they create, and offer a switch per note that
+  sets the key (`nt todo on|off <note>`).
 - **Not todos:** lines in frontmatter or in fenced code blocks, and task lines in the agents
   folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`.
 - **Due date:** `due:YYYY-MM-DD` anywhere in the text. Clients accept words such as `fri` or
@@ -441,7 +451,7 @@ A todo is a task list item in any note. A `todo.md` is where clients add new one
   counts it. Unchecking it takes the date away. A todo checked in an editor, with no `done:`,
   is done all the same.
 - **The text** a client shows is the line after the checkbox without `due:` and `done:`.
-- **`todo.md`** starts as `# Todo` and `## Inbox`. A client adds a new todo, `- [ ] text` with
+- **`todo.md`** starts as `todos: true` in its frontmatter, `# Todo` and `## Inbox`. A client adds a new todo, `- [ ] text` with
   its `due:` when it has one, at the end of `## Inbox` of the root's `todo.md`, or of
   `<folder>/todo.md` when the person names a folder, and adds the file or the section when it is
   missing. The agents folder and hidden folders have no todo list. The rest of the file is the
