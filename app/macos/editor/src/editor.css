@@ -167,12 +167,18 @@ html { -webkit-text-size-adjust: 100%; }
 #editor .cm-code-last { padding-bottom: 10px !important; border-radius: 0 0 6px 6px; }
 #editor .cm-code-first.cm-code-last { border-radius: 6px; }
 #editor .cm-fence { line-height: 6px; }
-#editor .cm-codeinfo { position: absolute; top: 6px; right: 54px; font-size: 11px; color: var(--ink-muted); }
-/* copy at a code block's top right puts its code on the clipboard; "copied" for a moment after */
+/* the language and copy at the block's top right: one set of metrics, so they sit on one line
+   whether the first line is the folded fence or the fence as written */
+#editor .cm-codeinfo, #editor .cm-copy {
+  position: absolute; top: 6px;
+  font-family: var(--mono); font-size: 11px; line-height: 16px; height: 16px;
+  color: var(--ink-muted);
+}
+#editor .cm-codeinfo { right: 54px; }
+/* copy puts the block's code on the clipboard; "copied" for a moment after */
 #editor .cm-copy {
-  position: absolute; top: 5px; right: 10px;
-  font: 11px var(--mono); color: var(--ink-muted);
-  background: none; border: 0; border-radius: 4px; padding: 1px 4px; margin: 0;
+  right: 10px;
+  background: none; border: 0; border-radius: 4px; padding: 0 4px; margin: 0;
   cursor: pointer; -webkit-user-select: none; user-select: none;
 }
 #editor .cm-copy:hover { color: var(--ink); background: var(--surface); }
