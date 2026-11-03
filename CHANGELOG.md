@@ -4,6 +4,24 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.2 (2026-11-03)
+
+Todos are opt-in per note, a switch sets it in every client, and the folder scope reaches any
+depth.
+
+- **Which notes hold todos:** a `todo.md` holds them by its name; any other note's task lines
+  are a checklist (a procedure, a recipe), ticked in the note and never listed as work to do,
+  unless its frontmatter says `todos: true`. A `todo.md` can say `todos: false`. nt writes the
+  key into every `todo.md` it makes; lists without it still count. **A plain note that held real
+  todos needs `todos: true` now,** or they leave Todos; the switch below adds it.
+- **Todos in this note:** a tick in a note's menu on the Mac and the phone, `T` in the terminal
+  browser, `nt todo on|off <note>` on the command line. On writes `todos: true`; off takes the
+  key out again (`todos: false` in a `todo.md`), so a note comes back as it was.
+- **The folder scope at any depth:** `f` in the browser's todos and "from every note" in the
+  apps offer every folder with open todos, each counting everything under it (a top-level
+  folder with any, a deeper one when its own notes have some). Keeping to `work` shows all of
+  it, keeping to `work/shell/rars` only that list; a todo added there goes to its `todo.md`.
+
 ## 0.9.1 (2026-11-03)
 
 nt for Mac no longer crashes in the background; the todos have a search of their own in every
