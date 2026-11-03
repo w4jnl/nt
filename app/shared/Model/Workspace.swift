@@ -420,6 +420,19 @@ final class Workspace {
         await todo([done ? "done" : "undo", t.id])
     }
 
+    /// todosOn says whether a note's task lines are todos, read from the file as the menu asks.
+    func todosOn(_ path: String) -> Bool {
+        guard let root, let text = try? String(contentsOf: root.appending(path: path), encoding: .utf8) else { return false }
+        return Todo.enabled(path, text)
+    }
+
+    /// setTodos makes a note's task lines todos, or a checklist again, through nt todo on|off,
+    /// which writes `todos:` in its frontmatter (docs/format.md §12).
+    @discardableResult
+    func setTodos(_ path: String, _ on: Bool) async -> Bool {
+        await todo([on ? "on" : "off", path])
+    }
+
     /// setDue sets a todo's due date from words: fri, +3d, 2026-11-03; none clears it.
     func setDue(_ t: Todo, _ when: String) async {
         await todo(["due", t.id, when])

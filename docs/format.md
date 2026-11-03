@@ -441,7 +441,8 @@ todos: true
 - **Which notes:** a `todo.md` holds todos by its name; any other note's task lines are a
   checklist or a procedure (a runbook, a recipe), ticked in the note, never listed as work to
   do, unless its frontmatter says `todos: true`. A `todo.md` can say `todos: false` to be read
-  as a checklist. Clients write `todos: true` into every `todo.md` they create.
+  as a checklist. Clients write `todos: true` into every `todo.md` they create, and offer a switch per note that
+  sets the key (`nt todo on|off <note>`).
 - **Not todos:** lines in frontmatter or in fenced code blocks, and task lines in the agents
   folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`.
 - **Due date:** `due:YYYY-MM-DD` anywhere in the text. Clients accept words such as `fri` or

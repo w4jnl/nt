@@ -2,6 +2,7 @@ package tui
 
 import (
 	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -11,7 +12,9 @@ import (
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/move"
+	"github.com/w4jnl/nt/internal/ops"
 	"github.com/w4jnl/nt/internal/scan"
+	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
 )
 
@@ -163,6 +166,34 @@ func (b *browser) startRename() tea.Cmd {
 	b.prompt("rename", label)
 	b.input.value, b.input.pos = []rune(cur), len([]rune(cur))
 	return nil
+}
+
+// toggleTodos (T) makes the note's task lines todos, or a checklist again, by `todos:` in its
+// frontmatter (docs/format.md §12), and says which; the note shows again, and the todos are
+// read again.
+func (b *browser) toggleTodos() tea.Cmd {
+	rel, dir, ok := b.target()
+	if !ok || dir {
+		b.say("T works on a note: its task lines become todos, or a checklist again", true)
+		return nil
+	}
+	data, err := os.ReadFile(b.v.Abs(rel))
+	if err != nil {
+		b.say(err.Error(), true)
+		return nil
+	}
+	on := !todo.Enabled(rel, data)
+	st, err := ops.SetTodos(b.v, rel, on)
+	if err != nil {
+		b.say(err.Error(), true)
+		return nil
+	}
+	word := "off"
+	if st.Todos {
+		word = "on"
+	}
+	b.say("todos "+word+": "+st.Path, false)
+	return tea.Batch(b.loadNow(), b.loadTodos(""))
 }
 
 // rename gives what R was pressed on the name typed.

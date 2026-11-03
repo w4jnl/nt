@@ -191,6 +191,35 @@ type TodoList struct {
 	Todos []Todo `json:"todos"`
 }
 
+// TodosState is a note and whether its task lines are todos, as `nt todo on|off` prints it.
+type TodosState struct {
+	Path  string `json:"path"`
+	Todos bool   `json:"todos"`
+}
+
+// SetTodos makes a note's task lines todos (on) or a checklist, in its frontmatter
+// (docs/format.md §12), and reports the state.
+func SetTodos(v *vault.Vault, note string, on bool) (TodosState, error) {
+	named := note
+	note = strings.Trim(path.Clean("/"+filepath.ToSlash(note)), "/")
+	if !strings.HasSuffix(note, ".md") || !isFile(v.Abs(note)) {
+		return TodosState{}, fmt.Errorf("todo: %q is no note in %s", named, Tilde(v.Root))
+	}
+	agents := strings.Trim(v.Cfg.Folders.Agents, "/")
+	for _, part := range strings.Split(note, "/") {
+		if strings.HasPrefix(part, ".") {
+			return TodosState{}, fmt.Errorf("todo: %s is hidden, so it holds no todos", note)
+		}
+	}
+	if agents != "" && strings.HasPrefix(note, agents+"/") {
+		return TodosState{}, fmt.Errorf("todo: %s is an agent report, which holds no todos", note)
+	}
+	if err := todo.SetEnabled(v, note, on); err != nil {
+		return TodosState{}, fmt.Errorf("todo: %w", err)
+	}
+	return TodosState{Path: note, Todos: on}, nil
+}
+
 // Todos are the todos in every note, or under folder, overdue first: the open ones, the done
 // ones, or all of them.
 func Todos(v *vault.Vault, folder string, done, all bool) ([]todo.Item, error) {

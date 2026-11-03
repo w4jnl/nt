@@ -1138,6 +1138,8 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		return b.startMove()
 	case "R":
 		return b.startRename()
+	case "T":
+		return b.toggleTodos()
 	case "N":
 		return b.startMkdir()
 	case "s":

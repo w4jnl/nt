@@ -28,6 +28,13 @@ struct AgendaTests {
         #expect(todos.filter { $0.under("work") }.map(\.text) == ["b", "d", "f"] && todos.filter { $0.under("work/shell/rars") }.map(\.text) == ["f"])
     }
 
+    @Test func aNoteSaysWhetherItsTaskLinesAreTodos() {
+        #expect(Todo.enabled("work/todo.md", "# Todo\n") && Todo.enabled("todo.md", ""))
+        #expect(!Todo.enabled("work/todo.md", "---\ntodos: false\n---\n# Todo\n"))
+        #expect(!Todo.enabled("work/sop.md", "# SOP\n\n- [ ] step\n"))
+        #expect(Todo.enabled("work/sop.md", "---\ntitle: SOP\ntodos: true\n---\n# SOP\n"))
+    }
+
     @Test func taskLinesAreTodosNotSearchHits() {
         for line in ["- [ ] Renew passport", "  - [x] done done:2026-10-01", "* [ ] a", "+ [X]", "3. [ ] third", "12) [x] x", "- [ ]"] {
             #expect(Todo.isTask(line), Comment(rawValue: line))
@@ -173,6 +180,14 @@ struct TodoActionTests {
         await ws.setDue(domain, "none")
         #expect(read("todo.md").contains("- [ ] Renew the domain\n"))
         #expect(ws.flash.isEmpty)
+
+        // Todos in this note: off makes the note's task lines a checklist, on todos again
+        #expect(ws.todosOn("homelab/2026-10-21-nas.md") && ws.todosOn("todo.md"))
+        await ws.setTodos("homelab/2026-10-21-nas.md", false)
+        #expect(!ws.todosOn("homelab/2026-10-21-nas.md") && !ws.todos.contains { $0.text == "Replace the fan" })
+        #expect(!read("homelab/2026-10-21-nas.md").contains("todos:"))
+        await ws.setTodos("homelab/2026-10-21-nas.md", true)
+        #expect(ws.todos.contains { $0.text == "Replace the fan" } && read("homelab/2026-10-21-nas.md").hasPrefix("---\ntodos: true\n---\n"))
 
         // a todo nt cannot find any more says so, and changes nothing
         try "# NAS\n".write(to: root.appending(path: "homelab/2026-10-21-nas.md"), atomically: true, encoding: .utf8)

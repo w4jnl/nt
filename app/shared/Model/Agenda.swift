@@ -57,6 +57,13 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         let todos: [Todo]
     }
 
+    /// enabled says whether a note's task lines are todos (docs/format.md §12): a todo.md's by
+    /// its name, any note's by `todos: true` in its frontmatter, a todo.md's not by `todos: false`.
+    nonisolated static func enabled(_ rel: String, _ text: String) -> Bool {
+        if let v = Agenda.frontmatter(text)["todos"] { return v == "true" }
+        return (rel as NSString).lastPathComponent == "todo.md"
+    }
+
     /// folder is the folder the todo's note is in, at any depth; "" at the root.
     var folder: String { (rel as NSString).deletingLastPathComponent }
 

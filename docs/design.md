@@ -126,6 +126,7 @@ Decisions taken with the user (2026-10-26):
 | `nt todo [folder] [--done\|--all]` | The open todos in every note, or under folder, overdue first; or the done ones, or all (Todos, below) |
 | `nt todo add "text" [--due when] [--in folder]` | A new todo at the end of `## Inbox` in `todo.md`, the root's or the folder's |
 | `nt todo done\|undo\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, delete a todo, or set its due date; `<todo>` is `path:line` or words from its text |
+| `nt todo on\|off <note>` | The note's task lines are todos, or a checklist: `todos:` in its frontmatter (docs/format.md §12) |
 | `nt paste <note> [--name words] [--from file]` | Save the clipboard's image, or the image file `--from` names, as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it, the Mac app pastes and drops through it |
 | `nt config [get\|set\|edit]` | Every setting with its value, its file and what it does; `set <key> <value>` changes one line of the right file, checked; `edit [--repo]` opens the whole file (Settings, below) |
 | `nt sync`, `nt doctor` | Sync now; check the setup, and list the links in the notes that point at nothing (`--json` lists every one) |
@@ -184,6 +185,7 @@ Decisions taken with the user (2026-10-26):
 | `D` | Delete the note (with the images no other note uses, and its line in the journal of its day) or an empty folder, after a y/n question on the footer line |
 | `m` | Move the selected note or folder: a picker of the folders it can go to, filtered as you type; a name that is no folder yet makes one |
 | `R` | Rename it: the prompt starts from the note's title or the folder's name |
+| `T` | The note's task lines become todos, or a checklist again: `todos:` in its frontmatter (docs/format.md §12); the footer says which |
 | `N` | A new folder in the current one; a name starting with `/` goes from the root |
 | `s` | Sync now |
 | `<` `>` | Narrower / wider list; dragging the divider with the mouse does the same |
@@ -476,7 +478,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - **Notes and folders** (added 2026-10-28). A folder in the sidebar selects, as the place for
   ⌘N; the note on screen stays. A right-click on a folder has New Note…, New Folder…, New
   Todo… (into its `todo.md`; not in the journals', agents' or weekly folder), Rename…, Move… and
-  Delete…; on a note Rename…, Move… and Delete…; on the Folders heading New Note…, New
+  Delete…; on a note Rename…, Move…, Todos in this note (a tick: its task lines are todos,
+  `todos:` in its frontmatter, through `nt todo on|off`) and Delete…; on the Folders heading New Note…, New
   Folder… and New Todo… at the root. They ask first, in an alert or a sheet of folders (a name that is no
   folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
   a delete says what goes with it and how many notes link to it. The journals, the agents'
@@ -740,7 +743,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
     settings are its name and its key, which a new key replaces at once.
   - Notes and folders, as on the Mac: + on the home list (New Note at nt's default folder, New
     Folder and New Todo at the root) and in a folder screen; a long press on a row has Rename, Move and
-    Delete, and a note's ⋯ the same. A row swipes as in Mail: to the right Move and Rename, to
+    Delete, and a note's ⋯ the same, with Todos in this note as on the Mac. A row swipes as in Mail: to the right Move and Rename, to
     the left Delete, a full swipe the first of them (a delete still asks). On the iPhone a new note opens on a
     screen of its own (a tap into it brings the keyboard: a web view takes no focus it was not
     tapped for), and a screen follows what it shows when it moves, or closes when it is deleted.

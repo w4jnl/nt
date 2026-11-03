@@ -17,7 +17,7 @@ import (
 	"github.com/w4jnl/nt/internal/todo"
 )
 
-// nt todo [folder] [--done|--all] [--json]; nt todo add|done|undo|due|rm.
+// nt todo [folder] [--done|--all] [--json]; nt todo add|done|undo|due|rm; nt todo on|off <note>.
 func runTodo(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
@@ -25,9 +25,41 @@ func runTodo(args []string) int {
 			return runTodoAdd(args[1:])
 		case "done", "undo", "due", "rm":
 			return runTodoChange(args[0], args[1:])
+		case "on", "off":
+			return runTodoSet(args[0] == "on", args[1:])
 		}
 	}
 	return runTodoList(args)
+}
+
+// nt todo on|off <note>: the note's task lines are todos, or a checklist, by `todos:` in its
+// frontmatter (docs/format.md §12).
+func runTodoSet(on bool, args []string) int {
+	args, asJSON := takeBool(args, "--json")
+	pos, err := positional("todo", args)
+	if err != nil {
+		return fail(err)
+	}
+	if len(pos) != 1 {
+		return fail(errors.New("todo on|off: name one note"))
+	}
+	v, m, err := openVault()
+	if err != nil {
+		return fail(err)
+	}
+	st, err := ops.SetTodos(v, pos[0], on)
+	if err != nil {
+		return fail(err)
+	}
+	if asJSON {
+		return printJSON(st)
+	}
+	word := "off"
+	if on {
+		word = "on"
+	}
+	lipgloss.Println(cliStyles(m).Muted.Render("todos " + word + ": " + st.Path))
+	return 0
 }
 
 // nt todo [folder] [--done|--all]: the open todos in every note, or in the notes under folder,

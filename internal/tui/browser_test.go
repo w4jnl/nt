@@ -1000,3 +1000,29 @@ func TestSearchLeavesTasksOut(t *testing.T) {
 		t.Fatalf("the note search keeps task lines: %v", got)
 	}
 }
+
+func TestToggleTodos(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	if err := os.WriteFile(b.v.Abs("tech/2026-10-20-a.md"), []byte("# SOP\n\n- [ ] a step\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read := func() string { s, _ := os.ReadFile(b.v.Abs("tech/2026-10-20-a.md")); return string(s) }
+	for i, e := range b.entries {
+		if e.rel == "tech/2026-10-20-a.md" {
+			b.sel = i
+		}
+	}
+	press(b, "T") // the checklist becomes todos
+	if read() != "---\ntodos: true\n---\n\n# SOP\n\n- [ ] a step\n" || b.msg != "todos on: tech/2026-10-20-a.md" {
+		t.Fatalf("T does not turn the todos on:\n%s\n%s", read(), b.msg)
+	}
+	press(b, "T") // and a checklist again
+	if read() != "# SOP\n\n- [ ] a step\n" || b.msg != "todos off: tech/2026-10-20-a.md" {
+		t.Fatalf("T again does not turn them off:\n%s\n%s", read(), b.msg)
+	}
+	press(b, "~")
+	press(b, "T") // a folder is no note
+	if !strings.Contains(b.msg, "T works on a note") {
+		t.Fatalf("T on a folder: %q", b.msg)
+	}
+}

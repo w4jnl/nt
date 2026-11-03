@@ -36,7 +36,8 @@ repository: `nt sync` is its only git writer.
 
 A todo is a task line, `- [ ] text due:YYYY-MM-DD`, and once done `- [x] text done:YYYY-MM-DD`,
 in a `todo.md` or in a note whose frontmatter says `todos: true`; any other note's task lines
-are a checklist, not todos. New ones go to `todo.md`, the root's or a folder's.
+are a checklist, not todos (`nt todo on <note>` makes them todos, `off` a checklist). New ones
+go to `todo.md`, the root's or a folder's.
 
 - `nt todo [folder] --json`: the open todos, overdue first, in every note or under folder
   (`--done`: the done ones, `--all`: both); each has `rel`, `line`, `text`, `due`.

@@ -291,3 +291,34 @@ func TestTodosOptIn(t *testing.T) {
 		}
 	}
 }
+
+func TestSetEnabled(t *testing.T) {
+	v := newVault(t)
+	for _, c := range []struct {
+		name, rel, before string
+		on                bool
+		want              string
+	}{
+		{"a plain note gets frontmatter", "a.md", "# A\n\n- [ ] x\n", true, "---\ntodos: true\n---\n\n# A\n\n- [ ] x\n"},
+		{"the key joins the keys there", "b.md", "---\ntitle: B\ntags: [x]\n---\n# B\n", true, "---\ntitle: B\ntags: [x]\ntodos: true\n---\n# B\n"},
+		{"off takes the key out of a note", "c.md", "---\ntitle: C\ntodos: true\n---\n# C\n", false, "---\ntitle: C\n---\n# C\n"},
+		{"off takes an emptied frontmatter out too", "e.md", "---\ntodos: true\n---\n\n# E\n", false, "# E\n"},
+		{"off on a plain note without the key changes nothing", "d.md", "# D\n", false, "# D\n"},
+		{"off on a todo.md says so", "todo.md", NewList, false, "---\ntodos: false\n---\n\n# Todo\n"},
+		{"on replaces false in place", "work/todo.md", "---\ntodos: false\ntitle: W\n---\n", true, "---\ntodos: true\ntitle: W\n---\n"},
+	} {
+		write(t, v, c.rel, c.before)
+		if err := SetEnabled(v, c.rel, c.on); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := read(t, v, c.rel); got != c.want {
+			t.Errorf("%s:\n%q\nwant\n%q", c.name, got, c.want)
+		}
+		if Enabled(c.rel, []byte(read(t, v, c.rel))) != c.on {
+			t.Errorf("%s: Enabled does not read back %v", c.name, c.on)
+		}
+	}
+	if err := SetEnabled(v, "missing.md", true); err == nil {
+		t.Error("a missing note gave no error")
+	}
+}
