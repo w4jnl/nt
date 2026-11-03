@@ -4,6 +4,24 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.3 (2026-11-03)
+
+Every client says when a note last changed and from which machine, read from git's history.
+
+- **Changed, and by whom:** under the note in the terminal browser, before "Linked from";
+  at the bottom right on the Mac, before the word count; under the title on the phone (after
+  the folders on iPad): `changed 2h ago · macbook`. "Just now" under a minute, minutes or hours
+  up to two days, then the date as todos say theirs. The machine is the one whose sync committed
+  the change; a commit made by hand names none. A note never synced shows nothing, and an edit
+  keeps its old line until the next sync: the time is the sync's, not the save's.
+- **`nt history <note>`:** every synced change of a note, newest first, with the machine;
+  `--json` gives `at` and `by`. `nt _editor index` carries `changed` and `by` on each note, for
+  the apps and for scripts.
+- **Why not frontmatter:** an `updated` line changed on two devices would turn every edit of
+  the same note into a conflict copy, and the journals' lines already carry their times.
+- **nt for Mac:** the line at the bottom right sits on the ground, so a note's last lines pass
+  under it, not through it.
+
 ## 0.9.2 (2026-11-03)
 
 Todos are opt-in per note, a switch sets it in every client, and the folder scope reaches any
