@@ -132,8 +132,8 @@ t today  [ ] day  a append  n new  / search  ? help
   `list-width` columns wide, at least `list-min`. Dragging the `│` divider with the mouse, or
   `<` `>` (`list-step` columns a press), changes the width; nt remembers it per machine. The
   divider turns `accent` while it is held.
-- The preview pane: the selected note rendered (see Preview styling), wrapped at no more than
-  `preview-max` columns. Under `list-min` + `preview-min` columns the preview hides and Enter
+- The preview pane: the selected note rendered (see Preview styling) across the pane's whole
+  width, as vim gives it. Under `list-min` + `preview-min` columns the preview hides and Enter
   shows the note full width.
 - Selection: a `▎` bar in `accent` at the left edge of the row on a `surface` background. It is
   the terminal form of the family's accent bar. There is no zebra striping and no boxes around
@@ -201,7 +201,8 @@ t today  [ ] day  a append  n new  / search  ? help
   note, the system's sidebar beside it, `accent` for links, keys and the selection. Headings are
   `ink`, not `accent` as in the terminal: a proportional face sets them apart by size, and accent
   stays for what can be clicked.
-- **The text column.** 680 px wide and centred, 40 px inside its edges; the rest is ground.
+- **The text column.** The view's whole width, 40 px inside its edges, so a table of output
+  in a code block has the room the screen gives it.
 - **Markdown while editing.** Only on the line with the cursor, in `ink-faint`. A heading's `#`
   hangs in the left margin so the text does not move.
 - **Code, math and diagrams.** Code in a known language takes the preview's Chroma roles from
@@ -256,8 +257,8 @@ t today  [ ] day  a append  n new  / search  ? help
 - Go: `internal/theme` mirrors `tokens.json` as Lip Gloss v2 colours for both themes, plus the
   state glyphs. A test parses `docs/design-system/tokens.json` and fails when the two drift.
   `internal/render` builds the Glamour style from the same values.
-- The terminal tokens (`list-width`, `list-step`, `list-min`, `preview-min`, `preview-max`,
-  `gutter`, `selection-bar`) are the layout rules above in numbers.
+- The terminal tokens (`list-width`, `list-step`, `list-min`, `preview-min`, `gutter`,
+  `selection-bar`) are the layout rules above in numbers.
 - The Mac and iOS apps hold the colours twice, in `app/shared/Brand.swift` for their views and
   in `app/macos/editor/src/editor.css` for the note; a Swift test and a node test compare each
   with `tokens.json`. They bundle `fonts/`, and the Mac app draws its icon from
