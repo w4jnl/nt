@@ -132,8 +132,11 @@ html { -webkit-text-size-adjust: 100%; }
 #editor .cm-link-broken { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
 
 /* where a search's words are, until the text changes or Escape: on-accent on accent, as the H1
-   band, so a hit shows at a glance; after the link rules, so a hit in a link keeps its colour */
-#editor .cm-hit { background: var(--accent); color: var(--on-accent); border-radius: 3px; }
+   band, so a hit shows at a glance. The spans CodeMirror nests inside the hit (a link, inline
+   code) take the same two colours, or the link's accent text and inline code's dark fill would
+   leave the hit a blank box. */
+#editor .cm-hit,
+#editor .cm-hit span { background: var(--accent); color: var(--on-accent); border-radius: 3px; }
 #editor .cm-url { color: var(--ink-muted); font-size: 0.9em; }
 
 #editor .cm-image { display: inline-block; width: 100%; margin: 8px 0 2px; }
