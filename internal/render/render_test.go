@@ -210,3 +210,63 @@ func TestImageAloneOnALineOfAParagraph(t *testing.T) {
 		}
 	}
 }
+
+func TestCodeBlockBreaksAtTheEdgeNotAtAWord(t *testing.T) {
+	r, err := New(40, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line1 := "CONTAINER ID  IMAGE                         COMMAND"
+	line2 := "0f927365796e  localhost/custom_atime_web:1.0  /run-httpd.sh"
+	out, err := r.Render([]byte("Before\n```sh\n" + line1 + "\n\n\t" + line2 + "\n```\nafter `x`\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []string
+	for _, l := range strings.Split(out, "\n") {
+		plain := strings.TrimRight(xansi.Strip(l), " ")
+		if strings.Contains(plain, "after") {
+			break
+		}
+		if strings.Contains(l, "48;2;") { // on the sunk background, 36 cells after the margin: 40 less the margins
+			if w := xansi.StringWidth(l); w != 38 {
+				t.Errorf("row %q is %d cells wide, want 38", plain, w)
+			}
+			rows = append(rows, strings.TrimPrefix(plain, "  "))
+		}
+	}
+	// the language at the top right, then each line broken at the 34th cell, the tab as four cells
+	want := []string{
+		"                                 sh",
+		" " + strings.TrimRight(line1[:34], " "),
+		" " + line1[34:],
+		"",
+		" " + "    " + line2[:30],
+		" " + line2[30:],
+	}
+	if strings.Join(rows, "\n") != strings.Join(want, "\n") {
+		t.Errorf("rows:\n%s\nwant:\n%s", strings.Join(rows, "\n"), strings.Join(want, "\n"))
+	}
+	plain := xansi.Strip(out)
+	if strings.Contains(plain, "```") || !strings.Contains(plain, "Before") || !strings.Contains(plain, "after") {
+		t.Errorf("the fences showed or the text around the block is missing:\n%s", plain)
+	}
+}
+
+func TestCodeBlocks(t *testing.T) {
+	body := []byte("p\n```sh\na\n```\ntext\n\n~~~~\nb\n~~~~~\n\n- item\n\n  ```\n  nested\n  ```\n\n```\nopen to the end\n")
+	got := codeBlocks(body)
+	want := []codeBlock{
+		{lang: "sh", code: "a\n", start: 2, end: 13},
+		{lang: "", code: "b\n", start: 20, end: 32},
+		{lang: "", code: "open to the end\n", start: 64, end: 83},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("block %d: got %+v (%q), want %+v", i, got[i], body[got[i].start:got[i].end], want[i])
+		}
+	}
+}

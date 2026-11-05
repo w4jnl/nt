@@ -162,6 +162,7 @@ html { -webkit-text-size-adjust: 100%; }
   line-height: 21px;
   background: var(--surface-sunk);
   padding: 0 16px !important;
+  word-break: break-all; /* a long line breaks at the block's edge, every line at the same column, as vim's wrap does: a table of output keeps its columns */
 }
 #editor .cm-code-first { padding-top: 10px !important; border-radius: 6px 6px 0 0; }
 #editor .cm-code-last { padding-bottom: 10px !important; border-radius: 0 0 6px 6px; }
