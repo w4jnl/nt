@@ -62,9 +62,7 @@ html, body { margin: 0; height: 100%; background: var(--ground); color: var(--in
 #editor .cm-scroller { font-family: inherit; line-height: inherit; }
 #editor .cm-content {
   box-sizing: border-box;
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 22px 40px 160px;
+  padding: 22px 40px 160px; /* the whole width, as the terminal and vim give the note */
   caret-color: var(--accent);
 }
 /* a phone: the column is the screen, with a phone's margins and text size */

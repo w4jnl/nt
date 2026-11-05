@@ -458,11 +458,13 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   the root. An agent report shows its machine where a note shows its day. In the order nt lists
   them (§4, Order): folders A to Z, then dated ones newest first; notes newest first with their
   day in mono; an agents day's digest first, then its sessions by when they began (`created`, in
-  `nt _editor index`), the latest first; journals by year; `assets/` hidden. Which folders are open is kept on the Mac (UserDefaults), never in the
-  repository. The sync state is at its foot as glyph and word, and a click syncs now; it stays
+  `nt _editor index`), the latest first; journals by year; `assets/` hidden. Folders start
+  closed, and only the ones the person opened stay open, kept on the Mac (UserDefaults), never
+  in the repository; opening a note does not open its folders. The sync state is at its foot as glyph and word, and a click syncs now; it stays
   out of the toolbar, which would draw it as a glass button. View › Hide Sidebar (⌃⌘S) or the
   toolbar's button hides the sidebar.
-- The note: a centred column, 680 px. The toolbar says where the note is (folders › title) and
+- The note: the view's whole width, 40 px inside its edges, as the terminal and vim give it.
+  The toolbar says where the note is (folders › title) and
   searches. At the bottom right, when the note last changed and from which machine, as the
   terminal says it under the note (§4), then the word count, on the ground so the note's last
   lines pass under it, not through it; a message at the bottom left when something did not work.

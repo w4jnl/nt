@@ -331,10 +331,7 @@ final class Workspace {
         note = n
         editor.load(n, text: text, anchor: anchor, line: line, end: end)
         selection = selectionFor(path)
-        recent = Self.remember(path, in: recent)
-        for dir in SidebarTree.ancestors(path) where !expanded.contains(dir) {
-            expanded.insert(dir)
-        }
+        recent = Self.remember(path, in: recent) // the folders stay as they are: only the person opens one
     }
 
     /// readOnly says whether a note is a digest, the day's or the week's, which nt writes again

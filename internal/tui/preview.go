@@ -18,10 +18,6 @@ import (
 	"github.com/w4jnl/nt/internal/theme"
 )
 
-// previewMax is the widest a note is wrapped (tokens.json terminal/preview-max): longer lines
-// are harder to read, so wider panes keep the extra width as margin.
-const previewMax = 100
-
 // imageDelay holds image data back until the frame that enters the alternate screen is drawn:
 // outside tmux the terminal keeps each screen's images apart. Bubble Tea draws a frame every
 // 1/60 s, so three frames is enough.
@@ -132,7 +128,7 @@ func (p *preview) render() {
 		if p.img != nil {
 			place = p.place
 		}
-		r, err := render.NewAt(min(p.width-2, previewMax), p.dark, p.rel)
+		r, err := render.NewAt(p.width-2, p.dark, p.rel) // the pane's whole width, as vim gives the note
 		if err == nil {
 			p.body, err = r.RenderImages(p.raw, place)
 		}
