@@ -132,10 +132,11 @@ struct NoteScreen: View {
             }
         }
         .background(Brand.ground)
+        .safeAreaInset(edge: .top) { if ws.finding { FindBar() } }
         .navigationTitle(ws.title(path))
         .navigationSubtitle(ws.changedLine(path) ?? "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { NoteMenu(path: path) }
+        .toolbar { NoteMenu(path: path, find: { ws.openFind() }) }
         .modifier(PhotoPicking())
         .task(id: path) {
             // a new note opens with the cursor at its end, the first time only
@@ -193,7 +194,8 @@ struct NoteDetail: View {
             return [folders, ws.changedLine(n.path) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
         } ?? "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { if let n = ws.note { NoteMenu(path: n.path) } }
+        .safeAreaInset(edge: .top) { if ws.finding { FindBar() } }
+        .toolbar { if let n = ws.note { NoteMenu(path: n.path, find: { ws.openFind() }) } }
         .modifier(PhotoPicking())
     }
 }
@@ -215,10 +217,13 @@ extension SidebarTree {
 /// NoteMenu is the note's ⋯: rename, move and delete.
 struct NoteMenu: ToolbarContent {
     let path: String
+    let find: () -> Void // shows the find bar
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button("Find in Note…", systemImage: "magnifyingglass", action: find)
+                Divider()
                 ItemMenu(path: path, folder: false)
             } label: {
                 Image(systemName: "ellipsis")

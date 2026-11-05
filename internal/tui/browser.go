@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -188,6 +189,7 @@ type browser struct {
 	input      *lineInput
 	inputKind  string // add, new, search, find, due, todo, todos, move, rename, mkdir
 	find       string // the last search's words, marked in every note shown until esc
+	hit        int    // which hit ctrl-f is on
 	searchSeq  int
 	searchStop context.CancelFunc
 
@@ -1124,6 +1126,15 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		}
 		b.pick = &picker{title: "search"}
 		return b.prompt("search", "search: ")
+	case "ctrl+f":
+		if b.showing == "" {
+			return nil
+		}
+		cmd := b.prompt("within", "find in note: ")
+		b.input.insert(b.find) // from the last search's words; ctrl-u clears them
+		b.hit = b.p.hitFrom()
+		b.noteHit()
+		return cmd
 	case "ctrl+p":
 		b.pick = &picker{title: "notes by title"}
 		b.prompt("find", "title: ")
@@ -1435,16 +1446,31 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "up", "ctrl+k":
+		if b.inputKind == "within" {
+			b.hit--
+			b.noteHit()
+			return nil
+		}
 		if b.pick != nil {
 			return b.pickMove(-1)
 		}
 		return nil
 	case "down", "ctrl+j", "tab":
+		if b.inputKind == "within" {
+			b.hit++
+			b.noteHit()
+			return nil
+		}
 		if b.pick != nil {
 			return b.pickMove(1)
 		}
 		return nil
 	case "enter":
+		if b.inputKind == "within" { // the next hit; esc closes the prompt, the marks stay
+			b.hit++
+			b.noteHit()
+			return nil
+		}
 		text := strings.TrimSpace(b.input.Value())
 		kind := b.inputKind
 		b.closeInput()
@@ -1508,6 +1534,11 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 
 func (b *browser) inputChanged() tea.Cmd {
 	switch b.inputKind {
+	case "within":
+		b.find = strings.TrimSpace(b.input.Value())
+		b.p.setFind(b.find)
+		b.hit = b.p.hitFrom()
+		b.noteHit()
 	case "search":
 		return b.runSearch(b.input.Value())
 	case "find":
@@ -1522,6 +1553,20 @@ func (b *browser) inputChanged() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// noteHit shows the hit ctrl-f is on and says which it is of how many on the prompt; "no match"
+// when the words are in no line, nothing when there are no words.
+func (b *browser) noteHit() {
+	at, of := b.p.showHit(b.hit)
+	switch {
+	case b.find == "":
+		b.input.note = ""
+	case of == 0:
+		b.input.note = "no match"
+	default:
+		b.input.note = fmt.Sprintf("%d of %d", at, of)
+	}
 }
 
 // runSearch starts rg for query after a short pause, so fast typing runs one search, not one

@@ -102,6 +102,13 @@ final class Workspace {
     var calendarDay = "" // the day the calendar shows; "" for today
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
+    // Find in the note on screen (FindBar): the words typed are marked as a search's are, and
+    // the page says which hit the cursor is on of how many.
+    var finding = false
+    var findText = ""
+    var findAt = 0
+    var findOf = 0
+    var findFocus = 0 // bumped to give the bar's field the keyboard again (⌘F while it is open)
     var editing = false // the note has the keyboard: the iPhone and iPad show the keyboard bar
     var undoable = false // the note has something to undo, or to redo, for the keyboard bar
     var redoable = false
@@ -304,6 +311,31 @@ final class Workspace {
     }
 
     /// go shows a note the person asked for: a link followed, a todo's note, a day's journal.
+    /// findCount is what the find bar says beside its field.
+    var findCount: String {
+        if findText.isEmpty { return "" }
+        return findOf == 0 ? "no match" : "\(findAt) of \(findOf)"
+    }
+
+    /// openFind shows the find bar, its field with the keyboard.
+    func openFind() {
+        finding = true
+        findFocus += 1
+    }
+
+    func findInNote(_ words: String) { editor?.find(words) }
+
+    func findStep(_ dir: Int) { editor?.findStep(dir) }
+
+    /// closeFind puts the bar away and takes the marks off the note.
+    func closeFind() {
+        finding = false
+        findText = ""
+        findAt = 0
+        findOf = 0
+        editor?.find("")
+    }
+
     func go(_ path: String, anchor: String = "", line: Int = 0, find: String = "") {
         if let navigate { navigate(path, anchor, line, false, find) } else { show(path, anchor: anchor, line: line, find: find) }
     }
@@ -330,6 +362,7 @@ final class Workspace {
         }
         let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
+        if finding { closeFind() } // another note: the bar goes with the one it was for
         editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
         selection = selectionFor(path)
         recent = Self.remember(path, in: recent)

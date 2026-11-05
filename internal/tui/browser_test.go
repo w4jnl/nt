@@ -1079,3 +1079,44 @@ func TestSearchWordsAreMarkedInTheNoteUntilEsc(t *testing.T) {
 		t.Errorf("esc left the marks: %q", b.find)
 	}
 }
+
+func TestFindInTheNoteWithCtrlF(t *testing.T) {
+	b := testBrowser(t, 120, t.TempDir())
+	note := "tech/2026-10-22-nas.md"
+	if err := os.WriteFile(b.v.Abs(note), []byte("# Setup\n\nThe nas box.\n\nA NAS rack.\n\nNo more.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.show(note)
+	b.key(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
+	if b.input == nil || b.inputKind != "within" {
+		t.Fatalf("ctrl-f opened no find prompt: %q", b.inputKind)
+	}
+	for _, r := range "nas" {
+		b.inputKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	if b.find != "nas" || b.input.note != "1 of 2" {
+		t.Errorf("after typing: find %q, note %q", b.find, b.input.note)
+	}
+	b.inputKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.input.note != "2 of 2" {
+		t.Errorf("enter: %q, want the next hit", b.input.note)
+	}
+	b.inputKey(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if b.input.note != "1 of 2" {
+		t.Errorf("enter at the end: %q, want round to the first", b.input.note)
+	}
+	for _, r := range "xx" {
+		b.inputKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	if b.input.note != "no match" {
+		t.Errorf("nasxx: %q", b.input.note)
+	}
+	b.inputKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.input != nil || b.find != "nasxx" {
+		t.Errorf("esc closed the prompt but the words should stay marked: input %v, find %q", b.input != nil, b.find)
+	}
+	b.key(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if b.find != "" {
+		t.Errorf("a second esc should take the marks off: %q", b.find)
+	}
+}

@@ -10,7 +10,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoD
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
 import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
-import { findField, frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
+import { findField, findHits, frontmatterRange, headingAt, hearingField, linkDests, livePreview, nextHit, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -105,6 +105,34 @@ function words(state) {
   return text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
+// goHit selects hit i of hits, scrolled to the middle, and tells the app which it is of how many.
+function goHit(i, hits) {
+  if (i < 0) {
+    post({ type: "find", at: 0, of: hits.length });
+    return;
+  }
+  const [a, b] = hits[i];
+  view.dispatch({ selection: { anchor: a, head: b }, effects: EditorView.scrollIntoView(a, { y: "center" }) });
+  post({ type: "find", at: i + 1, of: hits.length });
+}
+
+// findIn marks words in the note and goes to the first hit at or after the cursor.
+function findIn(words) {
+  view.dispatch({ effects: setFind.of(words) });
+  const hits = words ? findHits(view.state.doc.toString(), words) : [];
+  const from = view.state.selection.main.from;
+  let i = hits.findIndex(([a]) => a >= from);
+  if (i < 0 && hits.length) i = 0;
+  goHit(i, hits);
+}
+
+// findStep goes to the next hit (dir > 0) or the one before, round the ends.
+function findStep(dir) {
+  const words = view.state.field(findField);
+  const hits = words ? findHits(view.state.doc.toString(), words) : [];
+  goHit(nextHit(hits, view.state.selection.main.from, dir), hits);
+}
+
 // clearFind takes the search's marks off the note; false when there are none, so Escape goes on.
 function clearFind(v) {
   if (!v.state.field(findField)) return false;
@@ -184,8 +212,10 @@ window.nt = {
     reportHistory();
   },
   line: goLine,
-  // find marks a search's words in the note, "" takes the marks off.
-  find: (words) => view.dispatch({ effects: setFind.of(words) }),
+  // find marks words in the note and goes to the first hit from the cursor, "" takes the marks
+  // off; findStep goes to the next hit or the one before. Both answer {type: "find", at, of}.
+  find: findIn,
+  findStep,
   backlinks(list) {
     view.dispatch({ effects: setBacklinks.of(list) });
   },

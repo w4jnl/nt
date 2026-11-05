@@ -95,6 +95,50 @@ func (p *preview) setFind(words string) {
 	p.find = re
 }
 
+// hits is each place the search's words occur in the note: the row of each, one entry a match,
+// in order; none without words.
+func (p *preview) hits() []int {
+	if p.find == nil {
+		return nil
+	}
+	var rows []int
+	for i, l := range p.lines {
+		if isImageRow(l) {
+			continue
+		}
+		for range p.find.FindAllStringIndex(ansi.Strip(l), -1) {
+			rows = append(rows, i)
+		}
+	}
+	return rows
+}
+
+// showHit scrolls so hit i (round the ends) is the second row on screen and says which it is
+// of how many; 0 of 0 with none.
+func (p *preview) showHit(i int) (at, of int) {
+	h := p.hits()
+	if len(h) == 0 {
+		return 0, 0
+	}
+	i = ((i % len(h)) + len(h)) % len(h)
+	p.vp.SetYOffset(max(0, h[i]-1))
+	return i + 1, len(h)
+}
+
+// hitFrom is the first hit on or under the top of the screen, else the first; -1 with none.
+func (p *preview) hitFrom() int {
+	h := p.hits()
+	for i, r := range h {
+		if r >= p.vp.YOffset() {
+			return i
+		}
+	}
+	if len(h) > 0 {
+		return 0
+	}
+	return -1
+}
+
 // markHits is row with each place the search's words occur in ink on accent-soft.
 func markHits(row string, re *regexp.Regexp, st lipgloss.Style) string {
 	plain := ansi.Strip(row)

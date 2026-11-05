@@ -175,6 +175,7 @@ Decisions taken with the user (2026-10-26):
 | `n` | Title prompt, then a note in the current folder, opened in nvim |
 | `/` | Live `rg --json` search over the notes' lines, task lines left out (they are the todos'); `#tag` keeps to the notes with that tag. In the todos, or on the home list's Todos row, `/` searches the todos instead |
 | `ctrl-p` | Fuzzy title search |
+| `ctrl-f` | Find in the note on screen: the words typed are marked as a search's are and the note scrolls to the first hit from the top of the screen; the prompt says `2 of 7` or `no match`; Enter, `↓` the next hit, `↑` the one before, round the ends; Escape closes the prompt and keeps the marks, a second Escape takes them off. It starts from the last search's words (ctrl-u clears them) |
 | `e` | Open in nvim at the current line via `tea.ExecProcess`; reload on return. fsnotify also reloads live. |
 | `l` | Link picker; then follow the link |
 | `f` | Label the links on screen with letters; typing a label follows its link (a click on a link follows it too) |
@@ -205,7 +206,7 @@ Decisions taken with the user (2026-10-26):
 - Deleting is plain: the files go, sync commits it, git keeps them. Other notes' links to a deleted note stay (the question says how many there are).
 - Relative links in the preview are shown as repository paths (`tech/2026-10-26-nas.md`), the form `nt view` and `nt ls` take.
 
-**The viewer** (`nt view <file>`, `nt <file>`). One file on the whole screen: the brand line with its title and path, the file, a footer with the keys and the scroll position. It needs no repository; links are shown from the repository when the file is in it, else from the working folder. A markdown file is rendered as in the browser's preview; any other text file is shown as written, line by line, wrapped only at the edge, with escape sequences and control characters left out; a file with a NUL byte in its first 8 KB is refused, as git and grep tell binary files. It takes the browser's reading keys: `f` and a label or a click follow a link (a note or a `.txt` file opens in the viewer, an image in `image_viewer` as `i` does, anything else, a folder or a URL with the OS), `b` goes back (at most 50), `o` and `i` list the outline and the images in the file's place, the mouse selects text and `y` copies it (else the path), `e` edits, `r` reloads, `q` or esc quits. It polls the file once a second and shows it again when it changes and nothing is selected.
+**The viewer** (`nt view <file>`, `nt <file>`). One file on the whole screen: the brand line with its title and path, the file, a footer with the keys and the scroll position. It needs no repository; links are shown from the repository when the file is in it, else from the working folder. A markdown file is rendered as in the browser's preview; any other text file is shown as written, line by line, wrapped only at the edge, with escape sequences and control characters left out; a file with a NUL byte in its first 8 KB is refused, as git and grep tell binary files. It takes the browser's reading keys: `f` and a label or a click follow a link (a note or a `.txt` file opens in the viewer, an image in `image_viewer` as `i` does, anything else, a folder or a URL with the OS), `b` goes back (at most 50), `o` and `i` list the outline and the images in the file's place, `ctrl-f` finds in the file as the browser's does, the mouse selects text and `y` copies it (else the path), `e` edits, `r` reloads, `q` or esc quits. It polls the file once a second and shows it again when it changes and nothing is selected.
 
 - `nt paste` reads the clipboard with the OS: AppKit through `osascript` on macOS (a file copied in Finder, else PNG, else TIFF made PNG), `wl-paste` or `xclip` on Linux. A copied image file keeps its type and name; image data becomes PNG named `image` unless `--name` says otherwise. It writes under the repository lock and prints only the markdown line, so an editor can insert it.
 
@@ -567,6 +568,11 @@ rendered text.
   the nvim plugin do. A journal line's `HH:MM` is mono too.
 - Editing is CodeMirror's: its own undo history (Edit › Undo goes to it), Return continuing a
   list or a task, Tab indenting.
+- Find in Note (Edit menu, ⌘F): a bar above the note, a field like the sidebar's Open field,
+  `2 of 7` or `no match` in mono beside it, `‹` `›` and `×`. The words typed are marked in the
+  note as a search's are and the cursor goes to the first hit from where it was; Return the next,
+  ⇧Return the one before, round the ends; Escape or `×` closes the bar and takes the marks off.
+  Another note closes it.
 - An image pasted or dropped on the note goes to `nt paste <note> --from <file>`: it is saved as
   `assets/YYYY-MM-DD-<name>.<ext>` beside the note, named after its file, and its line goes on a
   line of its own at the cursor or where it was dropped.
@@ -647,7 +653,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - Today, Todos with the open and late counts, Calendar, Weekly, Agents;
   - the pinned folders, then the folders;
   - search: titles, then the lines that match, task lines left out (Todos finds those); a line
-    opens its note with the words marked, as on the Mac;
+    opens its note with the words marked, as on the Mac; Find in Note… in the note's menu is the
+    Mac's find bar (§8) above the note, Return the next hit;
   - the sync state at the foot, as glyph and word; a tap syncs.
 - **The note** is the Mac app's editor page in a `WKWebView`.
   - It has a narrower column and margins under 600 pt.

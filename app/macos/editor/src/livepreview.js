@@ -77,6 +77,18 @@ export function findHits(text, words) {
   return out;
 }
 
+// nextHit is the hit to go to from pos among hits: forward (dir > 0) the first that starts
+// after pos, back the last that starts before it, round the ends; -1 with none.
+export function nextHit(hits, pos, dir) {
+  if (!hits.length) return -1;
+  if (dir > 0) {
+    const i = hits.findIndex(([a]) => a > pos);
+    return i < 0 ? 0 : i;
+  }
+  for (let i = hits.length - 1; i >= 0; i--) if (hits[i][0] < pos) return i;
+  return hits.length - 1;
+}
+
 // noteField is what the preview knows besides the text: the note's repository path, its broken
 // links, the focus and focus mode, and whether the screen is touched rather than clicked.
 export const noteField = StateField.define({
