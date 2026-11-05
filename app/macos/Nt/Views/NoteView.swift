@@ -6,35 +6,38 @@ struct NoteView: View {
     @Environment(Workspace.self) private var ws
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if let editor = ws.editor {
-                EditorView(editor: editor)
-            }
-            HStack(alignment: .bottom) {
-                if !ws.flash.isEmpty {
-                    Text(ws.flash)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Brand.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Brand.surface, in: Capsule())
-                        .overlay(Capsule().stroke(Brand.line))
-                        .transition(.opacity)
+        VStack(spacing: 0) {
+            if ws.finding { FindBar() } // Edit › Find in Note (⌘F)
+            ZStack(alignment: .bottom) {
+                if let editor = ws.editor {
+                    EditorView(editor: editor)
                 }
-                Spacer()
-                if let n = ws.note {
-                    Text(status(n))
-                        .font(Brand.mono(11))
-                        .foregroundStyle(Brand.muted)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Brand.ground, in: RoundedRectangle(cornerRadius: 6)) // over the note's last lines, not through them
-                        .help(n.readOnly ? "A digest: nt writes it again whenever its notes change, so edits would not last." : "")
+                HStack(alignment: .bottom) {
+                    if !ws.flash.isEmpty {
+                        Text(ws.flash)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Brand.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Brand.surface, in: Capsule())
+                            .overlay(Capsule().stroke(Brand.line))
+                            .transition(.opacity)
+                    }
+                    Spacer()
+                    if let n = ws.note {
+                        Text(status(n))
+                            .font(Brand.mono(11))
+                            .foregroundStyle(Brand.muted)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Brand.ground, in: RoundedRectangle(cornerRadius: 6)) // over the note's last lines, not through them
+                            .help(n.readOnly ? "A digest: nt writes it again whenever its notes change, so edits would not last." : "")
+                    }
                 }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 10)
+                .animation(.easeOut(duration: 0.2), value: ws.flash)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 10)
-            .animation(.easeOut(duration: 0.2), value: ws.flash)
         }
         .background(Brand.ground)
         .navigationTitle("")

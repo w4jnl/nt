@@ -102,6 +102,13 @@ final class Workspace {
     var calendarDay = "" // the day the calendar shows; "" for today
     var flash = "" // one line for the person: what went wrong, or where a link pointed
     var words = 0
+    // Find in the note on screen (FindBar): the words typed are marked as a search's are, and
+    // the page says which hit the cursor is on of how many.
+    var finding = false
+    var findText = ""
+    var findAt = 0
+    var findOf = 0
+    var findFocus = 0 // bumped to give the bar's field the keyboard again (⌘F while it is open)
     var editing = false // the note has the keyboard: the iPhone and iPad show the keyboard bar
     var undoable = false // the note has something to undo, or to redo, for the keyboard bar
     var redoable = false
@@ -129,7 +136,7 @@ final class Workspace {
 
     /// navigate shows a note the person asked for on the iPhone: a screen of its own on the
     /// stack, so Back returns. Unset, on the Mac and the iPad, the note opens in place.
-    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int, _ end: Bool) -> Void)?
+    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int, _ end: Bool, _ find: String) -> Void)?
     /// relocated and removed keep the iPhone's screens on what they showed after a move, a
     /// rename or a delete: a screen follows its note or folder, or goes with it.
     @ObservationIgnored var relocated: ((_ from: String, _ to: String) -> Void)?
@@ -299,16 +306,42 @@ final class Workspace {
 
     /// show puts the note at path on screen, scrolled to a heading's anchor or to a line; end
     /// puts the cursor at its end, for a note just made. The note on screen is saved first.
-    func show(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) {
-        Task { await open(path, anchor: anchor, line: line, end: end, reload: reload) }
+    func show(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") {
+        Task { await open(path, anchor: anchor, line: line, end: end, reload: reload, find: find) }
     }
 
     /// go shows a note the person asked for: a link followed, a todo's note, a day's journal.
-    func go(_ path: String, anchor: String = "", line: Int = 0) {
-        if let navigate { navigate(path, anchor, line, false) } else { show(path, anchor: anchor, line: line) }
+    /// findCount is what the find bar says beside its field.
+    var findCount: String {
+        if findText.isEmpty { return "" }
+        return findOf == 0 ? "no match" : "\(findAt) of \(findOf)"
     }
 
-    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) async {
+    /// openFind shows the find bar, its field with the keyboard.
+    func openFind() {
+        finding = true
+        findFocus += 1
+    }
+
+    func findInNote(_ words: String) { editor?.find(words) }
+
+    func findStep(_ dir: Int) { editor?.findStep(dir) }
+
+    /// closeFind puts the bar away and takes the marks off the note.
+    func closeFind() {
+        finding = false
+        findText = ""
+        findAt = 0
+        findOf = 0
+        editor?.find("")
+    }
+
+    func go(_ path: String, anchor: String = "", line: Int = 0, find: String = "") {
+        if let navigate { navigate(path, anchor, line, false, find) } else { show(path, anchor: anchor, line: line, find: find) }
+    }
+
+    /// find is a search's words, marked in the note (the editor page's findField).
+    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") async {
         guard let root, let editor else { return }
         opening += 1
         let mine = opening
@@ -329,7 +362,8 @@ final class Workspace {
         }
         let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
-        editor.load(n, text: text, anchor: anchor, line: line, end: end)
+        if finding { closeFind() } // another note: the bar goes with the one it was for
+        editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
         selection = selectionFor(path)
         recent = Self.remember(path, in: recent) // the folders stay as they are: only the person opens one
     }
@@ -598,7 +632,7 @@ final class Workspace {
             if !folder.isEmpty { args.append(folder) }
             let c = try await nt.json(Created.self, args)
             await afterWrite()
-            if let navigate { navigate(c.rel, "", 0, true) } else { await open(c.rel, end: true) }
+            if let navigate { navigate(c.rel, "", 0, true, "") } else { await open(c.rel, end: true) }
         } catch {
             say(error.localizedDescription)
         }

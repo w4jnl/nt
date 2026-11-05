@@ -212,7 +212,7 @@ struct HomeList: View {
         if !lines.isEmpty {
             Section("Lines") {
                 ForEach(lines.prefix(50), id: \.self) { hit in
-                    result(hit.path, line: hit.line) {
+                    result(hit.path, line: hit.line, find: query) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(hit.text.trimmingCharacters(in: .whitespaces)).foregroundStyle(Brand.ink).lineLimit(2)
                             Text("\(ws.title(hit.path)) · \(hit.line)").font(Brand.mono(12)).foregroundStyle(Brand.muted)
@@ -228,11 +228,11 @@ struct HomeList: View {
     }
 
     @ViewBuilder
-    private func result(_ path: String, line: Int, @ViewBuilder label: () -> some View) -> some View {
+    private func result(_ path: String, line: Int, find: String = "", @ViewBuilder label: () -> some View) -> some View {
         if stacked {
-            NavigationLink(value: Route.note(path, line: line)) { label() }
+            NavigationLink(value: Route.note(path, line: line, find: find)) { label() }
         } else {
-            Button { ws.go(path, line: line) } label: { label() }
+            Button { ws.go(path, line: line, find: find) } label: { label() }
         }
     }
 

@@ -56,10 +56,13 @@ type viewer struct {
 	height    int
 	message   string
 	alert     bool
-	history   []visit // the files links were followed from, for b; rel is the file's path
-	hinted    string  // the letters typed after f so far
-	selecting bool    // the mouse is down on the note, selecting text
-	pick      *picker // the outline or the images, in the note's place
+	history   []visit    // the files links were followed from, for b; rel is the file's path
+	hinted    string     // the letters typed after f so far
+	selecting bool       // the mouse is down on the note, selecting text
+	pick      *picker    // the outline or the images, in the note's place
+	input     *lineInput // ctrl-f's prompt, nil when closed
+	find      string     // its words, marked in the note until esc
+	hit       int        // which hit ctrl-f is on
 }
 
 type editedMsg struct{ err error }
@@ -136,6 +139,10 @@ func (m *viewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pick != nil {
 			return m, m.pickKey(msg)
 		}
+		if m.input != nil {
+			m.inputKey(msg)
+			return m, nil
+		}
 		if cmd, ok := m.key(msg); ok {
 			return m, cmd
 		}
@@ -151,11 +158,19 @@ func (m *viewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *viewer) key(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	switch k.String() {
 	case "esc":
-		if m.p.mark != nil {
+		if m.p.mark != nil || m.find != "" {
 			m.p.mark = nil
+			m.find = ""
+			m.p.setFind("")
 			return nil, true
 		}
 		return tea.Quit, true
+	case "ctrl+f":
+		m.input = &lineInput{prompt: "find in note: "}
+		m.input.insert(m.find)
+		m.hit = m.p.hitFrom()
+		m.noteHit()
+		return nil, true
 	case "q", "ctrl+c":
 		return tea.Quit, true
 	case "e":
@@ -193,6 +208,41 @@ func (m *viewer) key(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		return copyText(m.p.path), true
 	}
 	return nil, false
+}
+
+// inputKey is a key while ctrl-f's prompt is open: the text finds as it is typed, enter and the
+// arrows go from hit to hit, esc closes the prompt and keeps the marks (as the browser's ctrl-f).
+func (m *viewer) inputKey(k tea.KeyPressMsg) {
+	switch k.String() {
+	case "esc", "ctrl+c":
+		m.input = nil
+	case "enter", "down", "ctrl+j", "tab":
+		m.hit++
+		m.noteHit()
+	case "up", "ctrl+k":
+		m.hit--
+		m.noteHit()
+	default:
+		if m.input.key(k) {
+			m.find = strings.TrimSpace(m.input.Value())
+			m.p.setFind(m.find)
+			m.hit = m.p.hitFrom()
+			m.noteHit()
+		}
+	}
+}
+
+// noteHit shows the hit ctrl-f is on and says which it is of how many on the prompt.
+func (m *viewer) noteHit() {
+	at, of := m.p.showHit(m.hit)
+	switch {
+	case m.find == "":
+		m.input.note = ""
+	case of == 0:
+		m.input.note = "no match"
+	default:
+		m.input.note = fmt.Sprintf("%d of %d", at, of)
+	}
 }
 
 // hintKey takes the letters of a label: a whole one follows its link, esc or a letter no label
@@ -460,6 +510,9 @@ func (m *viewer) brandLine() string {
 // footer is the bottom row: keys in accent with their verb in ink-muted, and at the right the
 // last message and the scroll position.
 func (m *viewer) footer() string {
+	if m.input != nil {
+		return pad(lipgloss.NewStyle().Background(m.pal.Surface).Render(" ")+m.input.View(m.st, m.pal, m.width-1), m.width)
+	}
 	var left string
 	switch {
 	case m.p.hints != nil:
@@ -469,7 +522,7 @@ func (m *viewer) footer() string {
 	case m.p.mark != nil && !m.p.mark.empty():
 		left = hints(m.st, "y", "copy", "esc", "clear", "drag", "select more")
 	default:
-		left = hints(m.st, "f", "follow", "b", "back", "o", "outline", "i", "images", "y", "copy", "e", "edit", "q", "quit")
+		left = hints(m.st, "f", "follow", "b", "back", "o", "outline", "i", "images", "^f", "find", "y", "copy", "e", "edit", "q", "quit")
 	}
 	left = " " + left
 	right := m.st.Muted.Render(fmt.Sprintf("%3.0f%%", m.p.vp.ScrollPercent()*100)) + " "

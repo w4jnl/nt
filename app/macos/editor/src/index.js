@@ -10,7 +10,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoD
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
 import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
-import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocus, setFocusMode, setHearing } from "./livepreview.js";
+import { findField, findHits, frontmatterRange, headingAt, hearingField, linkDests, livePreview, nextHit, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -33,7 +33,7 @@ function extensions(path, readOnly) {
   return [
     noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([{ key: "Escape", run: clearFind }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
@@ -42,6 +42,7 @@ function extensions(path, readOnly) {
     ),
     livePreview,
     hearingField,
+    findField,
     EditorView.updateListener.of(changed),
     EditorView.updateListener.of((u) => {
       if (u.focusChanged) post({ type: "focus", on: u.view.hasFocus });
@@ -104,6 +105,41 @@ function words(state) {
   return text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
+// goHit selects hit i of hits, scrolled to the middle, and tells the app which it is of how many.
+function goHit(i, hits) {
+  if (i < 0) {
+    post({ type: "find", at: 0, of: hits.length });
+    return;
+  }
+  const [a, b] = hits[i];
+  view.dispatch({ selection: { anchor: a, head: b }, effects: EditorView.scrollIntoView(a, { y: "center" }) });
+  post({ type: "find", at: i + 1, of: hits.length });
+}
+
+// findIn marks words in the note and goes to the first hit at or after the cursor.
+function findIn(words) {
+  view.dispatch({ effects: setFind.of(words) });
+  const hits = words ? findHits(view.state.doc.toString(), words) : [];
+  const from = view.state.selection.main.from;
+  let i = hits.findIndex(([a]) => a >= from);
+  if (i < 0 && hits.length) i = 0;
+  goHit(i, hits);
+}
+
+// findStep goes to the next hit (dir > 0) or the one before, round the ends.
+function findStep(dir) {
+  const words = view.state.field(findField);
+  const hits = words ? findHits(view.state.doc.toString(), words) : [];
+  goHit(nextHit(hits, view.state.selection.main.from, dir), hits);
+}
+
+// clearFind takes the search's marks off the note; false when there are none, so Escape goes on.
+function clearFind(v) {
+  if (!v.state.field(findField)) return false;
+  v.dispatch({ effects: setFind.of("") });
+  return true;
+}
+
 // goLine puts the cursor at the start of line n, from a search, so typing starts at what was
 // found, and scrolls it to the middle.
 function goLine(n) {
@@ -157,15 +193,15 @@ function dropped(e, v) {
 
 window.nt = {
   // load shows a note: {doc, path, readOnly, backlinks: [{path, title, folder}], anchor, line,
-  // end (put the cursor at the end and take the keyboard)}.
-  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false }) {
+  // end (put the cursor at the end and take the keyboard), find (a search's words, marked)}.
+  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false, find = "" }) {
     view.setState(EditorState.create({ doc: normalize(doc), extensions: extensions(path, readOnly) }));
     base = view.state.doc.toString();
     pending = ChangeSet.empty(base.length);
     inflight = null;
     // The new state starts unfocused; when the editor already has the keyboard (another note was
     // being edited) no focus event will come, so say so now, or no line would show its markdown.
-    view.dispatch({ effects: [setBacklinks.of(backlinks), setFocus.of(view.hasFocus)] });
+    view.dispatch({ effects: [setBacklinks.of(backlinks), setFocus.of(view.hasFocus), setFind.of(find)] });
     view.scrollDOM.scrollTop = 0;
     if (end) {
       view.dispatch({ selection: { anchor: view.state.doc.length }, scrollIntoView: true });
@@ -176,6 +212,10 @@ window.nt = {
     reportHistory();
   },
   line: goLine,
+  // find marks words in the note and goes to the first hit from the cursor, "" takes the marks
+  // off; findStep goes to the next hit or the one before. Both answer {type: "find", at, of}.
+  find: findIn,
+  findStep,
   backlinks(list) {
     view.dispatch({ effects: setBacklinks.of(list) });
   },

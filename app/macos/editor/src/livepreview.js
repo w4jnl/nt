@@ -37,6 +37,58 @@ export const hearingField = StateField.define({
     }),
 });
 
+// setFind gives the words a search found, "" when none. findField marks each place they occur,
+// in cm-hit (on accent-soft), until the text changes or Escape clears them.
+export const setFind = StateEffect.define();
+export const findField = StateField.define({
+  create: () => "",
+  update(v, tr) {
+    if (tr.docChanged) v = "";
+    for (const e of tr.effects) if (e.is(setFind)) v = e.value;
+    return v;
+  },
+  provide: (f) =>
+    EditorView.decorations.compute([f], (state) => {
+      const words = state.field(f);
+      if (!words) return Decoration.none;
+      const hit = Decoration.mark({ class: "cm-hit" });
+      return Decoration.set(findHits(state.doc.toString(), words).map(([a, b]) => hit.range(a, b)));
+    }),
+});
+
+// findHits is where words occur in text, [from, to] each, as rg finds them: a regular
+// expression, case ignored unless it has a capital; one that is no regular expression is taken
+// as written. #tag words keep a search to notes, so they are left out.
+export function findHits(text, words) {
+  const w = words
+    .split(/\s+/)
+    .filter((x) => x && !/^#\p{L}/u.test(x))
+    .join(" ");
+  if (!w) return [];
+  const flags = /\p{Lu}/u.test(w) ? "gu" : "giu";
+  let re;
+  try {
+    re = new RegExp(w, flags);
+  } catch {
+    re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+  }
+  const out = [];
+  for (const m of text.matchAll(re)) if (m[0]) out.push([m.index, m.index + m[0].length]);
+  return out;
+}
+
+// nextHit is the hit to go to from pos among hits: forward (dir > 0) the first that starts
+// after pos, back the last that starts before it, round the ends; -1 with none.
+export function nextHit(hits, pos, dir) {
+  if (!hits.length) return -1;
+  if (dir > 0) {
+    const i = hits.findIndex(([a]) => a > pos);
+    return i < 0 ? 0 : i;
+  }
+  for (let i = hits.length - 1; i >= 0; i--) if (hits[i][0] < pos) return i;
+  return hits.length - 1;
+}
+
 // noteField is what the preview knows besides the text: the note's repository path, its broken
 // links, the focus and focus mode, and whether the screen is touched rather than clicked.
 export const noteField = StateField.define({

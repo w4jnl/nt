@@ -17,6 +17,7 @@ type lineInput struct {
 	prompt string
 	value  []rune
 	pos    int
+	note   string // muted, after the text: a find's "2 of 7"
 }
 
 func (in *lineInput) Value() string { return string(in.value) }
@@ -83,10 +84,14 @@ func (in *lineInput) View(st theme.Styles, pal theme.Palette, width int) string 
 	if in.pos < len(in.value) {
 		at, after = string(in.value[in.pos]), string(in.value[in.pos+1:])
 	}
-	room := width - ansi.StringWidth(in.prompt) - 3
+	note := ""
+	if in.note != "" {
+		note = st.Muted.Background(pal.Surface).Render("  " + in.note)
+	}
+	room := width - ansi.StringWidth(in.prompt) - ansi.StringWidth(note) - 3
 	for ansi.StringWidth(before)+1 > room && before != "" { // keep the cursor on screen
 		before = string([]rune(before)[1:])
 	}
 	line := st.Key.Background(pal.Surface).Render(in.prompt) + text.Render(before) + cursor.Render(at) + text.Render(after)
-	return ansi.Truncate(line, width-1, "")
+	return ansi.Truncate(line, width-1-ansi.StringWidth(note), "") + note
 }

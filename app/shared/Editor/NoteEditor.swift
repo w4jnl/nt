@@ -66,7 +66,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
     /// load shows a note: its text, where it is, who links to it; end puts the cursor at its end
     /// and gives it the keyboard, as for a note just made.
-    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false) {
+    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "") {
         let payload: [String: Any] = [
             "doc": text,
             "path": note.path,
@@ -74,6 +74,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             "anchor": anchor,
             "line": line,
             "end": end,
+            "find": find,
             "backlinks": Self.backlinks(note.backlinks),
         ]
         page("window.nt.load(p)", ["p": payload])
@@ -89,6 +90,17 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
     func go(to line: Int) {
         page("window.nt.line(n)", ["n": line])
+    }
+
+    /// find marks words in the note and goes to the first hit from the cursor; "" takes the
+    /// marks off. findStep goes to the next hit, or the one before with dir < 0. The page
+    /// answers with which hit it is of how many (ws.findAt, ws.findOf).
+    func find(_ words: String) {
+        page("window.nt.find(w)", ["w": words])
+    }
+
+    func findStep(_ dir: Int) {
+        page("window.nt.findStep(d)", ["d": dir])
     }
 
     /// zoom sets the note's text size, the page's zoom.
@@ -292,6 +304,9 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             if let q = body["query"] as? String { ws.find(q) }
         case "stats":
             ws.words = body["words"] as? Int ?? 0
+        case "find":
+            ws.findAt = body["at"] as? Int ?? 0
+            ws.findOf = body["of"] as? Int ?? 0
         case "focus":
             ws.editing = body["on"] as? Bool ?? false
             #if os(iOS)

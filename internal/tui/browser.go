@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -131,6 +132,7 @@ type pickItem struct {
 	target      string // repository path, URL or file
 	line        int
 	text        string     // a heading or matched text to scroll to
+	find        string     // a search's words, marked in the note it opens
 	todo        *todo.Item // a row of the todo list
 }
 
@@ -186,6 +188,8 @@ type browser struct {
 	pick       *picker
 	input      *lineInput
 	inputKind  string // add, new, search, find, due, todo, todos, move, rename, mkdir
+	find       string // the last search's words, marked in every note shown until esc
+	hit        int    // which hit ctrl-f is on
 	searchSeq  int
 	searchStop context.CancelFunc
 
@@ -232,6 +236,7 @@ type (
 		todos []todo.Item
 	}
 	searchMsg struct {
+		words   string // the query without its #tag words
 		seq     int
 		matches []search.Match
 		err     error
@@ -533,6 +538,7 @@ func (b *browser) show(rel string) tea.Cmd {
 	b.showing = rel
 	b.p.open(b.v.Abs(rel), path.Dir(rel))
 	b.p.extra = b.linkedFrom(rel)
+	b.p.setFind(b.find)
 	b.p.render()
 	return b.p.sendImages()
 }
@@ -698,6 +704,9 @@ func (b *browser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		it := b.pick.items[b.pick.sel]
 		if _, err := os.Stat(b.v.Abs(it.target)); err != nil {
 			return b, nil
+		}
+		if it.find != "" {
+			b.find = it.find
 		}
 		cmd := b.show(it.target)
 		b.scrollTo(it)
@@ -1022,8 +1031,10 @@ func (b *browser) poll() tea.Cmd {
 
 func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 	s := k.String()
-	if s == "esc" && b.p.mark != nil {
+	if s == "esc" && (b.p.mark != nil || b.find != "") {
 		b.p.mark = nil
+		b.find = ""
+		b.p.setFind("")
 		return nil
 	}
 	if b.focus == onPreview {
@@ -1115,6 +1126,15 @@ func (b *browser) key(k tea.KeyPressMsg) tea.Cmd {
 		}
 		b.pick = &picker{title: "search"}
 		return b.prompt("search", "search: ")
+	case "ctrl+f":
+		if b.showing == "" {
+			return nil
+		}
+		cmd := b.prompt("within", "find in note: ")
+		b.input.insert(b.find) // from the last search's words; ctrl-u clears them
+		b.hit = b.p.hitFrom()
+		b.noteHit()
+		return cmd
 	case "ctrl+p":
 		b.pick = &picker{title: "notes by title"}
 		b.prompt("find", "title: ")
@@ -1426,16 +1446,31 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "up", "ctrl+k":
+		if b.inputKind == "within" {
+			b.hit--
+			b.noteHit()
+			return nil
+		}
 		if b.pick != nil {
 			return b.pickMove(-1)
 		}
 		return nil
 	case "down", "ctrl+j", "tab":
+		if b.inputKind == "within" {
+			b.hit++
+			b.noteHit()
+			return nil
+		}
 		if b.pick != nil {
 			return b.pickMove(1)
 		}
 		return nil
 	case "enter":
+		if b.inputKind == "within" { // the next hit; esc closes the prompt, the marks stay
+			b.hit++
+			b.noteHit()
+			return nil
+		}
 		text := strings.TrimSpace(b.input.Value())
 		kind := b.inputKind
 		b.closeInput()
@@ -1499,6 +1534,11 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 
 func (b *browser) inputChanged() tea.Cmd {
 	switch b.inputKind {
+	case "within":
+		b.find = strings.TrimSpace(b.input.Value())
+		b.p.setFind(b.find)
+		b.hit = b.p.hitFrom()
+		b.noteHit()
 	case "search":
 		return b.runSearch(b.input.Value())
 	case "find":
@@ -1515,6 +1555,20 @@ func (b *browser) inputChanged() tea.Cmd {
 	return nil
 }
 
+// noteHit shows the hit ctrl-f is on and says which it is of how many on the prompt; "no match"
+// when the words are in no line, nothing when there are no words.
+func (b *browser) noteHit() {
+	at, of := b.p.showHit(b.hit)
+	switch {
+	case b.find == "":
+		b.input.note = ""
+	case of == 0:
+		b.input.note = "no match"
+	default:
+		b.input.note = fmt.Sprintf("%d of %d", at, of)
+	}
+}
+
 // runSearch starts rg for query after a short pause, so fast typing runs one search, not one
 // per key; a newer search cancels the one running.
 func (b *browser) runSearch(query string) tea.Cmd {
@@ -1526,12 +1580,13 @@ func (b *browser) runSearch(query string) tea.Cmd {
 	ctx, stop := context.WithCancel(context.Background())
 	b.searchStop = stop
 	root := b.v.Root
+	_, words := search.Split(query)
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
 		if strings.TrimSpace(query) == "" || ctx.Err() != nil {
 			return searchMsg{seq: seq}
 		}
 		m, err := search.Search(ctx, root, query)
-		return searchMsg{seq: seq, matches: m, err: err}
+		return searchMsg{seq: seq, matches: m, err: err, words: words}
 	})
 }
 
@@ -1547,7 +1602,7 @@ func (b *browser) searched(msg searchMsg) tea.Cmd {
 		if todo.IsTask(m.Text) {
 			continue // a task line is the todo view's to find (/ there)
 		}
-		items = append(items, pickItem{label: strings.TrimSpace(m.Text), hint: m.Path, kind: "note", target: m.Path, line: m.Line})
+		items = append(items, pickItem{label: strings.TrimSpace(m.Text), hint: m.Path, kind: "note", target: m.Path, line: m.Line, find: msg.words})
 		if len(items) >= 500 {
 			break
 		}
@@ -1725,6 +1780,9 @@ func (b *browser) choose() tea.Cmd {
 			return nil
 		}
 		b.cal = nil // a todo picked from a day of the calendar: its note, in the list
+		if it.find != "" {
+			b.find = it.find
+		}
 		cmd := b.reveal(it.target)
 		b.scrollTo(it)
 		return cmd

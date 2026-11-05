@@ -45,6 +45,11 @@ struct NtApp: App {
                 Toggle("Focus Mode", isOn: Binding(get: { workspace.focusMode }, set: { _ in workspace.toggleFocus() }))
                     .keyboardShortcut("l", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .textEditing) {
+                Button("Find in Note…") { workspace.openFind() }
+                    .keyboardShortcut("f")
+                    .disabled(workspace.note == nil)
+            }
             // one group: a group placed after .newItem is dropped once .newItem is replaced
             CommandGroup(replacing: .newItem) {
                 Button("New Note…") { workspace.palette = .new }

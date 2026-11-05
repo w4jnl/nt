@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -58,6 +59,7 @@ type preview struct {
 	// is not drawn as broken; nil: none
 	expected func(file string) bool
 	mark     *span                     // text selected with the mouse, nil when none
+	find     *regexp.Regexp            // the last search's words, marked in the note; nil when none
 	img      *termimg.Terminal         // nil: images keep their alt text
 	images   map[string]*termimg.Image // by file
 	pending  string                    // image data for the terminal, sent after the next frame
@@ -68,6 +70,97 @@ func newPreview(img *termimg.Terminal, dark bool) *preview {
 }
 
 func (p *preview) setTheme(dark bool) { p.dark, p.pal = dark, theme.New(dark) }
+
+// setFind marks where words occur in the note, as rg found them: a regular expression, case
+// ignored unless it has a capital; one that is no regular expression is taken as written. ""
+// clears the marks.
+func (p *preview) setFind(words string) {
+	words = strings.TrimSpace(words)
+	if words == "" {
+		p.find = nil
+		return
+	}
+	flags := "(?i)"
+	if strings.ToLower(words) != words {
+		flags = ""
+	}
+	re, err := regexp.Compile(flags + words)
+	if err != nil {
+		re = regexp.MustCompile(flags + regexp.QuoteMeta(words))
+	}
+	p.find = re
+}
+
+// hits is each place the search's words occur in the note: the row of each, one entry a match,
+// in order; none without words.
+func (p *preview) hits() []int {
+	if p.find == nil {
+		return nil
+	}
+	var rows []int
+	for i, l := range p.lines {
+		if isImageRow(l) {
+			continue
+		}
+		for range p.find.FindAllStringIndex(ansi.Strip(l), -1) {
+			rows = append(rows, i)
+		}
+	}
+	return rows
+}
+
+// showHit scrolls so hit i (round the ends) is the second row on screen and says which it is
+// of how many; 0 of 0 with none.
+func (p *preview) showHit(i int) (at, of int) {
+	h := p.hits()
+	if len(h) == 0 {
+		return 0, 0
+	}
+	i = ((i % len(h)) + len(h)) % len(h)
+	p.vp.SetYOffset(max(0, h[i]-1))
+	return i + 1, len(h)
+}
+
+// hitFrom is the first hit on or under the top of the screen, else the first; -1 with none.
+func (p *preview) hitFrom() int {
+	h := p.hits()
+	for i, r := range h {
+		if r >= p.vp.YOffset() {
+			return i
+		}
+	}
+	if len(h) > 0 {
+		return 0
+	}
+	return -1
+}
+
+// markHits is row with each place the search's words occur in ink on accent-soft.
+func markHits(row string, re *regexp.Regexp, st lipgloss.Style) string {
+	plain := ansi.Strip(row)
+	locs := re.FindAllStringIndex(plain, -1)
+	for i := len(locs) - 1; i >= 0; i-- { // from the end, so earlier cells stay where they are
+		a, b := locs[i][0], locs[i][1]
+		if a == b {
+			continue
+		}
+		from, to := ansi.StringWidth(plain[:a]), ansi.StringWidth(plain[:b])
+		row = closed(ansi.Cut(row, 0, from)) + st.Render(plain[a:b]) + ansi.Cut(row, to, ansi.StringWidth(row))
+	}
+	return row
+}
+
+var trailingSGR = regexp.MustCompile("(\x1b\\[[0-9;]*m)+$")
+
+// closed is a cut row without the styles ansi.Cut carries over from past its end, one reset in
+// their place, so what comes after starts clean.
+func closed(s string) string {
+	t := trailingSGR.ReplaceAllString(s, "")
+	if t != "" && t != s {
+		t += "\x1b[m"
+	}
+	return t
+}
 
 func (p *preview) setSize(w, h int) {
 	if max(1, w) != p.width {
@@ -283,10 +376,21 @@ func (p *preview) showText(text string) bool {
 	return false
 }
 
-// View is the visible part of the note, the selected text in ink on the selection colour (accent
-// at a third over ground, theme.SelectionHex) and f's labels over the links they follow.
+// View is the visible part of the note, the search's words in ink on accent-soft, the selected
+// text in ink on the selection colour (accent at a third over ground, theme.SelectionHex) and
+// f's labels over the links they follow.
 func (p *preview) View() string {
 	v := p.vp.View()
+	if p.find != nil {
+		st := lipgloss.NewStyle().Foreground(p.pal.Ink).Background(p.pal.AccentSoft)
+		rows := strings.Split(v, "\n")
+		for i, row := range rows {
+			if !isImageRow(row) {
+				rows[i] = markHits(row, p.find, st)
+			}
+		}
+		v = strings.Join(rows, "\n")
+	}
 	if p.hints != nil {
 		tag := lipgloss.NewStyle().Foreground(p.pal.OnAccent).Background(p.pal.Accent).Bold(true)
 		rows := strings.Split(v, "\n")

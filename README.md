@@ -198,6 +198,7 @@ In the browser:
 | `,` | the settings: enter changes one, `e` edits its file |
 | `1`–`9` | pinned folders (`pins` in `.nt/config.toml`) |
 | `/`, `ctrl-p` | search every note (`#tag` keeps to tagged notes; in the todos, `/` searches those), find a note by its title |
+| `ctrl-f` | find in the note on screen: the hits are marked, enter goes to the next |
 | `f`, `b` | follow a link by its letters (a click works too), back to the note before |
 | `l`, `o`, `i` | the note's links, its outline, its images full size |
 | `x` | the todos beside the folders, open then done: `x` check, `d` due date, `a` add, `f` one folder's, `X` fold Done, enter its note |
