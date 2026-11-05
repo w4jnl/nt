@@ -568,7 +568,9 @@ rendered text.
   line of its own at the cursor or where it was dropped.
 - Code blocks are mono on `surface-sunk`, the language at the top right and, beside it, the copy
   glyph (two squares): a click puts the block's code on the pasteboard and shows a check in
-  `ok` for a moment. Text selected in
+  `ok` for a moment. A line longer than the block breaks at its edge, every line at the same
+  column, as in the terminal and in vim, so a table of output keeps its columns; never at a
+  word. Text selected in
   the note is the system's selection, `accent` at a third over the text, drawn over every
   background, a code block's too. Code in a language the
   page knows (shell, go, python, javascript and typescript, json, yaml, swift, sql, css, html,

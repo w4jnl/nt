@@ -160,7 +160,9 @@ t today  [ ] day  a append  n new  / search  ? help
 - Headings in `accent`, bold. Body text in `ink`.
 - Links in `accent`, underlined, as OSC 8 hyperlinks where the terminal supports them.
 - Inline code and code blocks on `surface-sunk`, with Chroma's highlighting limited to a
-  palette drawn from the tokens.
+  palette drawn from the tokens. A block spans the preview's width, the language in `ink-muted`
+  at its top right. A line longer than the block breaks at its edge, every line at the same
+  column, as vim's wrap does, so a table of output keeps its columns; never at a word.
 - Block quotes in `ink-muted` with a `line` rule on the left.
 - Tables use `line` for borders and `ink` for cells; links in tables stay inline.
 - Frontmatter is never rendered. An image alone on its line (`![alt](path)`, or one HTML

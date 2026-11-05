@@ -13,6 +13,7 @@ import (
 	"charm.land/glamour/v2"
 	"charm.land/glamour/v2/ansi"
 	"charm.land/glamour/v2/styles"
+	"github.com/alecthomas/chroma/v2"
 
 	"github.com/w4jnl/nt/internal/theme"
 )
@@ -42,7 +43,7 @@ func Style(dark bool) ansi.StyleConfig {
 	s.ImageText.Color = c("ink-muted")
 	s.Code.Color, s.Code.BackgroundColor = c("ink"), c("surface-sunk")
 	s.CodeBlock.Color = c("ink")
-	s.CodeBlock.Chroma = chroma(dark)
+	s.CodeBlock.Chroma = palette(dark)
 	s.Task.Ticked, s.Task.Unticked = "[✓] ", "[ ] "
 	s.Item.BlockPrefix = "• "
 	s.Table.Color = c("ink")
@@ -50,10 +51,11 @@ func Style(dark bool) ansi.StyleConfig {
 	return s
 }
 
-// chroma colours code blocks from the family palette: keywords in accent, strings in ok,
-// numbers in warn, comments muted, errors in alert. Few colours on purpose: code in a note is
-// read, not edited.
-func chroma(dark bool) *ansi.Chroma {
+// palette colours code from the family palette: keywords in accent, strings in ok, numbers in
+// warn, comments muted, errors in alert. Few colours on purpose: code in a note is read, not
+// edited. The style file (glow -s) carries it as Glamour's chroma style; the preview's own
+// blocks (code.go) draw with it through codeStyle.
+func palette(dark bool) *ansi.Chroma {
 	p := func(name string, bold bool) ansi.StylePrimitive {
 		v := theme.Hex(name, dark)
 		sp := ansi.StylePrimitive{Color: &v}
@@ -101,6 +103,8 @@ func JSON(dark bool) ([]byte, error) {
 type Renderer struct {
 	tr            *glamour.TermRenderer
 	width, margin int
+	dark          bool
+	code          *chroma.Style
 }
 
 // base is the fake URL scheme a note's folder is given, so Glamour resolves a relative link
@@ -133,7 +137,7 @@ func NewAt(width int, dark bool, dir string) (*Renderer, error) {
 	if s.Document.Margin != nil {
 		margin = int(*s.Document.Margin)
 	}
-	return &Renderer{tr: tr, width: width, margin: margin}, nil
+	return &Renderer{tr: tr, width: width, margin: margin, dark: dark, code: codeStyle(dark)}, nil
 }
 
 // Render styles a note: frontmatter stripped, the body rendered, images as their alt text.
