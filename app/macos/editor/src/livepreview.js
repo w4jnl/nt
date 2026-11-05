@@ -38,7 +38,7 @@ export const hearingField = StateField.define({
 });
 
 // setFind gives the words a search found, "" when none. findField marks each place they occur,
-// in cm-hit (on accent-soft), until the text changes or Escape clears them.
+// in cm-hit (on-accent on accent), until the text changes or Escape clears them.
 export const setFind = StateEffect.define();
 export const findField = StateField.define({
   create: () => "",

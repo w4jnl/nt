@@ -135,7 +135,7 @@ func (p *preview) hitFrom() int {
 	return -1
 }
 
-// markHits is row with each place the search's words occur in ink on accent-soft.
+// markHits is row with each place the search's words occur in on-accent on accent.
 func markHits(row string, re *regexp.Regexp, st lipgloss.Style) string {
 	plain := ansi.Strip(row)
 	locs := re.FindAllStringIndex(plain, -1)
@@ -376,13 +376,13 @@ func (p *preview) showText(text string) bool {
 	return false
 }
 
-// View is the visible part of the note, the search's words in ink on accent-soft, the selected
+// View is the visible part of the note, the search's words in on-accent on accent, the selected
 // text in ink on the selection colour (accent at a third over ground, theme.SelectionHex) and
 // f's labels over the links they follow.
 func (p *preview) View() string {
 	v := p.vp.View()
 	if p.find != nil {
-		st := lipgloss.NewStyle().Foreground(p.pal.Ink).Background(p.pal.AccentSoft)
+		st := lipgloss.NewStyle().Foreground(p.pal.OnAccent).Background(p.pal.Accent)
 		rows := strings.Split(v, "\n")
 		for i, row := range rows {
 			if !isImageRow(row) {

@@ -89,7 +89,7 @@ func New(dark bool) Palette {
 
 // SelectionHex is the background of text selected in the note: accent at a third over ground,
 // the Mac and iOS editor page's selection (color-mix in editor.css) in a terminal, which cannot
-// blend; accent-soft, the search match's fill, is too near the ground to read as a selection.
+// blend; accent-soft, a list's selected row, is too near the ground to read as a selection.
 func SelectionHex(dark bool) string {
 	return mix(Hex("accent", dark), Hex("ground", dark), 0.32)
 }

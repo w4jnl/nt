@@ -22,6 +22,7 @@
   --ink-muted: #5A686B;
   --ink-faint: #98A5A7;
   --accent: #0B7A7E;
+  --on-accent: #FFFFFF;
   --accent-soft: #E8F6F6;
   --ok: #1F7A3A;
   --warn: #9A5A0E;
@@ -42,6 +43,7 @@
     --ink-muted: #8A999C;
     --ink-faint: #5E6D70;
     --accent: #3FD0D4;
+    --on-accent: #0B1214;
     --accent-soft: #173437;
     --ok: #5FC47A;
     --warn: #E8963C;
@@ -106,9 +108,6 @@ html { -webkit-text-size-adjust: 100%; }
   padding: 1px 4px;
 }
 
-/* where a search's words are, until the text changes or Escape */
-#editor .cm-hit { background: var(--accent-soft); border-radius: 3px; }
-
 #editor .cm-link {
   color: var(--accent);
   text-decoration: underline;
@@ -131,6 +130,10 @@ html { -webkit-text-size-adjust: 100%; }
 /* words being dictated that the model may still change: faint, at the cursor */
 #editor .cm-hearing { color: var(--ink-faint); }
 #editor .cm-link-broken { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+/* where a search's words are, until the text changes or Escape: on-accent on accent, as the H1
+   band, so a hit shows at a glance; after the link rules, so a hit in a link keeps its colour */
+#editor .cm-hit { background: var(--accent); color: var(--on-accent); border-radius: 3px; }
 #editor .cm-url { color: var(--ink-muted); font-size: 0.9em; }
 
 #editor .cm-image { display: inline-block; width: 100%; margin: 8px 0 2px; }

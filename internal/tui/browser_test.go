@@ -1063,19 +1063,28 @@ func TestSearchWordsAreMarkedInTheNoteUntilEsc(t *testing.T) {
 	if err := os.WriteFile(b.v.Abs(note), []byte("# NAS\n\nThe nas box and the NAS rack.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, g, bl, _ := b.pal.AccentSoft.RGBA()
-	soft := fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, bl>>8)
+	r, g, bl, _ := b.pal.Accent.RGBA()
+	fill := fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, bl>>8)
+	line := func() string { // the body's line; the H1 band sits on accent whatever the marks
+		for _, row := range strings.Split(b.p.View(), "\n") {
+			if strings.Contains(ansi.Strip(row), "nas box") {
+				return row
+			}
+		}
+		t.Fatalf("the line is not on screen:\n%s", ansi.Strip(b.p.View()))
+		return ""
+	}
 	b.find = "nas" // as a search's hit sets it
 	b.show(note)
-	screen := b.p.View()
-	if n := strings.Count(screen, soft); n != 3 { // the heading, then both on the line, case ignored
-		t.Errorf("marked %d times on accent-soft, want 3:\n%q", n, screen)
+	row := line()
+	if n := strings.Count(row, fill); n != 2 { // both on the line, case ignored
+		t.Errorf("marked %d times on accent, want 2:\n%q", n, row)
 	}
-	if !strings.Contains(ansi.Strip(screen), "The nas box and the NAS rack.") {
-		t.Errorf("the marks changed the text:\n%s", ansi.Strip(screen))
+	if !strings.Contains(ansi.Strip(row), "The nas box and the NAS rack.") {
+		t.Errorf("the marks changed the text:\n%s", ansi.Strip(row))
 	}
 	b.key(tea.KeyPressMsg{Code: tea.KeyEscape})
-	if b.find != "" || strings.Contains(b.p.View(), soft) {
+	if b.find != "" || strings.Contains(line(), fill) {
 		t.Errorf("esc left the marks: %q", b.find)
 	}
 }
