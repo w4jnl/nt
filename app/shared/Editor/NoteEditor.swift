@@ -66,7 +66,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
     /// load shows a note: its text, where it is, who links to it; end puts the cursor at its end
     /// and gives it the keyboard, as for a note just made.
-    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false) {
+    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "") {
         let payload: [String: Any] = [
             "doc": text,
             "path": note.path,
@@ -74,6 +74,7 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             "anchor": anchor,
             "line": line,
             "end": end,
+            "find": find,
             "backlinks": Self.backlinks(note.backlinks),
         ]
         page("window.nt.load(p)", ["p": payload])

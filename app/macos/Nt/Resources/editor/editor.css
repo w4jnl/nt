@@ -108,6 +108,9 @@ html { -webkit-text-size-adjust: 100%; }
   padding: 1px 4px;
 }
 
+/* where a search's words are, until the text changes or Escape */
+#editor .cm-hit { background: var(--accent-soft); border-radius: 3px; }
+
 #editor .cm-link {
   color: var(--accent);
   text-decoration: underline;

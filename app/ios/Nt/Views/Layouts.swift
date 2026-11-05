@@ -7,13 +7,13 @@ import SwiftUI
 enum Route: Hashable {
     case todos, calendar, weekly, agents, settings
     case folder(String)
-    case note(String, anchor: String = "", line: Int = 0, end: Bool = false) // end: a new note, the cursor at its end
+    case note(String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "") // end: a new note, the cursor at its end; find: a search's words, marked
 
     /// moved is the route after from moved to to: a note or folder in what moved follows it.
     func moved(_ from: String, _ to: String) -> Route {
         func new(_ p: String) -> String { p == from ? to : p.hasPrefix(from + "/") ? to + p.dropFirst(from.count) : p }
         switch self {
-        case .note(let p, let a, let l, let e): return .note(new(p), anchor: a, line: l, end: e)
+        case .note(let p, let a, let l, let e, let f): return .note(new(p), anchor: a, line: l, end: e, find: f)
         case .folder(let p): return .folder(new(p))
         default: return self
         }
@@ -22,7 +22,7 @@ enum Route: Hashable {
     /// names says whether the route shows path or something in it.
     func names(_ path: String) -> Bool {
         switch self {
-        case .note(let p, _, _, _), .folder(let p): return p == path || p.hasPrefix(path + "/")
+        case .note(let p, _, _, _, _), .folder(let p): return p == path || p.hasPrefix(path + "/")
         default: return false
         }
     }
@@ -49,13 +49,13 @@ struct StackLayout: View {
                     case .agents: AgentsView()
                     case .settings: SettingsScreen()
                     case .folder(let id): FolderScreen(id: id)
-                    case .note(let path, let anchor, let line, let end): NoteScreen(path: path, anchor: anchor, line: line, end: end)
+                    case .note(let path, let anchor, let line, let end, let find): NoteScreen(path: path, anchor: anchor, line: line, end: end, find: find)
                     }
                 }
         }
         .onAppear {
             let r = router
-            ws.navigate = { path, anchor, line, end in r.path.append(.note(path, anchor: anchor, line: line, end: end)) }
+            ws.navigate = { path, anchor, line, end, find in r.path.append(.note(path, anchor: anchor, line: line, end: end, find: find)) }
             ws.relocated = { from, to in r.path = r.path.map { $0.moved(from, to) } }
             ws.removed = { path in r.path.removeAll { $0.names(path) } }
             ws.home = { r.path.removeAll() }
@@ -121,6 +121,7 @@ struct NoteScreen: View {
     let anchor: String
     let line: Int
     var end = false
+    var find = ""
     @State private var opened = false
 
     var body: some View {
@@ -138,7 +139,7 @@ struct NoteScreen: View {
         .modifier(PhotoPicking())
         .task(id: path) {
             // a new note opens with the cursor at its end, the first time only
-            await ws.open(path, anchor: anchor, line: line, end: end && !opened)
+            await ws.open(path, anchor: anchor, line: line, end: end && !opened, find: find)
             opened = true
         }
     }

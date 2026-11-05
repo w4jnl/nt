@@ -262,7 +262,7 @@ struct PaletteView: View {
             Task { await ws.create(title, in: ws.newFolder) }
             return
         }
-        ws.show(row.path, line: row.kind == .text ? row.line : 0)
+        ws.show(row.path, line: row.kind == .text ? row.line : 0, find: row.kind == .text ? query : "")
     }
 
     private func close() {

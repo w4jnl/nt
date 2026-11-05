@@ -10,7 +10,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoD
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
 import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
-import { frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFocus, setFocusMode, setHearing } from "./livepreview.js";
+import { findField, frontmatterRange, headingAt, hearingField, linkDests, livePreview, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -33,7 +33,7 @@ function extensions(path, readOnly) {
   return [
     noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([{ key: "Escape", run: clearFind }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
@@ -42,6 +42,7 @@ function extensions(path, readOnly) {
     ),
     livePreview,
     hearingField,
+    findField,
     EditorView.updateListener.of(changed),
     EditorView.updateListener.of((u) => {
       if (u.focusChanged) post({ type: "focus", on: u.view.hasFocus });
@@ -104,6 +105,13 @@ function words(state) {
   return text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
+// clearFind takes the search's marks off the note; false when there are none, so Escape goes on.
+function clearFind(v) {
+  if (!v.state.field(findField)) return false;
+  v.dispatch({ effects: setFind.of("") });
+  return true;
+}
+
 // goLine puts the cursor at the start of line n, from a search, so typing starts at what was
 // found, and scrolls it to the middle.
 function goLine(n) {
@@ -157,15 +165,15 @@ function dropped(e, v) {
 
 window.nt = {
   // load shows a note: {doc, path, readOnly, backlinks: [{path, title, folder}], anchor, line,
-  // end (put the cursor at the end and take the keyboard)}.
-  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false }) {
+  // end (put the cursor at the end and take the keyboard), find (a search's words, marked)}.
+  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false, find = "" }) {
     view.setState(EditorState.create({ doc: normalize(doc), extensions: extensions(path, readOnly) }));
     base = view.state.doc.toString();
     pending = ChangeSet.empty(base.length);
     inflight = null;
     // The new state starts unfocused; when the editor already has the keyboard (another note was
     // being edited) no focus event will come, so say so now, or no line would show its markdown.
-    view.dispatch({ effects: [setBacklinks.of(backlinks), setFocus.of(view.hasFocus)] });
+    view.dispatch({ effects: [setBacklinks.of(backlinks), setFocus.of(view.hasFocus), setFind.of(find)] });
     view.scrollDOM.scrollTop = 0;
     if (end) {
       view.dispatch({ selection: { anchor: view.state.doc.length }, scrollIntoView: true });
@@ -176,6 +184,8 @@ window.nt = {
     reportHistory();
   },
   line: goLine,
+  // find marks a search's words in the note, "" takes the marks off.
+  find: (words) => view.dispatch({ effects: setFind.of(words) }),
   backlinks(list) {
     view.dispatch({ effects: setBacklinks.of(list) });
   },

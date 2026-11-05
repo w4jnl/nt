@@ -129,7 +129,7 @@ final class Workspace {
 
     /// navigate shows a note the person asked for on the iPhone: a screen of its own on the
     /// stack, so Back returns. Unset, on the Mac and the iPad, the note opens in place.
-    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int, _ end: Bool) -> Void)?
+    @ObservationIgnored var navigate: ((_ path: String, _ anchor: String, _ line: Int, _ end: Bool, _ find: String) -> Void)?
     /// relocated and removed keep the iPhone's screens on what they showed after a move, a
     /// rename or a delete: a screen follows its note or folder, or goes with it.
     @ObservationIgnored var relocated: ((_ from: String, _ to: String) -> Void)?
@@ -299,16 +299,17 @@ final class Workspace {
 
     /// show puts the note at path on screen, scrolled to a heading's anchor or to a line; end
     /// puts the cursor at its end, for a note just made. The note on screen is saved first.
-    func show(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) {
-        Task { await open(path, anchor: anchor, line: line, end: end, reload: reload) }
+    func show(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") {
+        Task { await open(path, anchor: anchor, line: line, end: end, reload: reload, find: find) }
     }
 
     /// go shows a note the person asked for: a link followed, a todo's note, a day's journal.
-    func go(_ path: String, anchor: String = "", line: Int = 0) {
-        if let navigate { navigate(path, anchor, line, false) } else { show(path, anchor: anchor, line: line) }
+    func go(_ path: String, anchor: String = "", line: Int = 0, find: String = "") {
+        if let navigate { navigate(path, anchor, line, false, find) } else { show(path, anchor: anchor, line: line, find: find) }
     }
 
-    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false) async {
+    /// find is a search's words, marked in the note (the editor page's findField).
+    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") async {
         guard let root, let editor else { return }
         opening += 1
         let mine = opening
@@ -329,7 +330,7 @@ final class Workspace {
         }
         let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
-        editor.load(n, text: text, anchor: anchor, line: line, end: end)
+        editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
         selection = selectionFor(path)
         recent = Self.remember(path, in: recent)
         for dir in SidebarTree.ancestors(path) where !expanded.contains(dir) {
@@ -601,7 +602,7 @@ final class Workspace {
             if !folder.isEmpty { args.append(folder) }
             let c = try await nt.json(Created.self, args)
             await afterWrite()
-            if let navigate { navigate(c.rel, "", 0, true) } else { await open(c.rel, end: true) }
+            if let navigate { navigate(c.rel, "", 0, true, "") } else { await open(c.rel, end: true) }
         } catch {
             say(error.localizedDescription)
         }

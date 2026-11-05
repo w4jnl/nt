@@ -21,6 +21,7 @@ import {
   setFocus,
   alignsOf,
   blockDecorations,
+  findHits,
 } from "../src/livepreview.js";
 import { mathSource, renderMath } from "../src/math.js";
 import { isDiagram } from "../src/diagram.js";
@@ -273,4 +274,12 @@ test("a fenced code block has copy at its top right, with its code", () => {
   assert.equal(copies[0].w.text, "func main() {}\n// two");
   const open = decos(buildDecorations(state(doc, { cursor: doc.indexOf("main"), focused: true }))).filter((d) => d.widget === "CopyWidget");
   assert.equal(open.length, 1, "there with the cursor in the block too");
+});
+
+test("a search's words are marked where they occur, case ignored unless they have a capital", () => {
+  assert.deepEqual(findHits("NAS setup\nthe nas box", "nas"), [[0, 3], [14, 17]]);
+  assert.deepEqual(findHits("NAS setup\nthe nas box", "NAS"), [[0, 3]]);
+  assert.deepEqual(findHits("NAS setup\nthe nas box", "#work nas"), [[0, 3], [14, 17]], "the #tag word keeps to notes, not lines");
+  assert.deepEqual(findHits("c++ code", "c++"), [[0, 3]], "no regular expression: taken as written");
+  assert.deepEqual(findHits("nothing", ""), []);
 });
