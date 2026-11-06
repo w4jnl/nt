@@ -25,8 +25,11 @@
   --on-accent: #FFFFFF;
   --accent-soft: #E8F6F6;
   --ok: #1F7A3A;
+  --ok-soft: #E3F3E8;
   --warn: #9A5A0E;
+  --warn-soft: #FBEEDC;
   --alert: #C0342B;
+  --alert-soft: #FBE4E2;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -46,8 +49,11 @@
     --on-accent: #0B1214;
     --accent-soft: #173437;
     --ok: #5FC47A;
+    --ok-soft: #16301F;
     --warn: #E8963C;
+    --warn-soft: #33240F;
     --alert: #F0645A;
+    --alert-soft: #3A1A18;
   }
 }
 
@@ -161,6 +167,17 @@ html { -webkit-text-size-adjust: 100%; }
 #editor .cm-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); }
 
 #editor .cm-quote { border-left: 2px solid var(--line); padding-left: 14px !important; color: var(--ink-muted); }
+
+/* an alert (GitHub's note box): the quote on the kind's soft fill with its colour down the
+   left, the tag drawn as a title in that colour, the body in ink */
+#editor .cm-alert { --kind: var(--accent); --kind-soft: var(--accent-soft); }
+#editor .cm-alert-tip { --kind: var(--ok); --kind-soft: var(--ok-soft); }
+#editor .cm-alert-warning { --kind: var(--warn); --kind-soft: var(--warn-soft); }
+#editor .cm-alert-caution { --kind: var(--alert); --kind-soft: var(--alert-soft); }
+#editor .cm-alert { background: var(--kind-soft); border-left: 2px solid var(--kind); padding-left: 14px !important; padding-right: 14px !important; }
+#editor .cm-alert-first { padding-top: 6px !important; border-top-right-radius: 6px; }
+#editor .cm-alert-last { padding-bottom: 6px !important; border-bottom-right-radius: 6px; }
+#editor .cm-alert-title { color: var(--kind); font-weight: 600; }
 #editor .cm-hr { display: inline-block; width: 100%; height: 1px; vertical-align: middle; background: var(--line-strong); }
 
 #editor .cm-code {

@@ -7,8 +7,11 @@ import (
 	"testing"
 
 	"charm.land/glamour/v2/ansi"
+	"charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 	astext "github.com/yuin/goldmark/extension/ast"
+
+	"github.com/w4jnl/nt/internal/theme"
 )
 
 func TestSplitFrontmatter(t *testing.T) {
@@ -363,5 +366,58 @@ func TestTableColumnsKeepTheirWords(t *testing.T) {
 	}
 	if n := strings.Count(out, "\x1b[1m") + strings.Count(out, ";1m"); n == 0 {
 		t.Errorf("bold in a cell: %q", out)
+	}
+}
+
+func TestAlertBlocks(t *testing.T) {
+	body := []byte("p\n\n> [!WARNING]\n> Careful with\n> `this`.\n>\n> - a list\ntext\n\n> plain quote\n\n- item\n\n  > [!NOTE]\n  > nested\n\n> [!tip]\n> ```sh\n> ls\n> ```\n")
+	got := alertBlocks(body)
+	if len(got) != 2 {
+		t.Fatalf("got %d alerts, want 2: %+v", len(got), got)
+	}
+	if got[0].kind != "warning" || string(got[0].body) != "Careful with\n`this`.\n\n- a list\ntext\n" {
+		t.Errorf("the warning: %q %q", got[0].kind, got[0].body)
+	}
+	if s := string(body[got[0].start:got[0].end]); s != "> [!WARNING]\n> Careful with\n> `this`.\n>\n> - a list\ntext" {
+		t.Errorf("the warning's bytes: %q", s)
+	}
+	if got[1].kind != "tip" || string(got[1].body) != "```sh\nls\n```\n" {
+		t.Errorf("a code block's closing fence stays in the alert: %q %q", got[1].kind, got[1].body)
+	}
+}
+
+func TestAlertIsABoxWithATitle(t *testing.T) {
+	r, err := New(60, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := r.Render([]byte("Before\n\n> [!CAUTION]\n> The cron jobs' timing is critical for the tool, see [the note](a.md).\n>\n> - one\n> - two\n\nafter\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := xansi.Strip(out)
+	if strings.Contains(plain, "[!CAUTION]") {
+		t.Errorf("the tag is drawn: %s", plain)
+	}
+	var rows []string
+	for _, l := range strings.Split(plain, "\n") {
+		if strings.HasPrefix(l, "  │") {
+			rows = append(rows, l)
+		}
+	}
+	if len(rows) < 4 || rows[0] != "  │ Caution" || !strings.Contains(rows[1], "The cron jobs' timing is critical") || !strings.Contains(plain, "│ • one") {
+		t.Errorf("the box:\n%s", plain)
+	}
+	for _, l := range rows {
+		if w := xansi.StringWidth(l); w > 60 {
+			t.Errorf("a row of %d cells: %q", w, l)
+		}
+	}
+	r2, g, b, _ := lipgloss.Color(theme.Hex("alert", true)).RGBA()
+	if tint := fmt.Sprintf("38;2;%d;%d;%d", r2>>8, g>>8, b>>8); strings.Count(out, tint) < 5 {
+		t.Errorf("the rule and the title are not in alert: %q", out)
+	}
+	if i, j := strings.Index(plain, "Before"), strings.Index(plain, "after"); i < 0 || j < 0 || i > strings.Index(plain, "Caution") || j < strings.Index(plain, "two") {
+		t.Errorf("the text around the box: %s", plain)
 	}
 }

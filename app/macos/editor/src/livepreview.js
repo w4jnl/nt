@@ -576,6 +576,17 @@ const mark = (cls, attributes) => Decoration.mark(attributes ? { class: cls, att
 const line = (cls) => Decoration.line({ class: cls });
 
 const NAV = /^\s*(\[[^\]]*\]\([^)]*\)\s*(·\s*)?)+$/;
+
+// ALERTS are GitHub's note boxes (docs/format.md): a quote whose first line is `[!NOTE]`,
+// `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, drawn with the kind's word as a title.
+const ALERTS = { note: "Note", tip: "Tip", important: "Important", warning: "Warning", caution: "Caution" };
+const ALERT_TAG = /^\s{0,3}>\s*\[!(note|tip|important|warning|caution)\]\s*$/i;
+
+// alertKind is the kind an alert's first line names, in lowercase, or "" for a plain quote.
+export function alertKind(firstLine) {
+  const m = ALERT_TAG.exec(firstLine);
+  return m ? m[1].toLowerCase() : "";
+}
 const TIME = /^\d{1,2}:\d{2}(?=\s|$)/;
 const META = /\b(?:due|done):\d{4}-\d{2}-\d{2}\b/g;
 
@@ -669,9 +680,22 @@ export function buildDecorations(state) {
           for (const m of text.matchAll(META)) add(mark("cm-meta"), from + m.index, from + m.index + m[0].length);
           return;
         }
-        case "Blockquote":
-          lines(from, to, "cm-quote");
+        case "Blockquote": {
+          const kind = alertKind(doc.sliceString(from, doc.lineAt(from).to));
+          if (!kind) {
+            lines(from, to, "cm-quote");
+            return;
+          }
+          // an alert (GitHub's note box): the lines in the kind's tint, the tag its title
+          lines(from, to, "cm-alert");
+          for (let n = doc.lineAt(from).number; n <= doc.lineAt(to).number; n++) add(line("cm-alert-" + kind), doc.line(n).from);
+          const tag = doc.lineAt(from).text.indexOf("[!");
+          const a = doc.lineAt(from).from + tag;
+          const b = a + doc.lineAt(from).text.slice(tag).trimEnd().length;
+          if (isActive(from)) add(mark("cm-syntax"), a, b);
+          else add(Decoration.replace({ widget: new TextWidget(ALERTS[kind], "cm-alert-title") }), a, b);
           return;
+        }
         case "QuoteMark": {
           if (isActive(from)) add(mark("cm-syntax"), from, to);
           else add(hide, from, doc.sliceString(to, to + 1) === " " ? to + 1 : to);

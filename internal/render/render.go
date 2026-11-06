@@ -105,6 +105,7 @@ type Renderer struct {
 	cells         *glamour.TermRenderer // a table's cells, one line each, unwrapped (table.go)
 	width, margin int
 	dark          bool
+	dir           string // the note's folder, for the links of a block rendered on its own (alert.go)
 	code          *chroma.Style
 }
 
@@ -147,7 +148,7 @@ func NewAt(width int, dark bool, dir string) (*Renderer, error) {
 	if s.Document.Margin != nil {
 		margin = int(*s.Document.Margin)
 	}
-	return &Renderer{tr: tr, cells: cells, width: width, margin: margin, dark: dark, code: codeStyle(dark)}, nil
+	return &Renderer{tr: tr, cells: cells, width: width, margin: margin, dark: dark, dir: dir, code: codeStyle(dark)}, nil
 }
 
 // Render styles a note: frontmatter stripped, the body rendered, images as their alt text.

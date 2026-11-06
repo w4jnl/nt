@@ -32,7 +32,7 @@ Decisions taken with the user (2026-10-26):
   agents/2026/2026-10-26/<host>--<agent>--<project>--<sid8>.md   one report per agent session
 ```
 **Format rules:**
-- Only GitHub-flavoured markdown is written. No wikilinks, embeds or callouts.
+- Only GitHub-flavoured markdown is written. No wikilinks, embeds or callouts; a note box is a GitHub alert, `> [!NOTE]` and the other four kinds (docs/format.md).
 - Filenames are slugs with no spaces, so links work in the shell, on GitHub and on iOS. Any legacy name with spaces is linked with `%20`.
 - Frontmatter is flat YAML: `title, date, tags`.
 - Reports also carry: `type: agent-report, schema, date, created, updated, ended, agent, host, session, project, cwd, git_branch, git_head, status, summary, tags`.
@@ -339,7 +339,7 @@ The agent report glyphs are the same as flok's, so a report looks the same in fl
 **Theme in code.**
 - `internal/theme` maps the tokens to Lip Gloss v2 colours.
 - Dark or light is detected with OSC 11 (port of flok's `termtheme`; tmux handling included). A `[theme] mode = auto|dark|light` setting overrides it.
-- `internal/render` builds a **Glamour style from the same tokens**: accent headings, links and code on `surface-sunk`, quotes in `ink-muted` with a `line` rule. Two blocks it draws itself, in Glamour's look, through a marker Glamour carries: fenced code (a line breaks at the block's edge, never at a word) and tables (a column is at least its longest word wide, the room left shared by how much each column has to wrap; when the words do not fit, one longer than ten cells breaks at the edge so the prose columns keep room). Glamour's own table takes cells from the widest column with no notion of a word, so "High" lost its last letter to the next line.
+- `internal/render` builds a **Glamour style from the same tokens**: accent headings, links and code on `surface-sunk`, quotes in `ink-muted` with a `line` rule. Two blocks it draws itself, in Glamour's look, through a marker Glamour carries: fenced code (a line breaks at the block's edge, never at a word), tables (a column is at least its longest word wide, the room left shared by how much each column has to wrap; when the words do not fit, one longer than ten cells breaks at the edge so the prose columns keep room) and alerts (`> [!NOTE]`: a rule down the left in the kind's colour, the kind's word bold in it as the title, the body rendered as the note is, in ink; note and important in `accent`, tip in `ok`, warning in `warn`, caution in `alert`). Glamour's own table takes cells from the widest column with no notion of a word, so "High" lost its last letter to the next line.
 - `nt theme --glamour` writes `~/.config/nt/glamour-{dark,light}.json`, so `glow -s` and the `v` key render notes in the same style.
 
 **TUI rules** (the simplicity budget):
@@ -584,7 +584,10 @@ rendered text.
   `ok` for a moment. A line longer than the block breaks at its edge, every line at the same
   column, as in the terminal and in vim, so a table of output keeps its columns; never at a
   word. A table's column is at least its longest word wide, as in the terminal; a table wider
-  than the note scrolls sideways instead of squeezing a column to a letter a line. Text selected in
+  than the note scrolls sideways instead of squeezing a column to a letter a line. An alert
+  (`> [!NOTE]`) is its quote on the kind's `-soft` fill with the kind's colour down the left and
+  the tag drawn as a title in that colour, the body in `ink`; on the cursor's line the tag shows
+  as written. Text selected in
   the note is the system's selection, `accent` at a third over the text, drawn over every
   background, a code block's too. Code in a language the
   page knows (shell, go, python, javascript and typescript, json, yaml, swift, sql, css, html,
