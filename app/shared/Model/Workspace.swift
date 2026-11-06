@@ -155,6 +155,8 @@ final class Workspace {
     @ObservationIgnored private var reportCache: [String: [AgentReport]] = [:]
     @ObservationIgnored private var quitting = false
     @ObservationIgnored private var opening = 0 // counts opens, so the last one asked for wins
+    @ObservationIgnored private var askedFile: URL? // a file asked for before the repository was ready
+    @ObservationIgnored private var starting = false
     #if !os(macOS)
     @ObservationIgnored private var syncSoon: Task<Void, Never>?
     #endif
@@ -171,11 +173,14 @@ final class Workspace {
 
     var root: URL? { index.map { URL(filePath: $0.root) } }
 
-    /// start finds the repository and, on the Mac, opens today; on iPhone and iPad the layout
-    /// opens a note (the iPad today, the iPhone none until one is asked for). Under tests it does
-    /// nothing: the app must not touch the person's notes there.
+    /// start finds the repository and, on the Mac, opens today, or the note a file asked for
+    /// (openFile); on iPhone and iPad the layout opens a note (the iPad today, the iPhone none
+    /// until one is asked for). Under tests it does nothing: the app must not touch the person's
+    /// notes there. The window's task can run it twice at launch; the second call returns.
     func start() async {
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || phase == .ready { return }
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || phase == .ready || starting { return }
+        starting = true
+        defer { starting = false }
         guard await prepare() else { return }
         watch()
         // For screenshots: -NTOpen <repository path> opens a note in place of today, -NTView
@@ -183,6 +188,9 @@ final class Workspace {
         // (and -NTQuery types into it).
         if let path = UserDefaults.standard.string(forKey: "NTOpen") {
             await open(path)
+        } else if let file = askedFile {
+            askedFile = nil
+            await openFile(file)
         } else {
             #if os(macOS)
             await openToday()
@@ -366,6 +374,35 @@ final class Workspace {
         editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
         selection = selectionFor(path)
         recent = Self.remember(path, in: recent) // the folders stay as they are: only the person opens one
+    }
+
+    /// openFile opens a note by its path on disk, as Finder, the Dock or `open -a nt` give it:
+    /// the note it is in the repository, else a word that it is not. Before the repository is
+    /// ready the file waits, and opens in place of today.
+    func openFile(_ url: URL) async {
+        guard phase == .ready, let root else {
+            askedFile = url
+            return
+        }
+        guard let rel = Self.relative(url, in: root) else {
+            say("\(url.lastPathComponent) is not in your notes (\((root.path as NSString).abbreviatingWithTildeInPath))")
+            return
+        }
+        guard rel.lowercased().hasSuffix(".md") else {
+            say("\(rel) is not a markdown note")
+            return
+        }
+        await open(rel)
+    }
+
+    /// relative is url's path inside root, or nil when it is not under it. Both are resolved
+    /// first, so a link on the way (/tmp to /private/tmp, a repository behind a symlink) does
+    /// not hide a note.
+    nonisolated static func relative(_ url: URL, in root: URL) -> String? {
+        let file = url.standardizedFileURL.resolvingSymlinksInPath().path
+        let dir = root.standardizedFileURL.resolvingSymlinksInPath().path
+        guard file.hasPrefix(dir + "/") else { return nil }
+        return String(file.dropFirst(dir.count + 1))
     }
 
     /// readOnly says whether a note is a digest, the day's or the week's, which nt writes again

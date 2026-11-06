@@ -479,6 +479,11 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   searched for marked in `on-accent` on `accent`, as the terminal marks them; typing or Escape
   takes the marks off. Search (⇧⌘F) is the same field for text only. Both leave task lines out: Todos finds those, and while Todos is
   shown ⇧⌘F and the toolbar's glass go to its own field. Today is ⌘T, Sync now ⌥⌘S.
+- A markdown file opened from Finder, the Dock or `open -a nt` opens as its note when it is in
+  the repository, and the window comes forward; one from elsewhere leaves the bottom line saying
+  it is not in your notes. The app lists itself for markdown (`net.daringfireball.markdown`,
+  Editor, rank Alternate), so Finder's Open With offers it and Get Info › Open with › Change All
+  makes it the default; it does not claim every `.md` on the Mac by itself (added 2026-11-06).
 - The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search…
   and Sync now. New Todo… asks for the text and adds it under Inbox in the `todo.md` of
   the folder ⌘N would use, or the root's when that is the journals', the agents' or the weekly

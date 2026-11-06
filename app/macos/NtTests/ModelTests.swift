@@ -201,6 +201,23 @@ private func index() throws -> RepoIndex {
         #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/homelab/%2E%2E/%2E%2E/etc/hosts")!, root: root) == nil)
     }
 
+    @Test func aFileFromFinderIsItsNoteOnlyInsideTheRepository() throws {
+        let fm = FileManager.default
+        let base = URL(filePath: "/tmp").appending(path: "nt-finder-\(UUID().uuidString)") // /tmp is a link to /private/tmp
+        let root = base.appending(path: "notes")
+        try fm.createDirectory(at: root.appending(path: "work"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: base.appending(path: "notes-2"), withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: base) }
+        for p in ["notes/work/a.md", "notes/README.md", "notes-2/a.md"] {
+            try "x".write(to: base.appending(path: p), atomically: true, encoding: .utf8)
+        }
+        let priv = URL(filePath: "/private" + root.path)
+        #expect(Workspace.relative(priv.appending(path: "work/a.md"), in: root) == "work/a.md")
+        #expect(Workspace.relative(root.appending(path: "work/../README.md"), in: priv) == "README.md")
+        #expect(Workspace.relative(base.appending(path: "notes-2/a.md"), in: root) == nil, "a sibling with the same prefix is outside")
+        #expect(Workspace.relative(root, in: root) == nil)
+    }
+
     @Test func watcherIgnoresGitAndTempFiles() {
         #expect(RepoWatcher.relevant("/n/homelab/a.md", root: "/n"))
         #expect(!RepoWatcher.relevant("/n/.git/index", root: "/n"))
