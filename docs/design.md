@@ -101,7 +101,8 @@ Decisions taken with the user (2026-10-26):
 
 **`skills/nt/SKILL.md`.**
 - Carried in the binary; `nt install --skill` writes it to `~/.local/share/nt/skills/nt` and symlinks that from `~/.claude/skills/nt` and `~/.agents/skills/nt`, so it works in Claude Code and Copilot CLI alike and always matches the installed `nt`.
-- Covers search, read, `nt a`, and `nt agent write`.
+- Covers search, read, `nt a`, `nt agent write`, and how to write: Simplified Technical English
+  (ASD-STE100, decided 2026-11-06) unless the person asks for another style.
 - Every command takes `--json`.
 - The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
