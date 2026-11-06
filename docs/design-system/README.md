@@ -142,7 +142,8 @@ t today  [ ] day  a append  n new  / search  ? help
 - Link labels (`f`): one or two letters in `on-accent`, bold, on `accent`, over the first cells
   of each link on screen; the footer says what to type.
 - The footer: key hints, the key in `accent` and the verb in `ink-muted`, separated by two
-  spaces; at the right end the last message, else nt's version in `ink-faint` when the hints
+  spaces; at the right end the last message, else when the note on screen last changed and from
+  which machine (`changed 2h ago · macbook`), else nt's version, in `ink-faint` when the hints
   leave room. With a prompt open, the footer is the prompt.
 - No modals. A prompt (append, new note title, search) is one line at the bottom on `surface`,
   with its text on `surface-sunk`. Enter accepts, Escape cancels.

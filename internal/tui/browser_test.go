@@ -1029,10 +1029,12 @@ func TestToggleTodos(t *testing.T) {
 	}
 }
 
-// TestChangedLineUnderTheNote: the index's changed and by, from git's history, show under the
-// note as "changed 2h ago · mac", before Linked from; a note never synced shows nothing.
-func TestChangedLineUnderTheNote(t *testing.T) {
-	b := testBrowser(t, 120, t.TempDir())
+// TestChangedLineInTheFooter: the index's changed and by, from git's history, show at the
+// footer's right as "changed 2h ago · mac", where the version goes otherwise, as the Mac app's
+// bottom right; a message takes its place; a note never synced shows the version.
+func TestChangedLineInTheFooter(t *testing.T) {
+	b := testBrowser(t, 200, t.TempDir())
+	b.o.Version = "v0.9.4"
 	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.Local)
 	b.v.Now = func() time.Time { return now }
 	ix := scan.Build(b.v.Root)
@@ -1041,16 +1043,29 @@ func TestChangedLineUnderTheNote(t *testing.T) {
 	ix.Note("tech/2026-10-21-b.md").Changed = now.AddDate(0, 0, -10).Format(time.RFC3339)
 	b.Update(indexMsg{seq: b.indexSeq, ix: ix})
 	b.show("tech/2026-10-22-c.md")
-	if got := ansi.Strip(b.p.extra); !strings.Contains(got, "changed 2h ago · mac") {
-		t.Errorf("under the note: %q", got)
+	if f := ansi.Strip(b.footer()); !strings.HasSuffix(f, "changed 2h ago · mac ") || !strings.Contains(f, "? help") {
+		t.Errorf("the footer's right: %q", f)
 	}
+	if strings.Contains(ansi.Strip(b.p.extra), "changed") {
+		t.Errorf("the line is in the footer, not under the note: %q", ansi.Strip(b.p.extra))
+	}
+	b.say("synced", false)
+	if f := ansi.Strip(b.footer()); !strings.HasSuffix(f, "synced ") || strings.Contains(f, "changed") {
+		t.Errorf("a message takes its place: %q", f)
+	}
+	b.say("", false)
 	b.show("tech/2026-10-21-b.md")
-	if got := ansi.Strip(b.p.extra); !strings.Contains(got, "changed 24 oct") || strings.Contains(got, "·") {
-		t.Errorf("a change not by nt names no host: %q", got)
+	if f := ansi.Strip(b.footer()); !strings.HasSuffix(f, "changed 24 oct ") || strings.Contains(f, "·") {
+		t.Errorf("a change not by nt names no host: %q", f)
 	}
 	b.show("tech/2026-10-20-a.md")
-	if b.p.extra != "" {
-		t.Errorf("a note never synced: %q", b.p.extra)
+	if f := ansi.Strip(b.footer()); !strings.HasSuffix(f, "nt 0.9.4 ") {
+		t.Errorf("a note never synced shows the version: %q", f)
+	}
+	b.show("tech/2026-10-22-c.md")
+	b.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	if f := ansi.Strip(b.footer()); strings.Contains(f, "changed") || strings.Contains(f, "0.9.4") || !strings.Contains(f, "? help") {
+		t.Errorf("a narrow footer keeps the hints: %q", f)
 	}
 	if got := changedLine(now.Add(-20*time.Second).Format(time.RFC3339), "iphone", now); got != "changed just now · iphone" {
 		t.Errorf("under a minute: %q", got)

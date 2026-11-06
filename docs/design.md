@@ -195,7 +195,7 @@ Decisions taken with the user (2026-10-26):
 
 - `l`, `o` and `i` come from `internal/mdparse`, a line scan that skips code and keeps source line numbers. Glamour has no way to map rendered lines back to the source.
 - Backlinks ("Linked from") come from an in-memory scan (`internal/scan`), with no persisted index. Titles for `ctrl-p` come from the same scan, matched by nt's own subsequence scorer.
-- Under the note, before "Linked from": `changed 2h ago · macbook`, when git's history last saw the note change and the host whose sync committed it (`gitsync.Changes` over `git log --name-only`, read only; `changed` and `by` in `nt _editor index`). Under a minute it is "just now", up to two days minutes or hours ago, then the date as todos say theirs; a commit nt did not make names no host; a note never synced shows nothing. The time is the sync's, not the save's: a note written since the last sync keeps its earlier line until sync commits it. No frontmatter stamp: one `updated` line changed on two devices would make every edit a conflict copy, and the journals' lines carry their own times.
+- At the footer's right, where the version goes otherwise (a message still comes first), as the Mac app's bottom right: `changed 2h ago · macbook`, when git's history last saw the note change and the host whose sync committed it (`gitsync.Changes` over `git log --name-only`, read only; `changed` and `by` in `nt _editor index`). Under a minute it is "just now", up to two days minutes or hours ago, then the date as todos say theirs; a commit nt did not make names no host; a note never synced shows nothing. The time is the sync's, not the save's: a note written since the last sync keeps its earlier line until sync commits it. No frontmatter stamp: one `updated` line changed on two devices would make every edit a conflict copy, and the journals' lines carry their own times.
 - The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
 - While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
 - A search's words stay marked in the note, in `on-accent` on `accent`, in every note shown after
@@ -346,7 +346,7 @@ The agent report glyphs are the same as flok's, so a report looks the same in fl
 - **Screen:** one brand line `[nt]` at the top left, two panes, one status/footer line.
 - **Selection:** a `▎` accent bar plus a `surface` background. This is the terminal version of the family's 6px accent bar.
 - **Interaction:** no modals. Prompts are a single line at the bottom, and only one picker is open at a time.
-- **Footer hints:** the key in `accent`, the verb in `ink-muted`. The right end shows the last message, else nt's version (`nt 0.1.0`) in `ink-faint` when the hints leave room.
+- **Footer hints:** the key in `accent`, the verb in `ink-muted`. The right end shows the last message, else when the note on screen last changed and from which machine (`changed 2h ago · macbook`), else nt's version (`nt 0.1.0`), in `ink-faint` when the hints leave room.
 - **Colour:** off when `NO_COLOR` is set or output is not a TTY.
 
 **CLI.**
