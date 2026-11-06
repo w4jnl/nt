@@ -4,6 +4,30 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.5 (2026-11-06)
+
+Alerts, table columns that keep their words, and nt for Mac as an app for markdown files.
+
+- **Alerts:** a note box in every client, as GitHub draws `> [!NOTE]`, `> [!TIP]`,
+  `> [!IMPORTANT]`, `> [!WARNING]` and `> [!CAUTION]`: a rule down the left in the kind's
+  colour, the kind's word as a title, the body rendered as the rest of the note. Any other
+  viewer shows a quote with the tag, so nothing is lost. The skill and `AGENTS.md` tell agents
+  it is the one note box to write.
+- **Table columns keep their words:** a column is at least its longest word wide, and the room
+  left goes to the columns with the most to wrap, in the terminal and on the editor page. A
+  narrow column no longer loses a letter to the next line while the prose columns keep slack.
+- **Open with nt:** Finder's Open With lists nt for markdown files, and Get Info › Open with ›
+  Change All makes it the default. A file from Finder, the Dock or `open -a nt` opens as its
+  note when it is in your notes. One from elsewhere opens alone, the sidebar hidden until a note
+  from the repository opens again: the toolbar says its folder by its full path, links and
+  images beside it work, and it is saved as a note is, compared with what the editor read, a
+  conflict copy beside it. It has no backlinks, no todos and no pasted images.
+- **The terminal footer says when the note changed:** `changed 2h ago · macbook` at the right of
+  the browser's footer, as the Mac app says it at the bottom right, when it fits beside the
+  message; the line under the note is now "Linked from" alone.
+- **Fixed:** the Mac app's window started the workspace twice at launch, reading the index
+  twice.
+
 ## 0.9.4 (2026-11-06)
 
 Find in the note on screen, a search's words marked where they are, the note on the whole width,
