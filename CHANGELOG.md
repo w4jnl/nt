@@ -4,6 +4,32 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.4 (2026-11-06)
+
+Find in the note on screen, a search's words marked where they are, the note on the whole width,
+and a writing style for agents.
+
+- **Find in this note:** `ctrl-f` in the terminal browser and viewer, ⌘F (Edit › Find in Note…)
+  on the Mac, Find in Note… in the note's menu on the phone. A field above the note takes the
+  words; Return goes to the next hit, ⇧Return to the one before, Escape closes it. The field
+  says `2 of 9`, or `no match`.
+- **Hits you can see:** a search's words are marked in the note it opens, in every client, on
+  the accent fill with dark ink, as the H1 band is drawn, so a hit shows at a glance. The marks
+  stay in every note shown after, as vim keeps its last search; Escape in the note takes them
+  off. A hit in a link or in inline code keeps the same two colours.
+- **The whole width:** the note fills its pane in the terminal and the window on the Mac, with
+  40 px inside the edges, instead of a column capped in the middle.
+- **Folders start closed:** the Mac app's sidebar no longer opens today's folder and the open
+  note's ancestors on start; a folder opens when you open it.
+- **Code blocks keep their columns:** a long line in a fenced code block breaks at the block's
+  edge, not at a word, so a table of output stays a table. nt draws code blocks itself, with
+  the language at the top right, in the terminal and the apps alike.
+- **Agents write Simplified Technical English:** the skill (`nt install --skill`) and the
+  `AGENTS.md` that `nt init` writes tell an agent to write notes, journal lines and reports in
+  ASD-STE100 unless asked for another style: short sentences, one topic each, active voice,
+  present tense, one word for one meaning. Code, paths and the person's own words stay as they
+  are.
+
 ## 0.9.3 (2026-11-03)
 
 Every client says when a note last changed and from which machine, read from git's history.
