@@ -34,6 +34,27 @@ repository: `nt sync` is its only git writer.
 - Notes are GitHub markdown: `[Title](relative/path.md)` links, `![alt](assets/x.png)` images,
   flat YAML frontmatter (`title`, `date`, `tags`). No wikilinks, embeds or callouts.
 
+## How to write
+
+Write notes, journal lines and reports in Simplified Technical English (ASD-STE100) unless the
+person asks for another style. Code, commands, paths, quoted text and the person's own words
+stay as they are.
+
+- One topic per sentence, one instruction per sentence. At most 20 words in an instruction,
+  25 in a description; at most six sentences in a paragraph.
+- Active voice, present tense. Instructions in the imperative: "Run the tests", not "The tests
+  should be run".
+- Use "must" for a requirement, "can" for a possibility; not "should", "may" or "might".
+- One word for one meaning, the same word every time: "start", not "initiate", "launch" or
+  "kick off" in turn. Plain words over long ones: "use", "show", "do", "get".
+- No noun strings of more than three words: "the config of the sync timer", not "sync timer
+  config value".
+- Write the articles: "the file", "a note". No gerund as a verb: "when you save", not "when
+  saving".
+- A warning or a caution comes before the step it belongs to, as its own sentence.
+- Steps in a numbered list, in the order they are done; facts that line up in a table.
+- Keep the person's names for things (projects, hosts, tools) exactly as they write them.
+
 ## Todos
 
 A todo is a task line, `- [ ] text due:YYYY-MM-DD`, and once done `- [x] text done:YYYY-MM-DD`,
@@ -69,6 +90,6 @@ EOF
 - `--status` is `done`, `blocked` or `failed` (or `in-progress` while the session runs).
 - The command finds the report by this session's working folder; `--session <id>` picks one.
   Each write replaces Done, Decisions and Open, so write the whole account each time.
-- Keep it short and factual. No secrets, tokens, passwords or transcripts: the notes are
-  pushed to GitHub.
+- Keep it short and factual, in Simplified Technical English as above. No secrets, tokens,
+  passwords or transcripts: the notes are pushed to GitHub.
 - The day's `README.md` in the same folder is generated from the reports. Do not edit it.

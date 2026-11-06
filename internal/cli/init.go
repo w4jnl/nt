@@ -143,6 +143,9 @@ agent working in this repository.
   pushed to GitHub.
 - Find things with ` + "`nt s \"words\" --json` and `nt ls folder --json`" + `; the open todos with
   ` + "`nt todo --json`" + `.
+- Write in Simplified Technical English (ASD-STE100) unless asked otherwise: short sentences,
+  one topic each, active voice, present tense, one word for one meaning, "must" for a
+  requirement. Code, paths and the person's own words stay as they are.
 
 The full format is docs/format.md in github.com/w4jnl/nt.
 `
