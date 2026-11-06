@@ -175,7 +175,7 @@ Every command that prints data takes `--json`.
 | `nt ls [folder]` | the folders and notes in a folder, newest first |
 | `nt view <file>` | one note rendered, images included, any other text as written: `f` follows a link, `b` goes back, `o` `i` the outline and images, `y` copies, `e` edits |
 | `nt paste <note>` | save the clipboard's image (or `--from` an image file) beside the note and print its markdown line |
-| `nt history <note>` | when the note changed and from which machine, newest first, from git's history; the browser and the apps show the last one under the note |
+| `nt history <note>` | when the note changed and from which machine, newest first, from git's history; the browser shows the last one at the footer's right, the apps under the note |
 | `nt todo [folder]` | the open todos, overdue first; `add`, `done`, `undo`, `due`, `rm` change them; `on`/`off <note>` make a note's task lines todos, or a checklist |
 | `nt mv`, `nt rename`, `nt mkdir`, `nt rm` | move and rename notes and folders with their links, make a folder, delete a note or an empty folder |
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |

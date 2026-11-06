@@ -573,27 +573,28 @@ func (b *browser) closePick() tea.Cmd {
 	return b.loadNow()
 }
 
-// linkedFrom is what follows a note: when it last changed and from which machine, by git's
-// history, then "Linked from", the notes that link to it. Nothing for a note never synced.
-func (b *browser) linkedFrom(rel string) string {
-	if b.ix == nil {
+// changed is "changed 2h ago · macbook" for the note on screen: when git's history last saw it
+// change and from which machine. "" for a note never synced, and when the pane shows something
+// else (the help, the todos, the settings). The footer carries it at the right, as the Mac app's
+// bottom right does.
+func (b *browser) changed() string {
+	if b.ix == nil || b.showing == "" || b.help || b.tv != nil || b.set != nil {
 		return ""
 	}
-	changed := ""
-	if n := b.ix.Note(rel); n != nil && n.Changed != "" {
-		changed = changedLine(n.Changed, n.By, b.v.Now())
+	if n := b.ix.Note(b.showing); n != nil && n.Changed != "" {
+		return changedLine(n.Changed, n.By, b.v.Now())
 	}
-	if changed == "" && len(b.ix.Back[rel]) == 0 {
+	return ""
+}
+
+// linkedFrom is what follows a note: "Linked from", the notes that link to it. Nothing when
+// none does.
+func (b *browser) linkedFrom(rel string) string {
+	if b.ix == nil || len(b.ix.Back[rel]) == 0 {
 		return ""
 	}
 	var s strings.Builder
 	s.WriteString("\n\n  " + b.st.Rule.Render(strings.Repeat("─", 24)) + "\n")
-	if changed != "" {
-		s.WriteString("  " + b.st.Faint.Render(changed) + "\n")
-	}
-	if len(b.ix.Back[rel]) == 0 {
-		return s.String()
-	}
 	s.WriteString("  " + b.st.Muted.Render("Linked from") + "\n")
 	for _, from := range b.ix.Back[rel] { // hyperlinks, like the note's own links, so they follow
 		link := vault.RelLink(rel, from)

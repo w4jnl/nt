@@ -108,7 +108,7 @@ func (b *browser) syncBadge() string {
 
 // changedLine is "changed 2h ago · macbook": when a note last changed (RFC 3339, from the
 // index) and the host that synced it, left out when the commit was not nt's. Under a minute it
-// is "just now"; older than two days it is the date, as todos say theirs.
+// is "just now"; older than two days it is the date, as todos say theirs. The footer shows it.
 func changedLine(at, by string, now time.Time) string {
 	t, err := time.Parse(time.RFC3339, at)
 	if err != nil {
@@ -441,7 +441,8 @@ func (b *browser) helpText(w, h int) string {
 }
 
 // footer is the prompt when one is open, else the key hints with the last message at the right,
-// or nt's version when there is no message and the hints leave room for it.
+// or, when there is no message and the hints leave room, when the note on screen last changed
+// and from which machine, else nt's version.
 func (b *browser) footer() string {
 	if b.input != nil {
 		return pad(lipgloss.NewStyle().Background(b.pal.Surface).Render(" ")+b.input.View(b.st, b.pal, b.width-1), b.width)
@@ -491,9 +492,15 @@ func (b *browser) footer() string {
 			right = b.st.Muted.Render(b.msg) + " "
 		}
 	}
-	if right == "" && b.o.Version != "" {
-		if v := b.st.Faint.Render("nt "+strings.TrimPrefix(b.o.Version, "v")) + " "; lipgloss.Width(left)+2+lipgloss.Width(v) <= b.width {
-			right = v
+	if right == "" {
+		for _, s := range []string{b.changed(), "nt " + strings.TrimPrefix(b.o.Version, "v")} {
+			if s == "" || s == "nt " {
+				continue
+			}
+			if v := b.st.Faint.Render(s) + " "; lipgloss.Width(left)+2+lipgloss.Width(v) <= b.width {
+				right = v
+			}
+			break // the note's line over the version, and neither when the hints leave no room
 		}
 	}
 	if lipgloss.Width(left)+lipgloss.Width(right) > b.width && right != "" {
