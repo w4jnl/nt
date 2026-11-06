@@ -149,6 +149,7 @@ test("links resolve against the note's folder", () => {
   assert.equal(resolve("daily/2026/2026-10-27.md", "../../homelab/a%20b.md#setup"), "homelab/a b.md");
   assert.equal(resolve("homelab/n.md", "<my notes.md>"), "homelab/my notes.md");
   assert.equal(resolve("n.md", "../outside.md"), "");
+  assert.equal(resolve("/Users/me/docs/x.md", "img/a.png"), "/Users/me/docs/img/a.png", "a file outside the repository keeps its full path");
   assert.equal(resolve("n.md", "https://example.com"), "");
   assert.equal(resolve("n.md", "#setup"), "");
   assert.equal(assetURL("homelab/assets/a b.png"), "nt-asset://repo/homelab/assets/a%20b.png");

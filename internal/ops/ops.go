@@ -417,7 +417,28 @@ func Save(v *vault.Vault, rel string, text []byte, base string, keep bool) (Save
 		return Saved{}, err
 	}
 	defer unlock()
-	p := v.Abs(rel)
+	return save(v.Abs(rel), text, base, keep, func(cur []byte) (string, error) {
+		cp := v.Unique(gitsync.ConflictName(rel, v.Host, v.Now()))
+		return cp, vault.WriteFile(v.Abs(cp), cur)
+	})
+}
+
+// SaveFile writes a markdown file outside the repository as Save writes a note, without the
+// repository lock, which guards only the repository: the Mac app edits a file Finder opened
+// with it. A conflict copy goes beside the file, named as a note's is.
+func SaveFile(v *vault.Vault, abs string, text []byte, base string, keep bool) (Saved, error) {
+	if !strings.HasSuffix(abs, ".md") || !filepath.IsAbs(abs) {
+		return Saved{}, fmt.Errorf("_editor save: %s is not a markdown file by its full path", abs)
+	}
+	return save(abs, text, base, keep, func(cur []byte) (string, error) {
+		cp := filepath.Join(filepath.Dir(abs), gitsync.ConflictName(filepath.Base(abs), v.Host, v.Now()))
+		return cp, vault.WriteFile(cp, cur)
+	})
+}
+
+// save is the compared write behind Save and SaveFile: copy keeps the file as it is now beside
+// the note when keep says to write over another writer's change.
+func save(p string, text []byte, base string, keep bool, copy func(cur []byte) (string, error)) (Saved, error) {
 	cur, err := os.ReadFile(p)
 	gone := errors.Is(err, os.ErrNotExist)
 	if err != nil && !gone {
@@ -429,8 +450,8 @@ func Save(v *vault.Vault, rel string, text []byte, base string, keep bool) (Save
 			now := string(cur)
 			return Saved{Saved: false, Sha: SHA256(cur), Text: &now}, nil
 		}
-		cp := v.Unique(gitsync.ConflictName(rel, v.Host, v.Now()))
-		if err := vault.WriteFile(v.Abs(cp), cur); err != nil {
+		cp, err := copy(cur)
+		if err != nil {
 			return Saved{}, fmt.Errorf("_editor save: %w", err)
 		}
 		reply.Copy = cp
@@ -441,6 +462,24 @@ func Save(v *vault.Vault, rel string, text []byte, base string, keep bool) (Save
 		}
 	}
 	return reply, nil
+}
+
+// EditorSave is `_editor save`'s work for the CLI and the phone: the note named, or with
+// outside a markdown file anywhere, which is saved without the lock when it is not in the
+// repository.
+func EditorSave(v *vault.Vault, name string, text []byte, base string, keep, outside bool) (Saved, error) {
+	rel, err := InRepo(v, name)
+	if err == nil {
+		return Save(v, rel, text, base, keep)
+	}
+	if !outside {
+		return Saved{}, fmt.Errorf("_editor save: %w", err)
+	}
+	abs, err := filepath.Abs(name)
+	if err != nil {
+		return Saved{}, fmt.Errorf("_editor save: %w", err)
+	}
+	return SaveFile(v, abs, text, base, keep)
 }
 
 // Stamp writes into each note of ix when git's history last saw it change and by which host

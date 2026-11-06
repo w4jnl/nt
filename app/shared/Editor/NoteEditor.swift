@@ -170,14 +170,15 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     }
 
     private func saveOnce() async {
-        guard let nt = ws.nt, let note = ws.note, let root = ws.root else { return }
+        guard let nt = ws.nt, let note = ws.note, let file = ws.file(note.path) else { return }
         guard let snap = (try? await call("return window.nt.beginSave()")) as? [String: Any],
               let seq = snap["seq"] as? Int, let text = snap["text"] as? String else {
             if dirty { clean() } // the text is the file's again
             return
         }
-        var args = ["_editor", "save", root.appending(path: note.path).path, "--base", note.sha]
+        var args = ["_editor", "save", file.path, "--base", note.sha]
         if keep { args.append("--keep") }
+        if note.path.hasPrefix("/") { args.append("--outside") } // a file from Finder: saved without the repository's lock
         do {
             let r = try await nt.json(SaveReply.self, args, input: Data(text.utf8))
             if r.saved {
@@ -347,6 +348,10 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     /// own.
     func paste(name: String, mime: String, data: Data, at pos: Int) async {
         guard let nt = ws.nt, let note = ws.note, let root = ws.root else { return }
+        if note.path.hasPrefix("/") {
+            ws.say("An image goes beside a note in your notes: \(ws.title(note.path)) is outside them")
+            return
+        }
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appending(path: "nt-paste-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: dir) }

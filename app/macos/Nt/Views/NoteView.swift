@@ -43,7 +43,7 @@ struct NoteView: View {
         .navigationTitle("")
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Breadcrumb(path: ws.note?.path ?? "", title: ws.note.map { ws.index?.title($0.path) ?? $0.path } ?? "")
+                Breadcrumb(path: ws.note?.path ?? "", title: ws.note.map { ws.title($0.path) } ?? "")
             }
             .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .primaryAction) {
@@ -59,7 +59,8 @@ struct NoteView: View {
     }
 }
 
-/// Breadcrumb is the note's folders, then its title.
+/// Breadcrumb is the note's folders, then its title; for a file outside the repository, its
+/// folder by its full path, with ~ for home.
 extension NoteView {
     /// status is the line at the bottom right: read-only when the note is, when it last changed
     /// and from which machine (git's history, through the index), and the word count.
@@ -77,10 +78,16 @@ struct Breadcrumb: View {
     let title: String
 
     var body: some View {
-        let folders = SidebarTree.ancestors(path).map { ($0 as NSString).lastPathComponent }
+        let folders = path.hasPrefix("/")
+            ? [((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath]
+            : SidebarTree.ancestors(path).map { ($0 as NSString).lastPathComponent }
         HStack(spacing: 6) {
             ForEach(Array(folders.enumerated()), id: \.offset) { _, name in
-                Text(name).foregroundStyle(Brand.muted)
+                Text(name)
+                    .foregroundStyle(Brand.muted)
+                    .lineLimit(1)
+                    .truncationMode(.head) // a long full path keeps its end, the folder's name
+                    .frame(maxWidth: 320)
                 Text("›").foregroundStyle(Brand.faint)
             }
             Text(title)

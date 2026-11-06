@@ -348,6 +348,7 @@ func (r Runner) editor(args []string, stdin []byte) ([]byte, int, error) {
 		return nil, 0, nil // the app syncs when it sees fit; there is no process to start
 	case "save":
 		rest, keep := Flag(args[1:], "--keep")
+		rest, outside := Flag(rest, "--outside")
 		rest, base, _, err := Value(rest, "--base")
 		if err != nil {
 			return nil, 2, fmt.Errorf("_editor save: %w", err)
@@ -359,11 +360,7 @@ func (r Runner) editor(args []string, stdin []byte) ([]byte, int, error) {
 		if len(pos) != 1 {
 			return nil, 2, errors.New("_editor save: name one note")
 		}
-		rel, err := InRepo(v, pos[0])
-		if err != nil {
-			return nil, 1, fmt.Errorf("_editor save: %w", err)
-		}
-		s, err := Save(v, rel, stdin, base, keep)
+		s, err := EditorSave(v, pos[0], stdin, base, keep, outside)
 		return answer(s, err)
 	}
 	return nil, 2, fmt.Errorf("_editor: unknown %q: use repo, kick, day, index or save", args[0])
