@@ -137,7 +137,8 @@ agent working in this repository.
 - Move and rename with ` + "`nt mv <note|folder> <to>` and `nt rename <note> \"New title\"`" + `, never ` + "`mv`" + `:
   nt fixes the links to and in what moves.
 - GitHub-flavoured markdown only: ` + "`[Title](relative/path.md)`" + ` links, ` + "`![alt](assets/x.png)`" + `
-  images, flat YAML frontmatter (` + "`title`, `date`, `tags`" + `). No wikilinks, embeds or callouts.
+  images, flat YAML frontmatter (` + "`title`, `date`, `tags`" + `). No wikilinks, embeds or callouts;
+  a note box is a GitHub alert, a quote whose first line is ` + "`[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`" + `.
 - Your session's report: ` + "`nt agent write --status done --summary \"one line\"`" + ` with ` + "`## Done`" + `,
   ` + "`## Decisions` and `## Open`" + ` on stdin. No secrets and no transcripts: this repository is
   pushed to GitHub.

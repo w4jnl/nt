@@ -136,8 +136,8 @@ func plainText(n ast.Node, src []byte) string {
 // RenderImages renders a note like Render, and draws each image that stands alone in its
 // paragraph with place. The paragraph becomes a marker word before Glamour runs; afterwards the
 // line that holds the marker is replaced by the image's rows, at the marker's indent. Fenced
-// code blocks (code.go) and tables (table.go) go the same way, drawn by nt, with or without a
-// placer.
+// code blocks (code.go), tables (table.go) and alerts (alert.go) go the same way, drawn by nt,
+// with or without a placer.
 func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 	_, body := SplitFrontmatter(note)
 	width := max(1, r.width-2*r.margin)
@@ -146,7 +146,7 @@ func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 	splice := func(start, end int, repl string) {
 		src = append(append(append([]byte{}, src[:start]...), repl...), src[end:]...)
 	}
-	marks := r.ownBlocks(body, nonce, width) // last first, so earlier offsets stay valid
+	marks := r.ownBlocks(body, nonce, width, place) // last first, so earlier offsets stay valid
 	for _, m := range marks {
 		splice(m.start, m.end, "\n"+m.marker+"\n") // a fence or a table can follow a paragraph's last line; the marker must not
 	}

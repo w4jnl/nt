@@ -170,6 +170,10 @@ t today  [ ] day  a append  n new  / search  ? help
   the columns with the most to wrap; a word longer than ten cells breaks at the edge only when
   the words do not all fit.
 - Block quotes in `ink-muted` with a `line` rule on the left.
+- Alerts (a quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or
+  `[!CAUTION]`): the rule and the title, the kind's word in bold, in the kind's colour, note and
+  important `accent`, tip `ok`, warning `warn`, caution `alert`; the body in `ink`. The apps add
+  the kind's `-soft` fill behind the quote.
 - Tables use `line` for borders and `ink` for cells; links in tables stay inline.
 - Frontmatter is never rendered. An image alone on its line (`![alt](path)`, or one HTML
   `<img src>` alone in its block) is drawn in place where the terminal can (Ghostty, kitty, also

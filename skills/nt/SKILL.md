@@ -32,7 +32,9 @@ repository: `nt sync` is its only git writer.
   move, rename and make folders. nt fixes every link to and in what moves; never move notes
   with `mv` or `git mv`.
 - Notes are GitHub markdown: `[Title](relative/path.md)` links, `![alt](assets/x.png)` images,
-  flat YAML frontmatter (`title`, `date`, `tags`). No wikilinks, embeds or callouts.
+  flat YAML frontmatter (`title`, `date`, `tags`). No wikilinks, embeds or callouts. A note
+  or warning box is a GitHub alert: a quote whose first line is `[!NOTE]`, `[!TIP]`,
+  `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, in capitals, the text on the lines after it.
 
 ## How to write
 

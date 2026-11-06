@@ -276,10 +276,13 @@ type drawn struct {
 	rows        []string
 }
 
-// ownBlocks is every block nt draws itself (code blocks, tables), last first, so splicing one
-// leaves the earlier offsets as they are.
-func (r *Renderer) ownBlocks(body []byte, nonce string, width int) []drawn {
+// ownBlocks is every block nt draws itself (code blocks, tables, alerts), last first, so
+// splicing one leaves the earlier offsets as they are.
+func (r *Renderer) ownBlocks(body []byte, nonce string, width int, place Placer) []drawn {
 	var out []drawn
+	for i, a := range alertBlocks(body) {
+		out = append(out, drawn{start: a.start, end: a.end, marker: nonce + itoa(i) + "a", alt: strings.TrimSpace(string(body[a.start:a.end])), rows: r.alertRows(a, width, place)})
+	}
 	for i, b := range codeBlocks(body) {
 		out = append(out, drawn{start: b.start, end: b.end, marker: nonce + itoa(i) + "c", alt: strings.TrimRight(b.code, "\n"), rows: r.codeRows(b, width)})
 	}

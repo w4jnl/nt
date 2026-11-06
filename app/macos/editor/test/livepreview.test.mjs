@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { EditorState } from "@codemirror/state";
 import { noteMarkdown } from "../src/syntax.js";
 import {
+  alertKind,
   anchorOf,
   assetURL,
   buildDecorations,
@@ -168,7 +169,7 @@ test("editor.css carries the design system's colours", () => {
   const css = readFileSync(new URL("../src/editor.css", import.meta.url), "utf8");
   const [light, dark] = css.split("@media (prefers-color-scheme: dark)");
   const value = (block, name) => new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6});`).exec(block)?.[1];
-  const names = ["ground", "surface", "surface-sunk", "line", "line-strong", "ink", "ink-muted", "ink-faint", "accent", "on-accent", "accent-soft", "ok", "warn", "alert"];
+  const names = ["ground", "surface", "surface-sunk", "line", "line-strong", "ink", "ink-muted", "ink-faint", "accent", "on-accent", "accent-soft", "ok", "ok-soft", "warn", "warn-soft", "alert", "alert-soft"];
   for (const name of names) {
     const t = tokens.color.tokens.find((t) => t.name === name);
     assert.equal(value(light, name), t.value.light, `${name} light`);
@@ -293,4 +294,22 @@ test("the next hit is the first after the cursor, the one before the last before
   assert.equal(nextHit(hits, 10, -1), 0);
   assert.equal(nextHit(hits, 2, -1), 2, "round the start");
   assert.equal(nextHit([], 0, 1), -1);
+});
+
+test("an alert is a quote in its kind's tint with the tag as its title", () => {
+  assert.equal(alertKind("> [!WARNING]"), "warning");
+  assert.equal(alertKind("  > [!note]  "), "note");
+  assert.equal(alertKind("> [!WARNING] text"), "");
+  assert.equal(alertKind("> plain"), "");
+  const doc = "> [!WARNING]\n> Careful.\n\n> plain\n";
+  const ds = decos(buildDecorations(state(doc, { cursor: doc.length - 1, focused: true })));
+  assert.ok(ds.some((d) => d.from === 0 && d.cls === "cm-alert cm-alert-first"), "the first line is an alert line");
+  assert.ok(ds.some((d) => d.from === 13 && d.cls === "cm-alert cm-alert-last"), "the last line too");
+  assert.deepEqual(ds.filter((d) => d.cls === "cm-alert-warning").map((d) => d.from), [0, 13]);
+  const title = ds.find((d) => d.widget === "TextWidget" && d.w.text === "Warning");
+  assert.ok(title && title.from === 2 && title.to === 12, "the tag is drawn as the title");
+  assert.ok(ds.some((d) => d.from === 25 && d.cls === "cm-quote cm-quote-first cm-quote-last"), "a plain quote stays one");
+  const on = decos(buildDecorations(state(doc, { cursor: 3, focused: true })));
+  assert.ok(on.some((d) => d.from === 2 && d.to === 12 && d.cls === "cm-syntax"), "the tag shows as syntax on the cursor line");
+  assert.ok(!on.some((d) => d.widget === "TextWidget" && d.w?.text === "Warning"));
 });

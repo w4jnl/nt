@@ -100,6 +100,17 @@ GitHub READMEs and pasted snippets use that form to centre or size an image.
 
 Clients must not write `[[wikilinks]]`, `![[embeds]]`, callouts, `%%comments%%`, or block references. They don't render on GitHub.
 
+### Alerts
+
+A note box is a GitHub alert: a block quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`, the text on the lines after it.
+
+```markdown
+> [!WARNING]
+> The cron jobs' timing is critical for the tool.
+```
+
+GitHub draws it as a box with a title. Clients draw it the same way, in the kind's colour; any other viewer shows a quote with the tag, so nothing is lost. The tag is written in capitals, alone on its line.
+
 ### Reading legacy wikilinks
 
 Clients should still read `[[wikilinks]]`. `[[name]]`, `[[name|label]]` and `[[name#heading]]` resolve to the note whose file stem or title equals `name`, ignoring case. If several notes match, the one closest to the linking note in the folder tree wins.
