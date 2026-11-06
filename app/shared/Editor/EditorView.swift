@@ -64,7 +64,9 @@ final class WeakHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// AssetHandler serves nt-asset://repo/<path>: a file in the repository, never one outside it.
+/// AssetHandler serves nt-asset://repo/<path>: a file in the repository, or, for a file opened
+/// from outside it (Workspace.openFile), one in that file's folder by its full path; nothing
+/// else on the disk.
 @MainActor
 final class AssetHandler: NSObject, WKURLSchemeHandler {
     let workspace: Workspace
@@ -75,7 +77,7 @@ final class AssetHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
         guard let url = task.request.url, let root = workspace.root,
-              let file = AssetHandler.file(for: url, root: root),
+              let file = AssetHandler.file(for: url, root: root, outside: workspace.outside ? workspace.note.flatMap { workspace.file($0.path) } : nil),
               let data = try? Data(contentsOf: file) else {
             task.didFailWithError(URLError(.fileDoesNotExist))
             return
@@ -88,12 +90,22 @@ final class AssetHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
 
-    /// file is the repository file an nt-asset URL names, or nil when it leaves the repository.
-    nonisolated static func file(for url: URL, root: URL) -> URL? {
-        let rel = url.path(percentEncoded: false).trimmingPrefix("/")
-        guard !rel.isEmpty else { return nil }
-        let base = root.standardizedFileURL.resolvingSymlinksInPath().path
-        let file = root.appending(path: String(rel)).standardizedFileURL.resolvingSymlinksInPath()
-        return file.path.hasPrefix(base + "/") ? file : nil
+    /// file is the file an nt-asset URL names: a repository path, or a full path (a second slash
+    /// after the host) in the folder of outside, the file on screen from outside the repository;
+    /// nil when it leaves them.
+    nonisolated static func file(for url: URL, root: URL, outside: URL?) -> URL? {
+        let p = url.path(percentEncoded: false).trimmingPrefix("/")
+        guard !p.isEmpty else { return nil }
+        if p.hasPrefix("/") {
+            guard let dir = outside?.deletingLastPathComponent() else { return nil }
+            return inside(URL(filePath: String(p)), dir)
+        }
+        return inside(root.appending(path: String(p)), root)
+    }
+
+    private nonisolated static func inside(_ file: URL, _ dir: URL) -> URL? {
+        let base = dir.standardizedFileURL.resolvingSymlinksInPath().path
+        let f = file.standardizedFileURL.resolvingSymlinksInPath()
+        return f.path.hasPrefix(base + "/") ? f : nil
     }
 }

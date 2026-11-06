@@ -62,10 +62,12 @@ func runEditorHelper(args []string) int {
 }
 
 // editorSave writes a note an editor changed: its text, read from in, through ops.Save, which
-// says what is done when another writer changed it since. It prints {"saved", "sha", "text" when
+// says what is done when another writer changed it since; with --outside a markdown file
+// anywhere (ops.SaveFile). It prints {"saved", "sha", "text" when
 // not saved, "copy" when one was made}.
 func editorSave(v *vault.Vault, args []string, in io.Reader) int {
 	args, keep := takeBool(args, "--keep")
+	args, outside := takeBool(args, "--outside")
 	args, base, _, err := takeValue(args, "--base")
 	if err != nil {
 		return fail(fmt.Errorf("_editor save: %w", err))
@@ -77,15 +79,11 @@ func editorSave(v *vault.Vault, args []string, in io.Reader) int {
 	if len(pos) != 1 {
 		return fail(errors.New("_editor save: name one note"))
 	}
-	rel, err := ops.InRepo(v, pos[0])
-	if err != nil {
-		return fail(fmt.Errorf("_editor save: %w", err))
-	}
 	text, err := io.ReadAll(in)
 	if err != nil {
 		return fail(fmt.Errorf("_editor save: %w", err))
 	}
-	saved, err := ops.Save(v, rel, text, base, keep)
+	saved, err := ops.EditorSave(v, pos[0], text, base, keep, outside)
 	if err != nil {
 		return fail(err)
 	}

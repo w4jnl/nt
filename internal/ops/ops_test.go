@@ -134,3 +134,50 @@ func TestRemoveTakesWhatOnlyTheNoteUses(t *testing.T) {
 		t.Error("a path that is not there")
 	}
 }
+
+func TestSaveFileOutsideTheRepository(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	v, err := vault.Open(root, "mbp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.Now = func() time.Time { return time.Date(2026, 11, 6, 21, 30, 0, 0, time.UTC) }
+	out := t.TempDir()
+	file := filepath.Join(out, "README.md")
+	read := func() string { b, _ := os.ReadFile(file); return string(b) }
+
+	r, err := EditorSave(v, file, []byte("# Hi\n"), "", false, false)
+	if err == nil || !strings.Contains(err.Error(), "not in the notes repository") {
+		t.Fatalf("without --outside: %+v %v", r, err)
+	}
+	if r, err = EditorSave(v, file, []byte("# Hi\n"), "", false, true); err != nil || !r.Saved || read() != "# Hi\n" {
+		t.Fatalf("a new file: %+v %v %q", r, err, read())
+	}
+	base := r.Sha
+	if r, err = EditorSave(v, file, []byte("# Hi\n\nMore.\n"), base, false, true); err != nil || !r.Saved || read() != "# Hi\n\nMore.\n" {
+		t.Fatalf("a change on the base: %+v %v", r, err)
+	}
+	if err := os.WriteFile(file, []byte("# Hi\n\nTheirs.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err = EditorSave(v, file, []byte("# Hi\n\nMine.\n"), base, false, true)
+	if err != nil || r.Saved || r.Text == nil || *r.Text != "# Hi\n\nTheirs.\n" || read() != "# Hi\n\nTheirs.\n" {
+		t.Fatalf("another writer: %+v %v", r, err)
+	}
+	r, err = EditorSave(v, file, []byte("# Hi\n\nMine.\n"), base, true, true)
+	if err != nil || !r.Saved || read() != "# Hi\n\nMine.\n" || r.Copy != filepath.Join(out, "README.conflict-mbp-20261106T213000.md") {
+		t.Fatalf("kept: %+v %v", r, err)
+	}
+	if b, _ := os.ReadFile(r.Copy); string(b) != "# Hi\n\nTheirs.\n" {
+		t.Errorf("the copy: %q", b)
+	}
+	if _, err := SaveFile(v, filepath.Join(out, "a.txt"), nil, "", false); err == nil {
+		t.Error("a .txt is not a markdown file")
+	}
+	if _, err := EditorSave(v, filepath.Join(root, "x.md"), nil, "", false, true); err != nil || !isFile(filepath.Join(root, "x.md")) {
+		t.Errorf("a repository note with --outside is still a note: %v", err)
+	}
+}

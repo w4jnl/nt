@@ -455,7 +455,8 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
     the command line alone.
   - The app does not update itself: `brew upgrade --cask nt-app`, or a new DMG.
 - Nothing leaves the Mac. The editor page's content policy allows only the app's own files and
-  `nt-asset:`, the repository's files, so a remote image in a note shows its alt text.
+  `nt-asset:`, the repository's files (and the folder of a file opened from outside it), so a
+  remote image in a note shows its alt text.
 
 **The window.** Two columns, quiet, in the manner of Typora.
 - The sidebar: Open (⌘P), Today, the views (Todos with its open count, Calendar, Weekly,
@@ -480,10 +481,16 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   takes the marks off. Search (⇧⌘F) is the same field for text only. Both leave task lines out: Todos finds those, and while Todos is
   shown ⇧⌘F and the toolbar's glass go to its own field. Today is ⌘T, Sync now ⌥⌘S.
 - A markdown file opened from Finder, the Dock or `open -a nt` opens as its note when it is in
-  the repository, and the window comes forward; one from elsewhere leaves the bottom line saying
-  it is not in your notes. The app lists itself for markdown (`net.daringfireball.markdown`,
-  Editor, rank Alternate), so Finder's Open With offers it and Get Info › Open with › Change All
-  makes it the default; it does not claim every `.md` on the Mac by itself (added 2026-11-06).
+  the repository, and the window comes forward. One from elsewhere opens alone, the sidebar
+  hidden until a note from the repository opens again: the toolbar says its folder by its full
+  path (`~/Desktop › Title`, the title its H1 or its name), links and images beside it work
+  (the asset handler serves that folder too, nothing above it), and it is saved as a note is,
+  `nt _editor save --outside <path>`, compared with what the editor read and without the
+  repository's lock, which guards only the repository; a conflict copy goes beside it. It has
+  no backlinks, no changed line, no todos, no pasted images, and it is not in Recent. The app
+  lists itself for markdown (`net.daringfireball.markdown`, Editor, rank Alternate), so Finder's
+  Open With offers it and Get Info › Open with › Change All makes it the default; it does not
+  claim every `.md` on the Mac by itself (added 2026-11-06).
 - The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search…
   and Sync now. New Todo… asks for the text and adds it under Inbox in the `todo.md` of
   the folder ⌘N would use, or the root's when that is the journals', the agents' or the weekly

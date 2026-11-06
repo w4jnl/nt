@@ -157,6 +157,8 @@ final class Workspace {
     @ObservationIgnored private var opening = 0 // counts opens, so the last one asked for wins
     @ObservationIgnored private var askedFile: URL? // a file asked for before the repository was ready
     @ObservationIgnored private var starting = false
+    @ObservationIgnored private var sidebarBeforeOutside = true
+    @ObservationIgnored private var outsideTitle = ""
     #if !os(macOS)
     @ObservationIgnored private var syncSoon: Task<Void, Never>?
     #endif
@@ -172,6 +174,17 @@ final class Workspace {
     #endif
 
     var root: URL? { index.map { URL(filePath: $0.root) } }
+
+    /// outside says the note on screen is a markdown file outside the repository, opened from
+    /// Finder (openFile): its path is the file's full path, not a repository path.
+    var outside: Bool { note?.path.hasPrefix("/") ?? false }
+
+    /// file is where a note's path is on disk: in the repository, or anywhere for a file outside it.
+    func file(_ path: String) -> URL? { Self.fileURL(path, root: root) }
+
+    nonisolated static func fileURL(_ path: String, root: URL?) -> URL? {
+        path.hasPrefix("/") ? URL(filePath: path) : root?.appending(path: path)
+    }
 
     /// start finds the repository and, on the Mac, opens today, or the note a file asked for
     /// (openFile); on iPhone and iPad the layout opens a note (the iPad today, the iPhone none
@@ -350,7 +363,7 @@ final class Workspace {
 
     /// find is a search's words, marked in the note (the editor page's findField).
     func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") async {
-        guard let root, let editor else { return }
+        guard let editor, let url = file(path) else { return }
         opening += 1
         let mine = opening
         if path == note?.path, !reload {
@@ -363,36 +376,59 @@ final class Workspace {
             return
         }
         guard mine == opening else { return } // another note was asked for while this one waited
-        let url = root.appending(path: path)
         guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else {
             say("\(path) cannot be read: is it still there?")
             return
         }
+        let was = outside
         let n = OpenNote(path: path, sha: sha256(data), readOnly: Self.readOnly(text), backlinks: backlinks(path))
         note = n
+        if outside { // a file from Finder: the note alone, the sidebar back with the next note from the repository
+            outsideTitle = Self.heading(text) ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            if !was {
+                sidebarBeforeOutside = sidebar
+                sidebar = false
+            }
+        } else if was {
+            sidebar = sidebarBeforeOutside
+        }
         if finding { closeFind() } // another note: the bar goes with the one it was for
         editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
         selection = selectionFor(path)
-        recent = Self.remember(path, in: recent) // the folders stay as they are: only the person opens one
+        if !outside { recent = Self.remember(path, in: recent) } // the folders stay as they are: only the person opens one
     }
 
-    /// openFile opens a note by its path on disk, as Finder, the Dock or `open -a nt` give it:
-    /// the note it is in the repository, else a word that it is not. Before the repository is
-    /// ready the file waits, and opens in place of today.
+    /// openFile opens a markdown file by its path on disk, as Finder, the Dock or `open -a nt`
+    /// give it: the note it is in the repository, else the file alone, by its full path, with
+    /// the sidebar hidden. Before the repository is ready the file waits, and opens in place of
+    /// today.
     func openFile(_ url: URL) async {
         guard phase == .ready, let root else {
             askedFile = url
             return
         }
-        guard let rel = Self.relative(url, in: root) else {
-            say("\(url.lastPathComponent) is not in your notes (\((root.path as NSString).abbreviatingWithTildeInPath))")
+        let path = Self.relative(url, in: root) ?? url.standardizedFileURL.path
+        guard path.lowercased().hasSuffix(".md") else {
+            say("\(url.lastPathComponent) is not a markdown file")
             return
         }
-        guard rel.lowercased().hasSuffix(".md") else {
-            say("\(rel) is not a markdown note")
-            return
+        await open(path)
+    }
+
+    /// heading is a note's H1, the title of a file outside the repository, which the index does
+    /// not know; nil without one.
+    nonisolated static func heading(_ text: String) -> String? {
+        var inFront = false
+        for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let l = line.trimmingCharacters(in: .whitespaces)
+            if l == "---" && (i == 0 || inFront) {
+                inFront.toggle()
+                continue
+            }
+            if inFront { continue }
+            if l.hasPrefix("# ") { return String(l.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
         }
-        await open(rel)
+        return nil
     }
 
     /// relative is url's path inside root, or nil when it is not under it. Both are resolved
@@ -423,7 +459,8 @@ final class Workspace {
     }
 
     func title(_ path: String) -> String {
-        index?.title(path) ?? (path as NSString).lastPathComponent
+        if path.hasPrefix("/") { return path == note?.path ? outsideTitle : (path as NSString).lastPathComponent }
+        return index?.title(path) ?? (path as NSString).lastPathComponent
     }
 
     /// day is the day as nt counts it (day_starts), for a todo's done: date.
@@ -479,8 +516,8 @@ final class Workspace {
 
     /// follow follows a link the person clicked in the note on screen.
     func follow(_ href: String) {
-        guard let n = note, let root else { return }
-        let target = Links.target(from: n.path, href) { FileManager.default.fileExists(atPath: root.appending(path: $0).path) }
+        guard let n = note else { return }
+        let target = Links.target(from: n.path, href) { FileManager.default.fileExists(atPath: file($0)?.path ?? "") }
         switch target {
         case .note(let path, let anchor):
             if path == n.path, !anchor.isEmpty {
@@ -490,10 +527,10 @@ final class Workspace {
             }
         case .anchor(let a): scroll(to: a)
         #if os(macOS)
-        case .file(let path): NSWorkspace.shared.open(root.appending(path: path))
+        case .file(let path): if let u = file(path) { NSWorkspace.shared.open(u) }
         case .web(let url): NSWorkspace.shared.open(url)
         #else
-        case .file(let path): preview = root.appending(path: path)
+        case .file(let path): preview = file(path)
         case .web(let url): UIApplication.shared.open(url)
         #endif
         case .missing(let path): say("\(path) is not in the repository")
@@ -524,7 +561,7 @@ final class Workspace {
 
     /// todosOn says whether a note's task lines are todos, read from the file as the menu asks.
     func todosOn(_ path: String) -> Bool {
-        guard let root, let text = try? String(contentsOf: root.appending(path: path), encoding: .utf8) else { return false }
+        guard let url = file(path), let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
         return Todo.enabled(path, text)
     }
 
@@ -642,7 +679,7 @@ final class Workspace {
     /// root; then nt's default folder ("").
     var newFolder: String {
         if case .folder(let f) = selection { return f }
-        guard let n = note, let ix = index else { return "" }
+        guard let n = note, !outside, let ix = index else { return "" }
         return Self.newFolder(for: n.path, folders: ix.folders)
     }
 
@@ -847,10 +884,10 @@ final class Workspace {
 
     /// broken are the link destinations of the note on screen that point at nothing.
     func broken(_ dests: [String]) -> [String] {
-        guard let n = note, let root else { return [] }
+        guard let n = note else { return [] }
         return dests.filter { d in
-            guard let p = Links.resolve(from: n.path, d) else { return false }
-            return !FileManager.default.fileExists(atPath: root.appending(path: p).path)
+            guard let p = Links.resolve(from: n.path, d), let u = file(p) else { return false }
+            return !FileManager.default.fileExists(atPath: u.path)
         }
     }
 
@@ -981,8 +1018,8 @@ final class Workspace {
 
     /// reloadIfChanged hands the editor the note on screen as another writer left it on disk.
     func reloadIfChanged() async {
-        guard let n = note, let root, let editor else { return }
-        guard let data = try? Data(contentsOf: root.appending(path: n.path)) else {
+        guard let n = note, let url = file(n.path), let editor else { return }
+        guard let data = try? Data(contentsOf: url) else {
             say("\(n.path) was moved or deleted")
             return
         }

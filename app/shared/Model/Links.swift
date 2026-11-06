@@ -13,7 +13,8 @@ enum Links {
         case invalid
     }
 
-    /// resolve is the repository path dest points to from the note at from, without the anchor.
+    /// resolve is the repository path dest points to from the note at from, without the anchor;
+    /// from a file outside the repository (its full path), a full path again.
     nonisolated static func resolve(from: String, _ dest: String) -> String? {
         var d = dest
         if d.hasPrefix("<"), d.hasSuffix(">") { d = String(d.dropFirst().dropLast()) }
@@ -31,7 +32,7 @@ enum Links {
             default: parts.append(seg)
             }
         }
-        return parts.joined(separator: "/")
+        return (from.hasPrefix("/") ? "/" : "") + parts.joined(separator: "/")
     }
 
     nonisolated static func isExternal(_ dest: String) -> Bool {

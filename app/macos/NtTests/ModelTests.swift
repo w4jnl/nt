@@ -167,6 +167,7 @@ private func index() throws -> RepoIndex {
         #expect(Links.resolve(from: "n.md", "../outside.md") == nil)
         #expect(Links.resolve(from: "n.md", "https://example.com") == nil)
         #expect(Links.resolve(from: "n.md", "/etc/hosts") == nil)
+        #expect(Links.resolve(from: "/Users/me/docs/x.md", "img/a.png") == "/Users/me/docs/img/a.png", "a file outside the repository keeps its full path")
     }
 
     @Test func targets() {
@@ -196,9 +197,24 @@ private func index() throws -> RepoIndex {
 
     @Test func assetsStayInTheRepository() {
         let root = URL(filePath: NSTemporaryDirectory()).appending(path: "nt-assets-test")
-        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/homelab/assets/a%20b.png")!, root: root)?.lastPathComponent == "a b.png")
-        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/../../etc/hosts")!, root: root) == nil)
-        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/homelab/%2E%2E/%2E%2E/etc/hosts")!, root: root) == nil)
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/homelab/assets/a%20b.png")!, root: root, outside: nil)?.lastPathComponent == "a b.png")
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/../../etc/hosts")!, root: root, outside: nil) == nil)
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo/homelab/%2E%2E/%2E%2E/etc/hosts")!, root: root, outside: nil) == nil)
+        // a file from outside the repository: its folder, nothing above it
+        let doc = URL(filePath: "/Users/me/docs/x.md")
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo//Users/me/docs/img/a.png")!, root: root, outside: doc)?.path == "/Users/me/docs/img/a.png")
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo//Users/me/docs/../secret.png")!, root: root, outside: doc) == nil)
+        #expect(AssetHandler.file(for: URL(string: "nt-asset://repo//Users/me/docs/img/a.png")!, root: root, outside: nil) == nil)
+    }
+
+    @Test func aFileOutsideTheRepositoryIsItsOwnPath() {
+        let root = URL(filePath: "/r")
+        #expect(Workspace.fileURL("work/a.md", root: root)?.path == "/r/work/a.md")
+        #expect(Workspace.fileURL("/Users/me/docs/x.md", root: root)?.path == "/Users/me/docs/x.md")
+        #expect(Workspace.fileURL("work/a.md", root: nil) == nil)
+        #expect(Workspace.heading("---\ntitle: x\n---\n\n# The title \n\ntext") == "The title")
+        #expect(Workspace.heading("text\n## not it\n") == nil)
+        #expect(Workspace.heading("# First\n# Second\n") == "First")
     }
 
     @Test func aFileFromFinderIsItsNoteOnlyInsideTheRepository() throws {
