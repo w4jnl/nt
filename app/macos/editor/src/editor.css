@@ -220,6 +220,16 @@ html { -webkit-text-size-adjust: 100%; }
   margin: 6px 0;
   font-size: 15px;
   line-height: 22px;
+  /* CodeMirror wraps lines anywhere (overflow-wrap: anywhere), which a table's layout reads as
+     "every letter is a break": a narrow column shrank to one letter a line ("H ig h"). A cell
+     breaks at spaces only, so a column is at least its longest word wide; a table wider than
+     the note scrolls sideways instead of squeezing. */
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 #editor .cm-tbl th, #editor .cm-tbl td { padding: 6px 14px 6px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
 #editor .cm-tbl th { font-weight: 600; border-bottom-color: var(--line-strong); }

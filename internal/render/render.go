@@ -102,6 +102,7 @@ func JSON(dark bool) ([]byte, error) {
 // Renderer renders notes at one width in one theme. Make a new one when either changes.
 type Renderer struct {
 	tr            *glamour.TermRenderer
+	cells         *glamour.TermRenderer // a table's cells, one line each, unwrapped (table.go)
 	width, margin int
 	dark          bool
 	code          *chroma.Style
@@ -133,11 +134,20 @@ func NewAt(width int, dark bool, dir string) (*Renderer, error) {
 	if err != nil {
 		return nil, err
 	}
+	cells, err := glamour.NewTermRenderer(
+		glamour.WithStyles(s),
+		glamour.WithWordWrap(0),
+		glamour.WithInlineTableLinks(true),
+		glamour.WithBaseURL(base+dir),
+	)
+	if err != nil {
+		return nil, err
+	}
 	margin := 0
 	if s.Document.Margin != nil {
 		margin = int(*s.Document.Margin)
 	}
-	return &Renderer{tr: tr, width: width, margin: margin, dark: dark, code: codeStyle(dark)}, nil
+	return &Renderer{tr: tr, cells: cells, width: width, margin: margin, dark: dark, code: codeStyle(dark)}, nil
 }
 
 // Render styles a note: frontmatter stripped, the body rendered, images as their alt text.
