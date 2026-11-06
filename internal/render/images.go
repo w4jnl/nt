@@ -136,26 +136,19 @@ func plainText(n ast.Node, src []byte) string {
 // RenderImages renders a note like Render, and draws each image that stands alone in its
 // paragraph with place. The paragraph becomes a marker word before Glamour runs; afterwards the
 // line that holds the marker is replaced by the image's rows, at the marker's indent. Fenced
-// code blocks go the same way, drawn by nt (code.go), with or without a placer.
+// code blocks (code.go) and tables (table.go) go the same way, drawn by nt, with or without a
+// placer.
 func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 	_, body := SplitFrontmatter(note)
 	width := max(1, r.width-2*r.margin)
-	type drawn struct {
-		marker, alt string
-		rows        []string
-	}
-	var marks []drawn
 	nonce := markerNonce(body)
 	src := body
 	splice := func(start, end int, repl string) {
 		src = append(append(append([]byte{}, src[:start]...), repl...), src[end:]...)
 	}
-	codes := codeBlocks(body)
-	for i := len(codes) - 1; i >= 0; i-- { // from the end, so earlier offsets stay valid
-		b := codes[i]
-		m := drawn{marker: nonce + strconv.Itoa(i) + "c", alt: strings.TrimRight(b.code, "\n"), rows: r.codeRows(b, width)}
-		marks = append(marks, m)
-		splice(b.start, b.end, "\n"+m.marker+"\n") // a fence can follow a paragraph's last line; the marker must not
+	marks := r.ownBlocks(body, nonce, width) // last first, so earlier offsets stay valid
+	for _, m := range marks {
+		splice(m.start, m.end, "\n"+m.marker+"\n") // a fence or a table can follow a paragraph's last line; the marker must not
 	}
 	var blocks []imageBlock
 	if place != nil {
@@ -167,7 +160,7 @@ func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 		if !ok || len(rows) == 0 {
 			continue
 		}
-		m := drawn{marker: nonce + strconv.Itoa(i) + "x", alt: b.alt, rows: rows}
+		m := drawn{marker: nonce + itoa(i) + "x", alt: b.alt, rows: rows}
 		marks = append(marks, m)
 		// keep the newlines the block ends with, so it stays a block of its own
 		repl := m.marker + strings.Repeat("\n", len(src[b.start:b.end])-len(bytes.TrimRight(src[b.start:b.end], "\n")))
@@ -207,6 +200,8 @@ func (r *Renderer) RenderImages(note []byte, place Placer) (string, error) {
 	}
 	return out, nil
 }
+
+func itoa(i int) string { return strconv.Itoa(i) }
 
 // markerNonce is a word that does not occur in the note, so a marker never matches its text.
 func markerNonce(body []byte) string {

@@ -2,11 +2,13 @@ package render
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
 	"charm.land/glamour/v2/ansi"
 	xansi "github.com/charmbracelet/x/ansi"
+	astext "github.com/yuin/goldmark/extension/ast"
 )
 
 func TestSplitFrontmatter(t *testing.T) {
@@ -268,5 +270,98 @@ func TestCodeBlocks(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("block %d: got %+v (%q), want %+v", i, got[i], body[got[i].start:got[i].end], want[i])
 		}
+	}
+}
+
+func TestTableBlocks(t *testing.T) {
+	body := []byte("p\n| a | b |\n|---|:-:|\n| 1 | 2 |\n\ntext\n\n- item\n\n  | n | m |\n  |---|---|\n  | 3 | 4 |\n\n| h |\n|---|\n")
+	got := tableBlocks(body)
+	if len(got) != 2 {
+		t.Fatalf("got %d tables, want 2: %+v", len(got), got)
+	}
+	if s := string(body[got[0].start:got[0].end]); s != "| a | b |\n|---|:-:|\n| 1 | 2 |" {
+		t.Errorf("the first table's bytes: %q", s)
+	}
+	if got[0].cells[0][1] != "b" || got[0].cells[1][0] != "1" || got[0].aligns[1] != astext.AlignCenter {
+		t.Errorf("the first table's cells: %+v", got[0])
+	}
+	if s := string(body[got[1].start:got[1].end]); s != "| h |\n|---|" {
+		t.Errorf("a header alone takes its delimiter row: %q", s)
+	}
+}
+
+func TestTableWidths(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		max, min []int
+		avail    int
+		want     []int
+	}{
+		{"all fit", []int{1, 4, 25}, []int{1, 4, 25}, 40, []int{1, 4, 25}},
+		{"words fit, the slack shared by what wraps", []int{1, 4, 25, 97, 112}, []int{1, 4, 25, 25, 7}, 84, []int{1, 4, 25, 33, 21}},
+		{"long words break, short ones stay whole", []int{1, 4, 25, 97, 112}, []int{1, 4, 25, 25, 7}, 54, []int{1, 4, 11, 19, 19}},
+		{"not even the short words fit", []int{1, 4, 25}, []int{1, 4, 25}, 6, []int{1, 2, 3}},
+	} {
+		got := tableWidths(c.max, c.min, c.avail)
+		sum := 0
+		for _, w := range got {
+			sum += w
+		}
+		if fmt.Sprint(got) != fmt.Sprint(c.want) || sum > c.avail {
+			t.Errorf("%s: got %v (sum %d), want %v within %d", c.name, got, sum, c.want, c.avail)
+		}
+	}
+}
+
+func TestTableColumnsKeepTheirWords(t *testing.T) {
+	md := "# Risks\n\n| # | Sev | Location | Issue | Effect |\n|---|-----|----------|------:|--------|\n" +
+		"| 1 | High | `ou_script_synciq.py:772` | The code replaces the site list with `['riosed-tcs-w1-mgmt…']`. The file changed on 13 Oct 2026. | If the live copy also has this change, only Rio, AMS and HOU get new data. The old OU files of the other sites stay. |\n" +
+		"| 2 | High | `ou_script_synciq.py:801` | The code sets `ou` one time, before the loop. | A scan file without a match gets the **OU of the** file before it. |\n\nafter\n"
+	for _, c := range []struct {
+		width   int
+		wantSev string // the header's row, stripped
+	}{{100, " # │ Sev  │ Location                  │"}, {70, " # │ Sev  │ Location    │"}} {
+		r, err := New(c.width, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := r.Render([]byte(md))
+		if err != nil {
+			t.Fatal(err)
+		}
+		plain := xansi.Strip(out)
+		var rows []string
+		for _, l := range strings.Split(plain, "\n") {
+			if strings.Contains(l, "│") || strings.Contains(l, "┼") {
+				rows = append(rows, strings.TrimPrefix(l, "  "))
+			}
+		}
+		if len(rows) < 4 || !strings.HasPrefix(rows[0], c.wantSev) {
+			t.Fatalf("width %d: the header row %q, want it to start %q\n%s", c.width, rows[0], c.wantSev, plain)
+		}
+		if !strings.Contains(rows[2], "│ High │") {
+			t.Errorf("width %d: \"High\" is not whole on the first row: %q", c.width, rows[2])
+		}
+		if c.width == 100 && !strings.Contains(rows[2], "ou_script_synciq.py:772") {
+			t.Errorf("width 100: the path is cut: %q", rows[2])
+		}
+		for _, row := range rows {
+			if w := xansi.StringWidth(row); w > c.width-2 {
+				t.Errorf("width %d: a row of %d cells: %q", c.width, w, row)
+			}
+		}
+		if !strings.Contains(plain, "after") || !strings.Contains(plain, "Risks") {
+			t.Errorf("the text around the table: %s", plain)
+		}
+	}
+	// a right-aligned column, and the markdown in a cell rendered
+	r, _ := New(80, true)
+	out, _ := r.Render([]byte("| n | word |\n|--:|------|\n| 1 | **bold** `x` |\n| 100 | b |\n"))
+	plain := xansi.Strip(out)
+	if !strings.Contains(plain, "   1 │ bold") || !strings.Contains(plain, " 100 │ b") {
+		t.Errorf("right alignment: %s", plain)
+	}
+	if n := strings.Count(out, "\x1b[1m") + strings.Count(out, ";1m"); n == 0 {
+		t.Errorf("bold in a cell: %q", out)
 	}
 }

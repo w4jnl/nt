@@ -165,6 +165,10 @@ t today  [ ] day  a append  n new  / search  ? help
   palette drawn from the tokens. A block spans the preview's width, the language in `ink-muted`
   at its top right. A line longer than the block breaks at its edge, every line at the same
   column, as vim's wrap does, so a table of output keeps its columns; never at a word.
+- Tables in Glamour's look (a space each side of a cell, `│` between columns, a rule under the
+  header), laid out by nt: a column is at least its longest word wide and the room left goes to
+  the columns with the most to wrap; a word longer than ten cells breaks at the edge only when
+  the words do not all fit.
 - Block quotes in `ink-muted` with a `line` rule on the left.
 - Tables use `line` for borders and `ink` for cells; links in tables stay inline.
 - Frontmatter is never rendered. An image alone on its line (`![alt](path)`, or one HTML
