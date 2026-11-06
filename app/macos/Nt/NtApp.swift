@@ -109,6 +109,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// A markdown file from Finder, the Dock or `open -a nt` (Info.plist lists the type): the
+    /// window comes forward and the note opens, when the file is in the repository
+    /// (Workspace.openFile). Of several, the last.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        NSApp.activate()
+        if let w = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
+            w.makeKeyAndOrderFront(nil)
+        } else {
+            _ = NSApp.delegate?.applicationShouldHandleReopen?(NSApp, hasVisibleWindows: false)
+        }
+        guard let url = urls.last else { return }
+        Task { await workspace.openFile(url) }
+    }
+
     func applicationDidBecomeActive(_ notification: Notification) {
         workspace.active = true
     }

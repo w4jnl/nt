@@ -66,6 +66,14 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: w4j.nl · MIT
+        # A markdown file opened from Finder, the Dock or `open -a nt` opens as its note when it
+        # is in the notes repository (AppDelegate). Alternate: Finder lists nt under Open With
+        # and Get Info › Change All makes it the default; nt does not claim every .md on the Mac.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [net.daringfireball.markdown]
   NtTests:
     type: bundle.unit-test
     platform: macOS
