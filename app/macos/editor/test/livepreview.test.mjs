@@ -168,7 +168,7 @@ test("editor.css carries the design system's colours", () => {
   const css = readFileSync(new URL("../src/editor.css", import.meta.url), "utf8");
   const [light, dark] = css.split("@media (prefers-color-scheme: dark)");
   const value = (block, name) => new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6});`).exec(block)?.[1];
-  const names = ["ground", "surface", "surface-sunk", "line", "line-strong", "ink", "ink-muted", "ink-faint", "accent", "accent-soft", "ok", "warn", "alert"];
+  const names = ["ground", "surface", "surface-sunk", "line", "line-strong", "ink", "ink-muted", "ink-faint", "accent", "on-accent", "accent-soft", "ok", "warn", "alert"];
   for (const name of names) {
     const t = tokens.color.tokens.find((t) => t.name === name);
     assert.equal(value(light, name), t.value.light, `${name} light`);

@@ -67,7 +67,8 @@ a report reads the same in flok's sidebar, in nt and in the digest.
 - Set text in `ink`, secondary text (dates, paths, footer verbs) in `ink-muted`, placeholders
   only in `ink-faint`.
 - `accent` is the only interactive colour: the selection bar, footer keys, links and headings
-  in the preview, the syncing spinner. A highlighted search match sits on `accent-soft`. Text
+  in the preview, the syncing spinner. A search's hit in the note is `on-accent` on `accent`, as
+  the H1 band, so it shows at a glance; `accent-soft` is for a selected row in a list. Text
   selected in the note, in `ink`, sits on `accent` at a third over `ground`, in every client: the
   apps' page blends it with `color-mix`, the terminal from the two tokens (`theme.SelectionHex`),
   since `accent-soft` is too near the ground to read as a selection.

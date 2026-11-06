@@ -197,7 +197,7 @@ Decisions taken with the user (2026-10-26):
 - Under the note, before "Linked from": `changed 2h ago · macbook`, when git's history last saw the note change and the host whose sync committed it (`gitsync.Changes` over `git log --name-only`, read only; `changed` and `by` in `nt _editor index`). Under a minute it is "just now", up to two days minutes or hours ago, then the date as todos say theirs; a commit nt did not make names no host; a note never synced shows nothing. The time is the sync's, not the save's: a note written since the last sync keeps its earlier line until sync commits it. No frontmatter stamp: one `updated` line changed on two devices would make every edit a conflict copy, and the journals' lines carry their own times.
 - The browser polls once a second instead of using fsnotify: the note on screen, the folder and `status.json`. It catches edits, merges from sync and agents' writes alike, without a dependency.
 - While a picker is open the preview follows its highlighted row; Escape gives it back to the list.
-- A search's words stay marked in the note, in `ink` on `accent-soft`, in every note shown after
+- A search's words stay marked in the note, in `on-accent` on `accent`, in every note shown after
   it, as vim keeps its last search; Escape in the note takes the marks off. To search one note,
   `/` with its words and `j` `k` down the lines that are its.
 - `i` opens an image with `image_viewer`, else Quick Look, else `xdg-open` on a Linux desktop, else `nt _image` (chafa, full screen) in the terminal.
@@ -475,7 +475,7 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
 - Open (⌘P) is one field: fuzzy titles first, scored as the terminal picker scores them, then the
   lines that match (`nt s`), then "New note" with what was typed as its title, when no title is
   exactly that. Return opens the note, the cursor at the line for a text match, and the words
-  searched for marked in `ink` on `accent-soft`, as the terminal marks them; typing or Escape
+  searched for marked in `on-accent` on `accent`, as the terminal marks them; typing or Escape
   takes the marks off. Search (⇧⌘F) is the same field for text only. Both leave task lines out: Todos finds those, and while Todos is
   shown ⇧⌘F and the toolbar's glass go to its own field. Today is ⌘T, Sync now ⌥⌘S.
 - The File menu: New Note… (⌘N), New Todo… (⇧⌘N), Add to Today…, then Today, Open…, Search…
