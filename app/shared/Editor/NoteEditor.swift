@@ -308,6 +308,8 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             } else if let path = body["path"] as? String { // a "Linked from" line
                 ws.followed(path)
             }
+        case "back": // ⌘[ while the note has the keyboard, which CodeMirror would take to outdent
+            Task { await ws.back() }
         case "tag":
             if let q = body["query"] as? String { ws.find(q) }
         case "stats":

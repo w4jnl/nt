@@ -139,8 +139,9 @@ struct WritingTests {
         ws.follow("2026-10-22-other.md")
         try await until("the link's note") { ws.note?.path == "homelab/2026-10-22-other.md" }
         #expect(ws.history.map(\.path) == [note])
-        await ws.back()
-        #expect(ws.note?.path == note)
+        // ⌘[ in the note itself: the page hands it to the app instead of outdenting
+        try await page("document.querySelector('.cm-content').dispatchEvent(new KeyboardEvent('keydown', { key: '[', metaKey: true, bubbles: true }))")
+        try await until("the note the link was followed from") { ws.note?.path == note }
         #expect(!ws.canGoBack)
         await ws.back()
         #expect(ws.flash == "No note to go back to")

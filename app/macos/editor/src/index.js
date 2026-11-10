@@ -33,7 +33,8 @@ function extensions(path, readOnly) {
   return [
     noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
     history(),
-    keymap.of([{ key: "Escape", run: clearFind }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
+    // Mod-[ goes to the app's Back before defaultKeymap takes it to outdent (Shift-Tab still does).
+    keymap.of([{ key: "Escape", run: clearFind }, { key: "Mod-[", run: () => (post({ type: "back" }), true) }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
