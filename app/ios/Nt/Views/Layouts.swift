@@ -195,7 +195,15 @@ struct NoteDetail: View {
         } ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top) { if ws.finding { FindBar() } }
-        .toolbar { if let n = ws.note { NoteMenu(path: n.path, find: { ws.openFind() }) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Back", systemImage: "chevron.left") { Task { await ws.back() } }
+                    .disabled(!ws.canGoBack)
+                    .keyboardShortcut("[")
+                    .accessibilityLabel("Back to the note the link was followed from")
+            }
+            if let n = ws.note { NoteMenu(path: n.path, find: { ws.openFind() }) }
+        }
         .modifier(PhotoPicking())
     }
 }

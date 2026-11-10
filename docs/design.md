@@ -510,6 +510,14 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   reports and the digests are not renamed or moved.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
+- Back (⌘[, View; the chevron before the folders in the toolbar) returns to the note a link or
+  a "Linked from" line was followed from, scrolled as it was, as the terminal's `b` does (at
+  most 50; `Workspace.history`). It is dimmed when there is none. While the note has the
+  keyboard the page hands ⌘[ to the app, which CodeMirror binds to outdent (Shift-Tab still
+  does). A note renamed or moved keeps
+  its place in the history, a deleted one leaves it, and a note gone since is skipped. Opening a
+  note from the sidebar, Todos, the calendar or Open is a choice from a list, not a jump, so it
+  is not remembered.
 
 **The views**, in the note's place; the note on screen is saved first.
 - **Todos** is the terminal browser's todo list: every open todo, overdue first, with its date in
@@ -682,6 +690,8 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - A bar above the keyboard: a task, a heading, a link, a photo, undo, redo, done.
   - A tap follows a link. On the line being edited the link shows an "open" chip in place of
     the Mac's Command-click.
+  - On an iPad a link opens in place and Back, a chevron at the left of the note's bar (⌘[ on a
+    keyboard), returns as on the Mac. On an iPhone the stack's Back does.
 - **Views:** Todos, Calendar, Weekly and Agents, shared with the Mac app. Todos has Search todos
   under its title, as the home list has its search.
 - **Capture:**

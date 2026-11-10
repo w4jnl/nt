@@ -118,6 +118,26 @@ final class Workspace {
     var recent: [String] = UserDefaults.standard.stringArray(forKey: "recentNotes") ?? [] { // the notes opened last, newest first
         didSet { UserDefaults.standard.set(recent, forKey: "recentNotes") }
     }
+    /// history is the notes links were followed from, the last at the end, so Back returns to
+    /// them scrolled as they were, as the terminal browser's b does. The iPhone's stack keeps
+    /// its own; this is the Mac's and the iPad's.
+    var history: [Visit] = []
+    nonisolated static let historyMax = 50
+    var canGoBack: Bool { !history.isEmpty }
+
+    /// Visit is a note a link was followed from and how far it was scrolled.
+    struct Visit: Equatable, Sendable {
+        let path: String
+        let top: Double
+
+        /// moved is the visit after from moved to to: a note in what moved follows it.
+        func moved(_ from: String, _ to: String) -> Visit {
+            path == from ? Visit(path: to, top: top) : path.hasPrefix(from + "/") ? Visit(path: to + path.dropFirst(from.count), top: top) : self
+        }
+
+        /// names says whether the visit is path or something in it.
+        func names(_ path: String) -> Bool { self.path == path || self.path.hasPrefix(path + "/") }
+    }
     var textSize = TextSize(rawValue: UserDefaults.standard.double(forKey: "textSize")) ?? .standard {
         didSet {
             UserDefaults.standard.set(textSize.rawValue, forKey: "textSize")
@@ -361,8 +381,37 @@ final class Workspace {
         if let navigate { navigate(path, anchor, line, false, find) } else { show(path, anchor: anchor, line: line, find: find) }
     }
 
-    /// find is a search's words, marked in the note (the editor page's findField).
-    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "") async {
+    /// followed opens the note a link, or a "Linked from" line, points at, the note on screen
+    /// remembered first so Back returns to it. On the iPhone the stack remembers instead.
+    func followed(_ path: String, anchor: String = "") {
+        Task {
+            if navigate == nil, let n = note, let editor {
+                history = Self.push(Visit(path: n.path, top: await editor.top()), on: history)
+            }
+            go(path, anchor: anchor)
+        }
+    }
+
+    /// push puts v last in the history, at most max kept.
+    nonisolated static func push(_ v: Visit, on list: [Visit], max: Int = historyMax) -> [Visit] {
+        Array((list + [v]).suffix(max))
+    }
+
+    /// back shows the note a link was followed from, scrolled as it was; a note gone since is
+    /// skipped.
+    func back() async {
+        while let v = history.popLast() {
+            if let url = file(v.path), FileManager.default.fileExists(atPath: url.path) {
+                await open(v.path, top: v.top)
+                return
+            }
+        }
+        say("No note to go back to")
+    }
+
+    /// find is a search's words, marked in the note (the editor page's findField); top is how
+    /// far it was scrolled, for Back.
+    func open(_ path: String, anchor: String = "", line: Int = 0, end: Bool = false, reload: Bool = false, find: String = "", top: Double = 0) async {
         guard let editor, let url = file(path) else { return }
         opening += 1
         let mine = opening
@@ -393,7 +442,7 @@ final class Workspace {
             sidebar = sidebarBeforeOutside
         }
         if finding { closeFind() } // another note: the bar goes with the one it was for
-        editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find)
+        editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find, top: top)
         selection = selectionFor(path)
         if !outside { recent = Self.remember(path, in: recent) } // the folders stay as they are: only the person opens one
     }
@@ -523,7 +572,7 @@ final class Workspace {
             if path == n.path, !anchor.isEmpty {
                 scroll(to: anchor)
             } else {
-                go(path, anchor: anchor)
+                followed(path, anchor: anchor)
             }
         case .anchor(let a): scroll(to: a)
         #if os(macOS)
@@ -779,6 +828,7 @@ final class Workspace {
             await afterWrite()
             expanded = Set(expanded.map(new))
             recent = recent.map(new)
+            history = history.map { $0.moved(p.from, p.to) }
             if case .folder(let f) = selection { selection = .folder(new(f)) }
             relocated?(p.from, p.to)
             if let n = note, new(n.path) != n.path { await open(new(n.path), reload: true) }
@@ -814,6 +864,7 @@ final class Workspace {
             let r = try await nt.json(Removal.self, ["rm", "--json", "--", path])
             await afterWrite()
             removed?(path)
+            history.removeAll { $0.names(path) }
             if selection == .folder(path) || selection == .note(path) { selection = nil }
             if let n = note, n.path == path || n.path.hasPrefix(path + "/") {
                 note = nil
