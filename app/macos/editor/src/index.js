@@ -193,8 +193,9 @@ function dropped(e, v) {
 
 window.nt = {
   // load shows a note: {doc, path, readOnly, backlinks: [{path, title, folder}], anchor, line,
-  // end (put the cursor at the end and take the keyboard), find (a search's words, marked)}.
-  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false, find = "" }) {
+  // end (put the cursor at the end and take the keyboard), find (a search's words, marked),
+  // top (how far it was scrolled, in pixels, for Back)}.
+  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false, find = "", top = 0 }) {
     view.setState(EditorState.create({ doc: normalize(doc), extensions: extensions(path, readOnly) }));
     base = view.state.doc.toString();
     pending = ChangeSet.empty(base.length);
@@ -208,6 +209,7 @@ window.nt = {
       view.focus();
     } else if (anchor) requestAnimationFrame(() => scrollToAnchor(anchor));
     else if (line > 0) requestAnimationFrame(() => goLine(line));
+    else if (top > 0) requestAnimationFrame(() => { view.scrollDOM.scrollTop = top; });
     report();
     reportHistory();
   },
@@ -224,6 +226,10 @@ window.nt = {
     view.dispatch({ effects: setBroken.of(dests) });
   },
   anchor: scrollToAnchor,
+  // top is how far the note is scrolled, in pixels, so Back can show it scrolled as it was.
+  top() {
+    return view.scrollDOM.scrollTop;
+  },
 
   // beginSave is the text to save, {seq, text}, or null when there is nothing to save. Changes
   // made while it is saved are kept apart until the app says how the save went.

@@ -43,6 +43,16 @@ struct NoteView: View {
         .navigationTitle("")
         .toolbar {
             ToolbarItem(placement: .navigation) {
+                Button {
+                    Task { await ws.back() }
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .disabled(!ws.canGoBack)
+                .help("Back to the note the link was followed from  ⌘[")
+                .accessibilityLabel("Back")
+            }
+            ToolbarItem(placement: .navigation) {
                 Breadcrumb(path: ws.note?.path ?? "", title: ws.note.map { ws.title($0.path) } ?? "")
             }
             .sharedBackgroundVisibility(.hidden)
@@ -94,6 +104,7 @@ struct Breadcrumb: View {
                 .foregroundStyle(Brand.ink)
                 .fontWeight(.medium)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false) // beside Back the toolbar would squeeze it to a few letters
         }
         .font(.system(size: 13))
         .padding(.horizontal, 6)

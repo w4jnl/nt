@@ -65,8 +65,8 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     // MARK: Swift → page
 
     /// load shows a note: its text, where it is, who links to it; end puts the cursor at its end
-    /// and gives it the keyboard, as for a note just made.
-    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "") {
+    /// and gives it the keyboard, as for a note just made; top scrolls it as it was, for Back.
+    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "", top: Double = 0) {
         let payload: [String: Any] = [
             "doc": text,
             "path": note.path,
@@ -75,9 +75,16 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             "line": line,
             "end": end,
             "find": find,
+            "top": top,
             "backlinks": Self.backlinks(note.backlinks),
         ]
         page("window.nt.load(p)", ["p": payload])
+    }
+
+    /// top is how far the note is scrolled, in pixels, for Back.
+    func top() async -> Double {
+        guard ready else { return 0 }
+        return (try? await call("return window.nt.top()")) as? Double ?? 0
     }
 
     func setBacklinks(_ list: [Workspace.Backlink]) {
@@ -298,8 +305,8 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         case "open":
             if let href = body["href"] as? String {
                 ws.follow(href)
-            } else if let path = body["path"] as? String {
-                ws.go(path)
+            } else if let path = body["path"] as? String { // a "Linked from" line
+                ws.followed(path)
             }
         case "tag":
             if let q = body["query"] as? String { ws.find(q) }

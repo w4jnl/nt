@@ -132,6 +132,29 @@ struct WritingTests {
         #expect(ws.note?.path == "homelab/2026-10-22-other.md")
     }
 
+    @Test func backReturnsToTheNoteALinkWasFollowedFrom() async throws {
+        try write("# Other\n", to: "homelab/2026-10-22-other.md")
+        _ = try await opened("# NAS\n\nSee [other](2026-10-22-other.md).\n")
+        #expect(!ws.canGoBack)
+        ws.follow("2026-10-22-other.md")
+        try await until("the link's note") { ws.note?.path == "homelab/2026-10-22-other.md" }
+        #expect(ws.history.map(\.path) == [note])
+        await ws.back()
+        #expect(ws.note?.path == note)
+        #expect(!ws.canGoBack)
+        await ws.back()
+        #expect(ws.flash == "No note to go back to")
+    }
+
+    @Test func aLinkedFromLineIsFollowedTheSameWay() async throws {
+        try write("# Other\n\n[NAS](2026-10-21-nas.md)\n", to: "homelab/2026-10-22-other.md")
+        _ = try await opened("# NAS\n")
+        ws.followed("homelab/2026-10-22-other.md")
+        try await until("the linking note") { ws.note?.path == "homelab/2026-10-22-other.md" }
+        await ws.back()
+        #expect(ws.note?.path == note)
+    }
+
     @Test func aPastedImageGoesBesideTheNoteOnALineOfItsOwn() async throws {
         _ = try await opened("# NAS\n\nFour disks.\n")
         let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])

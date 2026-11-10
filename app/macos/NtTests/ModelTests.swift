@@ -242,6 +242,35 @@ private func index() throws -> RepoIndex {
     }
 }
 
+@Suite struct HistoryTests {
+    typealias Visit = Workspace.Visit
+
+    @Test func backKeepsTheLastFifty() {
+        var h: [Visit] = []
+        for i in 0..<60 { h = Workspace.push(Visit(path: "n\(i).md", top: Double(i)), on: h) }
+        #expect(h.count == Workspace.historyMax)
+        #expect(h.first == Visit(path: "n10.md", top: 10))
+        #expect(h.last == Visit(path: "n59.md", top: 59))
+    }
+
+    @Test func aMovedNoteKeepsItsPlaceInTheHistory() {
+        let h = [Visit(path: "work/a.md", top: 120), Visit(path: "work/b.md", top: 0), Visit(path: "home/c.md", top: 40)]
+        let moved = h.map { $0.moved("work", "jobs") }
+        #expect(moved.map(\.path) == ["jobs/a.md", "jobs/b.md", "home/c.md"])
+        #expect(moved[0].top == 120)
+        #expect(Visit(path: "work/a.md", top: 1).moved("work/a.md", "work/d.md").path == "work/d.md")
+        #expect(Visit(path: "workshop/a.md", top: 1).moved("work", "jobs").path == "workshop/a.md")
+    }
+
+    @Test func aDeletedNoteLeavesTheHistory() {
+        var h = [Visit(path: "work/a.md", top: 0), Visit(path: "work/b.md", top: 0), Visit(path: "workshop/c.md", top: 0)]
+        h.removeAll { $0.names("work") }
+        #expect(h.map(\.path) == ["workshop/c.md"])
+        h.removeAll { $0.names("workshop/c.md") }
+        #expect(h.isEmpty)
+    }
+}
+
 @Suite struct DesignSystemTests {
     struct Tokens: Decodable {
         struct Color: Decodable {
