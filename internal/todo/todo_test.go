@@ -227,6 +227,40 @@ func TestChange(t *testing.T) {
 		t.Errorf("due cleared on a done todo: %q %v", d.Raw, err)
 	}
 
+	// started: in progress while open, kept when it is done, before done:
+	s, err := Start(v, d, day("2026-10-29"))
+	if err != nil || s.Raw != "  * [ ] Review the report started:2026-10-29" || !s.InProgress() || s.Started != "2026-10-29" {
+		t.Errorf("started a done todo: %+v %v", s, err)
+	}
+	s, _ = SetDue(v, s, "2026-11-05")
+	if s.Raw != "  * [ ] Review the report due:2026-11-05 started:2026-10-29" {
+		t.Errorf("due on a started todo: %q", s.Raw)
+	}
+	s, _ = Check(v, s, day("2026-10-30"))
+	if s.Raw != "  * [x] Review the report due:2026-11-05 started:2026-10-29 done:2026-10-30" || s.InProgress() {
+		t.Errorf("checked a started todo: %q", s.Raw)
+	}
+	s, _ = Uncheck(v, s)
+	if !s.InProgress() {
+		t.Errorf("unchecked: in progress again, got %q", s.Raw)
+	}
+	s, _ = Stop(v, s)
+	if s.Raw != "  * [ ] Review the report due:2026-11-05" || s.InProgress() {
+		t.Errorf("stopped: %q", s.Raw)
+	}
+	if s, _ = Start(v, s, day("2026-10-31")); s.Text != "Review the report" {
+		t.Errorf("text with started: %q", s.Text)
+	}
+	d, _ = Check(v, s, day("2026-10-28"))
+	d, err = SetDue(v, d, "")
+	if err != nil || d.Raw != "  * [x] Review the report started:2026-10-31 done:2026-10-28" {
+		t.Errorf("due cleared on a started, done todo: %q %v", d.Raw, err)
+	}
+	d, _ = Stop(v, d)
+	if d.Raw != "  * [x] Review the report done:2026-10-28" {
+		t.Errorf("stopped a done todo: %q", d.Raw)
+	}
+
 	// a line added above: the todo is found by its text
 	write(t, v, "work/a.md", fm+"# A\n\nnew line\n"+strings.TrimPrefix(read(t, v, "work/a.md"), fm+"# A\n\n"))
 	if _, err := Uncheck(v, d); err != nil {

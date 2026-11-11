@@ -9,7 +9,7 @@ import { EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
-import { dictated, headingLine, normalize, ownLine, rebase, taskLine, toggleTask } from "./edits.js";
+import { dictated, headingLine, normalize, ownLine, rebase, startTask, taskLine, toggleTask } from "./edits.js";
 import { findField, findHits, frontmatterRange, headingAt, hearingField, linkDests, livePreview, nextHit, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
@@ -149,6 +149,14 @@ function goLine(n) {
   view.dispatch({ selection: { anchor: at }, effects: EditorView.scrollIntoView(at, { y: "center" }) });
 }
 
+// retask puts text, a task line ticked or started, in place of line n.
+function retask(n, text) {
+  const doc = view.state.doc;
+  if (view.state.readOnly || n < 1 || n > doc.lines || text === null) return;
+  const l = doc.line(n);
+  view.dispatch({ changes: { from: l.from, to: l.to, insert: text }, userEvent: "input.toggle" });
+}
+
 function scrollToAnchor(anchor) {
   const at = headingAt(view.state, anchor);
   if (at >= 0) view.dispatch({ effects: EditorView.scrollIntoView(at, { y: "start", yMargin: 24 }) });
@@ -274,11 +282,11 @@ window.nt = {
 
   // toggle checks or opens again the todo on line n with the day nt counts (done:).
   toggle(n, day) {
-    const doc = view.state.doc;
-    if (view.state.readOnly || n < 1 || n > doc.lines) return;
-    const l = doc.line(n);
-    const text = toggleTask(l.text, day);
-    if (text !== null) view.dispatch({ changes: { from: l.from, to: l.to, insert: text }, userEvent: "input.toggle" });
+    retask(n, toggleTask(view.state.doc.line(n).text, day));
+  },
+  // start marks line n's task in progress (started:day), or open again when it is.
+  start(n, day) {
+    retask(n, startTask(view.state.doc.line(n).text, day));
   },
   // insertImage puts the markdown line nt paste printed on a line of its own at pos.
   insertImage(pos, line) {

@@ -11,6 +11,7 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
     let done: Bool
     let text: String
     var due: String
+    var started: String // the day work on it began; in progress while open
     var doneOn: String
     var when: String
     var late: Bool
@@ -36,8 +37,11 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         return s.isEmpty || s.first == " " || s.first == "\t"
     }
 
+    /// inProgress: started and still open, as nt's in_progress says.
+    var inProgress: Bool { !done && !started.isEmpty }
+
     enum CodingKeys: String, CodingKey {
-        case rel, line, done, text, due, when, late
+        case rel, line, done, text, due, when, late, started
         case doneOn = "done_on"
     }
 
@@ -48,6 +52,7 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         done = try c.decode(Bool.self, forKey: .done)
         text = try c.decode(String.self, forKey: .text)
         due = try c.decodeIfPresent(String.self, forKey: .due) ?? ""
+        started = try c.decodeIfPresent(String.self, forKey: .started) ?? ""
         doneOn = try c.decodeIfPresent(String.self, forKey: .doneOn) ?? ""
         when = try c.decodeIfPresent(String.self, forKey: .when) ?? ""
         late = try c.decodeIfPresent(Bool.self, forKey: .late) ?? false

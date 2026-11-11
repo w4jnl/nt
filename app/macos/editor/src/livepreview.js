@@ -322,24 +322,28 @@ class CopyWidget extends WidgetType {
   }
 }
 
-// CheckWidget is a task's checkbox; a click asks the app to tick it (it knows the day for done:).
+// CheckWidget is a task's checkbox: ○ open, ◐ in progress (started:), ✓ done. A click asks the
+// app to tick it, an Option-click to start or stop it (the app knows the day).
 class CheckWidget extends WidgetType {
-  constructor(checked) {
+  constructor(checked, started = false) {
     super();
     this.checked = checked;
+    this.started = started;
   }
   eq(o) {
-    return o.checked === this.checked;
+    return o.checked === this.checked && o.started === this.started;
   }
   toDOM(view) {
     const s = document.createElement("span");
-    s.className = "cm-check" + (this.checked ? " cm-check-done" : "");
-    s.textContent = this.checked ? "✓" : "○";
+    s.className = "cm-check" + (this.checked ? " cm-check-done" : this.started ? " cm-check-doing" : "");
+    s.textContent = this.checked ? "✓" : this.started ? "◐" : "○";
     s.setAttribute("role", "checkbox");
     s.setAttribute("aria-checked", String(this.checked));
+    if (this.started && !this.checked) s.setAttribute("aria-label", "In progress");
     s.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      if (!view.state.readOnly) post({ type: "toggle", line: view.state.doc.lineAt(view.posAtDOM(s)).number });
+      if (view.state.readOnly) return;
+      post({ type: e.altKey ? "start" : "toggle", line: view.state.doc.lineAt(view.posAtDOM(s)).number });
     });
     return s;
   }
@@ -588,7 +592,7 @@ export function alertKind(firstLine) {
   return m ? m[1].toLowerCase() : "";
 }
 const TIME = /^\d{1,2}:\d{2}(?=\s|$)/;
-const META = /\b(?:due|done):\d{4}-\d{2}-\d{2}\b/g;
+const META = /\b(?:due|started|done):\d{4}-\d{2}-\d{2}\b/g;
 
 // buildDecorations is the preview of the whole note for its state: what is hidden, replaced or
 // styled. It reads only the state, so the tests run it without a screen.
@@ -806,8 +810,9 @@ export function buildDecorations(state) {
     const marker = task?.getChild("TaskMarker");
     if (marker) {
       const checked = /\[[xX]\]/.test(doc.sliceString(marker.from, marker.to));
+      const started = !checked && /\bstarted:\d{4}-\d{2}-\d{2}\b/.test(doc.sliceString(marker.to, task.to));
       if (on) add(mark("cm-syntax"), n.from, marker.to);
-      else add(Decoration.replace({ widget: new CheckWidget(checked) }), n.from, marker.to);
+      else add(Decoration.replace({ widget: new CheckWidget(checked, started) }), n.from, marker.to);
       if (checked) add(mark("cm-done"), marker.to, task.to);
       return;
     }

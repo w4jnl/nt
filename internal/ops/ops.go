@@ -174,6 +174,8 @@ type Todo struct {
 	Done    bool   `json:"done"`
 	Text    string `json:"text"`
 	Due     string `json:"due"`
+	Started string `json:"started"`     // the day work on it began, "" when it has not
+	Doing   bool   `json:"in_progress"` // started and still open
 	DoneOn  string `json:"done_on"`
 	Section string `json:"section"`
 	When    string `json:"when"`
@@ -185,7 +187,7 @@ type Todo struct {
 func TodoOf(v *vault.Vault, it todo.Item) Todo {
 	when, late := it.Word(v.Day(v.Now()))
 	return Todo{Path: v.Abs(it.Path), Rel: it.Path, Line: it.Line, Done: it.Done, Text: it.Text, Due: it.Due,
-		DoneOn: it.DoneOn, Section: it.Section, When: when, Late: late}
+		Started: it.Started, Doing: it.InProgress(), DoneOn: it.DoneOn, Section: it.Section, When: when, Late: late}
 }
 
 // TodoList is nt todo --json: {"todos": [...]}.
@@ -228,7 +230,7 @@ func Todos(v *vault.Vault, folder string, done, all bool) ([]todo.Item, error) {
 	if named := folder; folder != "" {
 		folder = strings.Trim(path.Clean("/"+filepath.ToSlash(folder)), "/")
 		if !isDir(v.Abs(folder)) {
-			return nil, fmt.Errorf("todo: %q is no folder in %s, nor add, done, undo, due or rm", named, Tilde(v.Root))
+			return nil, fmt.Errorf("todo: %q is no folder in %s, nor add, done, undo, start, stop, due or rm", named, Tilde(v.Root))
 		}
 	}
 	items := todo.Collect(v)
@@ -251,8 +253,8 @@ func AddTodo(v *vault.Vault, folder, text, due string) (todo.Item, error) {
 	return it, nil
 }
 
-// ChangeTodo checks (done), unchecks (undo), deletes (rm) or dates (due, to when) the todo match
-// names: path:line, or words from its text.
+// ChangeTodo checks (done), unchecks (undo), marks in progress (start) or open again (stop),
+// deletes (rm) or dates (due, to when) the todo match names: path:line, or words from its text.
 func ChangeTodo(v *vault.Vault, kind, match, when string) (todo.Item, error) {
 	today := v.Day(v.Now())
 	date := ""
@@ -263,13 +265,15 @@ func ChangeTodo(v *vault.Vault, kind, match, when string) (todo.Item, error) {
 		}
 	}
 	want := map[string]func(todo.Item) bool{
-		"done": func(it todo.Item) bool { return !it.Done },
-		"due":  func(it todo.Item) bool { return !it.Done },
-		"undo": func(it todo.Item) bool { return it.Done },
-		"rm":   func(todo.Item) bool { return true },
+		"done":  func(it todo.Item) bool { return !it.Done },
+		"due":   func(it todo.Item) bool { return !it.Done },
+		"undo":  func(it todo.Item) bool { return it.Done },
+		"start": func(it todo.Item) bool { return !it.InProgress() },
+		"stop":  func(it todo.Item) bool { return it.InProgress() },
+		"rm":    func(todo.Item) bool { return true },
 	}[kind]
 	if want == nil {
-		return todo.Item{}, fmt.Errorf("todo: %q is not add, done, undo, due or rm", kind)
+		return todo.Item{}, fmt.Errorf("todo: %q is not add, done, undo, start, stop, due or rm", kind)
 	}
 	it, err := MatchTodo(todo.Collect(v), match, want)
 	if err != nil {
@@ -280,6 +284,10 @@ func ChangeTodo(v *vault.Vault, kind, match, when string) (todo.Item, error) {
 		it, err = todo.Check(v, it, today)
 	case "undo":
 		it, err = todo.Uncheck(v, it)
+	case "start":
+		it, err = todo.Start(v, it, today)
+	case "stop":
+		it, err = todo.Stop(v, it)
 	case "due":
 		it, err = todo.SetDue(v, it, date)
 	case "rm":

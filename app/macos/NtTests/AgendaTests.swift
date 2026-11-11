@@ -7,11 +7,13 @@ import Testing
 
 struct AgendaTests {
     @Test func todosDecodeAsNtPrintsThem() throws {
-        let json = #"{"todos": [{"path": "/r/todo.md", "rel": "todo.md", "line": 4, "done": false, "text": "Replace the UPS battery", "due": "2026-10-25", "done_on": "", "section": "Inbox", "when": "3d late", "late": true}, {"path": "/r/homelab/n.md", "rel": "homelab/n.md", "line": 9, "done": true, "text": "Update the firmware", "done_on": "2026-10-27", "when": "yesterday", "late": false}]}"#
+        let json = #"{"todos": [{"path": "/r/todo.md", "rel": "todo.md", "line": 4, "done": false, "text": "Replace the UPS battery", "due": "2026-10-25", "started": "2026-10-24", "in_progress": true, "done_on": "", "section": "Inbox", "when": "3d late", "late": true}, {"path": "/r/homelab/n.md", "rel": "homelab/n.md", "line": 9, "done": true, "text": "Update the firmware", "started": "2026-10-20", "done_on": "2026-10-27", "when": "yesterday", "late": false}]}"#
         let list = try JSONDecoder().decode(Todo.List.self, from: Data(json.utf8))
         #expect(list.todos.count == 2)
         #expect(list.todos[0].id == "todo.md:4" && list.todos[0].late && list.todos[0].when == "3d late")
+        #expect(list.todos[0].inProgress && list.todos[0].started == "2026-10-24")
         #expect(list.todos[1].done && list.todos[1].doneOn == "2026-10-27" && list.todos[1].due == "")
+        #expect(!list.todos[1].inProgress) // started, but done
         // an older nt without when and late still decodes
         let old = try JSONDecoder().decode(Todo.List.self, from: Data(#"{"todos": [{"rel": "todo.md", "line": 1, "done": false, "text": "x"}]}"#.utf8))
         #expect(old.todos[0].when == "" && !old.todos[0].late)

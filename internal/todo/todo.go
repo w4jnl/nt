@@ -1,5 +1,5 @@
 // Package todo reads and writes the todos in a notes repository (docs/format.md §12): GFM task
-// list lines in any note, with due: and done: dates. nt adds new ones to todo.md. The files are
+// list lines in any note, with due:, started: and done: dates. nt adds new ones to todo.md. The files are
 // the truth: todos are read from them each time, and a change rewrites one line under the
 // repository lock.
 package todo
@@ -30,8 +30,9 @@ type Item struct {
 	Path    string `json:"rel"`  // repository path of the note
 	Line    int    `json:"line"` // 1-based
 	Done    bool   `json:"done"`
-	Text    string `json:"text"` // without the checkbox, due: and done:
+	Text    string `json:"text"` // without the checkbox, due:, started: and done:
 	Due     string `json:"due,omitempty"`
+	Started string `json:"started,omitempty"` // the day work on it began: in progress while it is open
 	DoneOn  string `json:"done_on,omitempty"`
 	Section string `json:"section,omitempty"` // the heading above it
 	Raw     string `json:"-"`                 // the line as it is in the file
@@ -47,7 +48,7 @@ var (
 )
 
 func init() {
-	for _, k := range []string{"due", "done"} {
+	for _, k := range []string{"due", "started", "done"} {
 		stamps[k] = regexp.MustCompile(`(?:^|\s)` + k + `:(\d{4}-\d{2}-\d{2})\b`)
 	}
 }
@@ -103,8 +104,8 @@ func Parse(rel string, data []byte) []Item {
 			continue
 		}
 		it := Item{Path: rel, Line: i + 1, Done: m[2] != " ", Raw: lines[i], Section: section,
-			Due: stamp(m[3], "due"), DoneOn: stamp(m[3], "done")}
-		it.Text = strings.TrimSpace(unstamp(unstamp(m[3], "due"), "done"))
+			Due: stamp(m[3], "due"), Started: stamp(m[3], "started"), DoneOn: stamp(m[3], "done")}
+		it.Text = strings.TrimSpace(unstamp(unstamp(unstamp(m[3], "due"), "started"), "done"))
 		if it.Text != "" {
 			items = append(items, it)
 		}
@@ -139,9 +140,10 @@ func Collect(v *vault.Vault) []Item {
 	return items
 }
 
-// Sort puts open todos first, by due date with the overdue ones first and the undated ones
-// after; among undated ones the todo lists come first in file order (the root's, then the
-// folders' by path), then other notes newest first. Done todos follow, the latest done first.
+// Sort puts open todos first: the ones in progress, then the rest by due date with the overdue
+// ones first and the undated ones after; among undated ones the todo lists come first in file
+// order (the root's, then the folders' by path), then other notes newest first. Done todos
+// follow, the latest done first.
 func Sort(items []Item) {
 	sort.SliceStable(items, func(i, j int) bool {
 		a, b := items[i], items[j]
@@ -150,6 +152,8 @@ func Sort(items []Item) {
 			return !a.Done
 		case a.Done && a.DoneOn != b.DoneOn:
 			return a.DoneOn > b.DoneOn
+		case !a.Done && a.InProgress() != b.InProgress():
+			return a.InProgress()
 		case !a.Done && (a.Due == "") != (b.Due == ""):
 			return a.Due != ""
 		case !a.Done && a.Due != b.Due:
@@ -247,14 +251,19 @@ func When(due string, today time.Time) (word string, late bool) {
 	return shortDate(due, today), false
 }
 
+// InProgress reports an open todo that work has begun on: started: with no done.
+func (it Item) InProgress() bool { return !it.Done && it.Started != "" }
+
 // Word says when the todo is due, or for a done one when it was done, in words; late reports
-// an open todo whose due date has passed.
+// an open todo whose due date has passed. A todo in progress with no due date says since when.
 func (it Item) Word(today time.Time) (word string, late bool) {
 	switch {
 	case it.Done && it.DoneOn != "":
 		return Ago(it.DoneOn, today), false
 	case !it.Done && it.Due != "":
 		return When(it.Due, today)
+	case it.InProgress():
+		return "since " + Ago(it.Started, today), false
 	}
 	return "", false
 }
@@ -435,28 +444,54 @@ func Add(v *vault.Vault, folder, text, due string, now time.Time) (Item, error) 
 	return Item{Path: list, Line: at, Text: text, Due: date, Section: "Inbox", Raw: line}, err
 }
 
-// Check marks the todo done on day, adding done:YYYY-MM-DD.
+// Check marks the todo done on day, adding done:YYYY-MM-DD. A started: date stays, so the line
+// says when the work began and when it ended.
 func Check(v *vault.Vault, it Item, day time.Time) (Item, error) {
 	return change(v, it, func(l string) string {
 		return restamp(box(l, "x"), "done", day.Format("2006-01-02"))
 	})
 }
 
-// Uncheck opens the todo again, taking its done: date away.
+// Uncheck opens the todo again, taking its done: date away; one that was started is in
+// progress again.
 func Uncheck(v *vault.Vault, it Item) (Item, error) {
 	return change(v, it, func(l string) string { return restamp(box(l, " "), "done", "") })
 }
 
-// SetDue sets the todo's due date, YYYY-MM-DD, or with "" takes it away. done: stays last.
+// Start marks the todo in progress from day, adding started:YYYY-MM-DD; a done one opens again.
+func Start(v *vault.Vault, it Item, day time.Time) (Item, error) {
+	return change(v, it, func(l string) string {
+		return keepLast(restamp(box(l, " "), "done", ""), func(l string) string {
+			return restamp(l, "started", day.Format("2006-01-02"))
+		})
+	})
+}
+
+// Stop takes the todo's started: date away: it is open, not in progress.
+func Stop(v *vault.Vault, it Item) (Item, error) {
+	return change(v, it, func(l string) string { return restamp(l, "started", "") })
+}
+
+// SetDue sets the todo's due date, YYYY-MM-DD, or with "" takes it away. started: and done:
+// stay after it.
 func SetDue(v *vault.Vault, it Item, date string) (Item, error) {
 	return change(v, it, func(l string) string {
-		done := stamp(l, "done")
-		l = restamp(restamp(l, "done", ""), "due", date)
-		if done != "" {
-			l = restamp(l, "done", done)
-		}
-		return l
+		return keepLast(l, func(l string) string { return restamp(l, "due", date) })
 	})
+}
+
+// keepLast applies f to the line with its started: and done: stamps taken off, then puts them
+// back at its end in that order, so the stamps read due, started, done.
+func keepLast(l string, f func(string) string) string {
+	started, done := stamp(l, "started"), stamp(l, "done")
+	l = f(restamp(restamp(l, "started", ""), "done", ""))
+	if started != "" {
+		l = restamp(l, "started", started)
+	}
+	if done != "" {
+		l = restamp(l, "done", done)
+	}
+	return l
 }
 
 // Remove deletes the todo's line.

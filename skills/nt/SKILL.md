@@ -59,18 +59,21 @@ stay as they are.
 
 ## Todos
 
-A todo is a task line, `- [ ] text due:YYYY-MM-DD`, and once done `- [x] text done:YYYY-MM-DD`,
+A todo is a task line, `- [ ] text due:YYYY-MM-DD`, in progress `- [ ] text started:YYYY-MM-DD`, and once done `- [x] text done:YYYY-MM-DD`,
 in a `todo.md` or in a note whose frontmatter says `todos: true`; any other note's task lines
 are a checklist, not todos (`nt todo on <note>` makes them todos, `off` a checklist). New ones
 go to `todo.md`, the root's or a folder's.
 
 - `nt todo [folder] --json`: the open todos, overdue first, in every note or under folder
-  (`--done`: the done ones, `--all`: both); each has `rel`, `line`, `text`, `due`.
+  (`--done`: the done ones, `--all`: both); each has `rel`, `line`, `text`, `due`, `started`,
+  `in_progress`. The ones in progress come first.
 - `nt todo add "text" --due fri`: add one when the person asks you to remember something for
   them; `--in work` puts it in `work/todo.md`. `--due` takes YYYY-MM-DD, today, tomorrow,
   mon…sun, +3d, +2w.
-- `nt todo done <todo>`, `nt todo due <todo> <when>`, `nt todo undo <todo>`, `nt todo rm <todo>`:
-  `<todo>` is `path:line` from the list, or words from its text.
+- `nt todo done <todo>`, `nt todo start <todo>` (mark it in progress: do this when you begin
+  working on it), `nt todo stop <todo>`, `nt todo due <todo> <when>` (`none` clears the date),
+  `nt todo undo <todo>`, `nt todo rm <todo>`: `<todo>` is `path:line` from the list, or words
+  from its text.
 
 ## This session's report
 

@@ -5,8 +5,9 @@ import SwiftUI
 /// ones below. "from every note" in the summary is a menu that keeps to one folder's todos, at
 /// any depth, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. Search todos,
 /// the view's own field, keeps to the todos with the words typed, in their text or their note's
-/// name. A click on ○ checks a todo; arrows move, space checks, d sets the due date and
-/// Return opens the note at the todo.
+/// name. A click on ○ checks a todo; arrows move, space checks, i starts or stops it (◐, in
+/// progress, listed first), d sets the due date and Return opens the note at the todo; the
+/// row's menu has the same, with Change and Remove Due Date.
 ///
 /// A tick shows at once: the glyph turns, with a small pop, and the text fades. The row stays
 /// where it is until the ticks settle, a moment after the last, so the person sees what they did
@@ -111,6 +112,7 @@ struct TodosView: View {
         .onKeyPress(.space) { act { tick($0) } }
         .onKeyPress(.return) { act { t in ws.go(t.rel, line: t.line) } }
         .onKeyPress("d") { act { t in startDue(t) } }
+        .onKeyPress("i") { act { t in start(t) } }
         .viewToolbar("Todos", search: false)
         .searchable(text: $query, placement: searchPlacement, prompt: "Search todos")
         .searchFocused($searching)
@@ -135,7 +137,14 @@ struct TodosView: View {
 
     private func summary(_ open: [Todo]) -> some View {
         let late = open.filter(\.late).count
+        let doing = open.filter(\.inProgress).count
         var s = AttributedString("\(open.count) open")
+        if doing > 0 {
+            s += AttributedString(" · ")
+            var d = AttributedString("\(doing) in progress")
+            d.foregroundColor = Brand.accent
+            s += d
+        }
         if late > 0 {
             s += AttributedString(" · ")
             var l = AttributedString("\(late) late")
@@ -213,9 +222,9 @@ struct TodosView: View {
             Button {
                 tick(t)
             } label: {
-                Text(done ? "✓" : "○")
+                Text(done ? "✓" : t.inProgress ? "◐" : "○")
                     .font(.system(size: 16))
-                    .foregroundStyle(done ? Brand.ok : Brand.muted)
+                    .foregroundStyle(done ? Brand.ok : t.inProgress ? Brand.accent : Brand.muted)
                     .frame(width: 20)
                     .keyframeAnimator(initialValue: 1.0, trigger: reduceMotion ? false : done) { glyph, scale in
                         glyph.scaleEffect(scale)
@@ -228,7 +237,7 @@ struct TodosView: View {
             }
             .buttonStyle(.plain)
             .help(done ? "Open it again" : "Mark it done")
-            .accessibilityLabel(done ? "Done; open it again" : "Open; mark it done")
+            .accessibilityLabel(done ? "Done; open it again" : t.inProgress ? "In progress; mark it done" : "Open; mark it done")
             let text = Text(t.text)
                 .font(.system(size: 15))
                 .foregroundStyle(done ? Brand.muted : Brand.ink)
@@ -283,7 +292,13 @@ struct TodosView: View {
         .onTapGesture(count: 2) { ws.go(t.rel, line: t.line) }
         .contextMenu {
             Button(done ? "Open Again" : "Done") { tick(t) }
-            if !done { Button("Set Due Date…") { startDue(t) } }
+            if !done { Button(t.inProgress ? "Stop" : "Start") { start(t) } }
+            if !done {
+                Divider()
+                Button(t.due.isEmpty ? "Set Due Date…" : "Change Due Date…") { startDue(t) }
+                if !t.due.isEmpty { Button("Remove Due Date") { removeDue(t) } }
+            }
+            Divider()
             Button("Open Note") { ws.go(t.rel, line: t.line) }
         }
         .accessibilityElement(children: .contain)
@@ -359,6 +374,25 @@ struct TodosView: View {
         guard editingDue == nil, focus == .list, let t = shown.first(where: { $0.id == selected }) else { return .ignored }
         f(t)
         return .handled
+    }
+
+    /// start marks a todo in progress, or open again; the list is read again at once, since the
+    /// row moves among the open ones.
+    private func start(_ t: Todo) {
+        guard !isDone(t) else { return }
+        selected = t.id
+        let now = !t.inProgress
+        Task {
+            await settled()
+            await ws.setStarted(t, now)
+        }
+    }
+
+    private func removeDue(_ t: Todo) {
+        Task {
+            await settled()
+            await ws.setDue(t, "none")
+        }
     }
 
     private func startDue(_ t: Todo) {

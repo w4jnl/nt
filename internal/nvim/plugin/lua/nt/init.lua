@@ -2,6 +2,7 @@
 --   <leader>ip   pastes the clipboard's image: nt paste saves it beside the note, the line
 --                that shows it goes below the cursor.
 --   <leader>tx   checks the todo on the cursor line, adding done:<the day>, or opens it again.
+--   <leader>ti   marks it in progress, adding started:<the day>, or takes that away.
 --   While a note has unsaved changes, sync commits but does not merge (nt holds .git/nt-edit),
 --   so a merge never lands under text you have not written yet.
 --   A note sync changed on disk is reloaded when it has no unsaved changes.
@@ -11,7 +12,7 @@ local M = {}
 
 local defaults = {
   cmd = "nt", -- the nt binary
-  keys = { paste = "<leader>ip", todo = "<leader>tx" }, -- false turns a key off
+  keys = { paste = "<leader>ip", todo = "<leader>tx", start = "<leader>ti" }, -- false turns a key off
   reload = 3000, -- ms between checks for notes changed on disk; 0 turns them off
 }
 
@@ -111,9 +112,9 @@ local function day()
   return res.code == 0 and vim.trim(res.stdout) or os.date("%Y-%m-%d")
 end
 
--- toggle checks the todo on the cursor line, "- [ ] text" to "- [x] text done:YYYY-MM-DD", or
--- opens a done one again. It changes the buffer only; writing it is yours.
-local function toggle()
+-- task splits the cursor line into the text up to the box, its mark and the rest; nil when it
+-- is not a todo.
+local function task()
   local line = vim.api.nvim_get_current_line()
   local pre, mark, rest = line:match("^(%s*[-*+]%s+%[)([ xX])(%].*)$")
   if not pre then
@@ -121,6 +122,16 @@ local function toggle()
   end
   if not pre then
     vim.notify("nt: not a todo; a todo is a line like - [ ] text", vim.log.levels.WARN)
+    return nil
+  end
+  return pre, mark, rest
+end
+
+-- toggle checks the todo on the cursor line, "- [ ] text" to "- [x] text done:YYYY-MM-DD", or
+-- opens a done one again (a started: date stays). It changes the buffer only; writing it is yours.
+local function toggle()
+  local pre, mark, rest = task()
+  if not pre then
     return
   end
   rest = rest:gsub("%s+done:%d%d%d%d%-%d%d%-%d%d", ""):gsub("%s+$", "")
@@ -128,6 +139,22 @@ local function toggle()
     vim.api.nvim_set_current_line(pre .. "x" .. rest .. " done:" .. day())
   else
     vim.api.nvim_set_current_line(pre .. " " .. rest)
+  end
+end
+
+-- start marks the todo on the cursor line in progress, open with started:YYYY-MM-DD, or takes
+-- that away when it is.
+local function start()
+  local pre, mark, rest = task()
+  if not pre then
+    return
+  end
+  local doing = mark == " " and rest:find("%s+started:%d%d%d%d%-%d%d%-%d%d") ~= nil
+  rest = rest:gsub("%s+done:%d%d%d%d%-%d%d%-%d%d", ""):gsub("%s+started:%d%d%d%d%-%d%d%-%d%d", ""):gsub("%s+$", "")
+  if doing then
+    vim.api.nvim_set_current_line(pre .. " " .. rest)
+  else
+    vim.api.nvim_set_current_line(pre .. " " .. rest .. " started:" .. day())
   end
 end
 
@@ -147,6 +174,9 @@ local function attach(buf)
   end
   if M.opts.keys.todo then
     vim.keymap.set("n", M.opts.keys.todo, toggle, { buffer = buf, desc = "nt: check or uncheck the todo" })
+  end
+  if M.opts.keys.start then
+    vim.keymap.set("n", M.opts.keys.start, start, { buffer = buf, desc = "nt: the todo in progress, or open again" })
   end
   if not timer and M.opts.reload > 0 then
     timer = vim.uv.new_timer()

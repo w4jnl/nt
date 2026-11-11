@@ -161,6 +161,7 @@ html { -webkit-text-size-adjust: 100%; }
 
 #editor .cm-check { display: inline-block; width: 1.3em; color: var(--ink-muted); cursor: pointer; }
 #editor .cm-check-done { color: var(--ok); }
+#editor .cm-check-doing { color: var(--accent); }
 #editor .cm-done { color: var(--ink-muted); }
 #editor .cm-bullet { color: var(--ink-muted); }
 #editor .cm-time { font-family: var(--mono); font-size: 13px; color: var(--ink-muted); }
