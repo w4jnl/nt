@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChangeSet, EditorState, Text } from "@codemirror/state";
-import { clashes, dictated, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, taskLine, toggleTask } from "../src/edits.js";
+import { clashes, dictated, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, startTask, taskLine, toggleTask } from "../src/edits.js";
 
 // edit is the text after the person's changes, and those changes as a ChangeSet from base.
 function edit(base, ...specs) {
@@ -88,12 +88,24 @@ test("toggleTask checks with done: and opens again without it", () => {
     ["- [ ] Replace the fan", "- [x] Replace the fan done:2026-10-28"],
     ["- [x] Replace the fan done:2026-10-27", "- [ ] Replace the fan"],
     ["  * [X] nested due:2026-11-01 done:2026-10-27  ", "  * [ ] nested due:2026-11-01"],
+    ["- [ ] begun started:2026-10-27", "- [x] begun started:2026-10-27 done:2026-10-28"],
     ["1. [ ] numbered", "1. [x] numbered done:2026-10-28"],
     ["+ [ ] plus  ", "+ [x] plus done:2026-10-28"],
     ["- plain item", null],
     ["text [ ] not a task", null],
   ];
   for (const [line, want] of cases) assert.equal(toggleTask(line, day), want, line);
+});
+
+test("startTask marks in progress with started: and open again without it", () => {
+  const day = "2026-10-28";
+  const cases = [
+    ["- [ ] Replace the fan", "- [ ] Replace the fan started:2026-10-28"],
+    ["- [ ] Replace the fan due:2026-11-01 started:2026-10-27", "- [ ] Replace the fan due:2026-11-01"],
+    ["- [x] Replace the fan started:2026-10-20 done:2026-10-27", "- [ ] Replace the fan started:2026-10-28"],
+    ["- plain item", null],
+  ];
+  for (const [line, want] of cases) assert.equal(startTask(line, day), want, line);
 });
 
 test("ownLine puts an image on a line of its own", () => {

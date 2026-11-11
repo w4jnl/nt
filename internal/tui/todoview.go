@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/w4jnl/nt/internal/scan"
+	"github.com/w4jnl/nt/internal/theme"
 	"github.com/w4jnl/nt/internal/todo"
 	"github.com/w4jnl/nt/internal/vault"
 )
@@ -285,7 +286,7 @@ func (b *browser) todoViewKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			keep = todoRef(it)
 		}
 		return b.loadTodos(keep), true
-	case "x", "space", "d", "e", "D", "enter", "right", "l":
+	case "x", "space", "i", "d", "e", "D", "enter", "right", "l":
 		if it == nil {
 			return nil, true
 		}
@@ -293,6 +294,8 @@ func (b *browser) todoViewKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 		switch s {
 		case "x", "space":
 			return b.toggleTodo(c), true
+		case "i":
+			return b.startTodo(c), true
 		case "d":
 			if tv.done(c) {
 				return nil, true
@@ -358,7 +361,7 @@ func (b *browser) todoViewLines(tv *todoView, active bool) []todoViewLine {
 		}
 	}
 	if !active {
-		lines = append(lines, todoViewLine{row: -1}, todoViewLine{row: -1, text: "enter, then: x checks, d due date, a adds, enter opens the note"})
+		lines = append(lines, todoViewLine{row: -1}, todoViewLine{row: -1, text: "enter, then: x checks, i starts, d due date, a adds, enter opens the note"})
 	}
 	return lines
 }
@@ -409,7 +412,8 @@ func (b *browser) todoViewPane(tv *todoView, w, h int, active bool) string {
 	return strings.Join(out, "\n")
 }
 
-// todoSummary is the line above the todos: how many are open, the late ones in warn.
+// todoSummary is the line above the todos: how many are open, how many of them in progress,
+// the late ones in warn.
 func (b *browser) todoSummary(tv *todoView) string {
 	if !tv.ready {
 		return b.st.Muted.Render("reading the todos")
@@ -422,7 +426,16 @@ func (b *browser) todoSummary(tv *todoView) string {
 			late++
 		}
 	}
+	doing := 0
+	for _, it := range open {
+		if it.InProgress() {
+			doing++
+		}
+	}
 	s := b.st.Muted.Render(plural(len(open), "open todo"))
+	if doing > 0 {
+		s += b.st.Muted.Render(" · ") + lipgloss.NewStyle().Foreground(b.pal.Color(theme.InProgress)).Render(strconv.Itoa(doing)+" in progress")
+	}
 	if late > 0 {
 		s += b.st.Muted.Render(" · ") + lipgloss.NewStyle().Foreground(b.pal.Warn).Render(strconv.Itoa(late)+" late")
 	}

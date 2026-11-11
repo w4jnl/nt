@@ -439,6 +439,7 @@ todos: true
 ## Inbox
 
 - [ ] Renew passport due:2026-11-03
+- [ ] Book the venue started:2026-10-28
 - [x] Pay the invoice done:2026-10-27
 
 ## Work
@@ -458,10 +459,17 @@ todos: true
   folder (§6), in conflict copies (§3) and in hidden folders such as `.nt/templates/`.
 - **Due date:** `due:YYYY-MM-DD` anywhere in the text. Clients accept words such as `fri` or
   `+3d` when a person types a date, and always write the date as `YYYY-MM-DD`.
+- **In progress:** `started:YYYY-MM-DD` anywhere in the text marks an open todo as work under
+  way, from that day. The checkbox stays `[ ]`, so every other viewer still shows an open task.
+  Clients list todos in progress before the other open ones, draw them with the in-progress
+  glyph, and write the stamps in the order `due:`, `started:`, `done:`. Stopping takes the date
+  away.
 - **Done date:** checking a todo appends `done:YYYY-MM-DD`, the day it was done as `day_starts`
-  counts it. Unchecking it takes the date away. A todo checked in an editor, with no `done:`,
-  is done all the same.
-- **The text** a client shows is the line after the checkbox without `due:` and `done:`.
+  counts it; a `started:` date stays, so the line says when the work began and ended. Unchecking
+  it takes the done date away, and a todo that was started is in progress again. A todo checked
+  in an editor, with no `done:`, is done all the same.
+- **The text** a client shows is the line after the checkbox without `due:`, `started:` and
+  `done:`.
 - **`todo.md`** starts as `todos: true` in its frontmatter, `# Todo` and `## Inbox`. A client adds a new todo, `- [ ] text` with
   its `due:` when it has one, at the end of `## Inbox` of the root's `todo.md`, or of
   `<folder>/todo.md` when the person names a folder, and adds the file or the section when it is

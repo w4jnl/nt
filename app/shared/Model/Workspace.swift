@@ -608,6 +608,11 @@ final class Workspace {
         await todo([done ? "done" : "undo", t.id])
     }
 
+    /// setStarted marks a todo in progress (started:), or open again, through nt.
+    func setStarted(_ t: Todo, _ started: Bool) async {
+        await todo([started ? "start" : "stop", t.id])
+    }
+
     /// todosOn says whether a note's task lines are todos, read from the file as the menu asks.
     func todosOn(_ path: String) -> Bool {
         guard let url = file(path), let text = try? String(contentsOf: url, encoding: .utf8) else { return false }

@@ -325,11 +325,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         case "history":
             ws.undoable = body["undo"] as? Bool ?? false
             ws.redoable = body["redo"] as? Bool ?? false
-        case "toggle":
+        case "toggle", "start": // a click on a task's box ticks it; Option-click starts or stops it
             if let line = body["line"] as? Int {
                 Task {
                     let day = await ws.day()
-                    page("window.nt.toggle(n, d)", ["n": line, "d": day])
+                    page("window.nt.\(type)(n, d)", ["n": line, "d": day])
                 }
             }
         case "copy": // a code block's copy button

@@ -104,14 +104,27 @@ export function normalize(text) {
 
 const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\].*)$/;
 const DONE = /\s+done:\d{4}-\d{2}-\d{2}/g;
+const STARTED = /\s+started:\d{4}-\d{2}-\d{2}/g;
 
 // toggleTask is a todo line checked, with done:<day>, or opened again without it, as nt and the
-// nvim plugin do it (docs/format.md §12); null when the line is not a todo.
+// nvim plugin do it (docs/format.md §12); null when the line is not a todo. A started: date
+// stays, so a todo opened again is in progress again.
 export function toggleTask(line, day) {
   const m = TASK.exec(line);
   if (!m) return null;
   const rest = m[3].replace(DONE, "").replace(/\s+$/, "");
   return m[2] === " " ? `${m[1]}x${rest} done:${day}` : `${m[1]} ${rest}`;
+}
+
+// startTask is a todo line marked in progress, open with started:<day> (a done one opens
+// again), or, when it is in progress, open again without it; null when the line is not a todo.
+export function startTask(line, day) {
+  const m = TASK.exec(line);
+  if (!m) return null;
+  const doing = m[2] === " " && STARTED.test(m[3]);
+  STARTED.lastIndex = 0;
+  const rest = m[3].replace(DONE, "").replace(STARTED, "").replace(/\s+$/, "");
+  return doing ? `${m[1]} ${rest}` : `${m[1]} ${rest} started:${day}`;
 }
 
 const ITEM = /^(\s*)([-*+] |\d+[.)] )?(\[[ xX]\] )?(.*)$/;

@@ -17,13 +17,13 @@ import (
 	"github.com/w4jnl/nt/internal/todo"
 )
 
-// nt todo [folder] [--done|--all] [--json]; nt todo add|done|undo|due|rm; nt todo on|off <note>.
+// nt todo [folder] [--done|--all] [--json]; nt todo add|done|undo|start|stop|due|rm; nt todo on|off <note>.
 func runTodo(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
 		case "add":
 			return runTodoAdd(args[1:])
-		case "done", "undo", "due", "rm":
+		case "done", "undo", "start", "stop", "due", "rm":
 			return runTodoChange(args[0], args[1:])
 		case "on", "off":
 			return runTodoSet(args[0] == "on", args[1:])
@@ -73,7 +73,7 @@ func runTodoList(args []string) int {
 		return fail(err)
 	}
 	if len(pos) > 1 {
-		return fail(errors.New("todo: name one folder, or use add, done, undo, due or rm"))
+		return fail(errors.New("todo: name one folder, or use add, done, undo, start, stop, due or rm"))
 	}
 	v, m, err := openVault()
 	if err != nil {
@@ -126,10 +126,7 @@ func todoRow(m config.Machine, it todo.Item, today time.Time, textW, whenW int) 
 	if lipgloss.Width(text) > textW {
 		text = string([]rune(text)[:max(0, textW-1)]) + "…"
 	}
-	mark := st.Muted.Render("○")
-	if it.Done {
-		mark = lipgloss.NewStyle().Foreground(pal.Color(theme.Done)).Render(theme.Glyph(theme.Done, 0))
-	}
+	mark := todoMark(it, st, pal)
 	word, late := it.Word(today)
 	when := st.Muted
 	if late {
@@ -140,6 +137,17 @@ func todoRow(m config.Machine, it todo.Item, today time.Time, textW, whenW int) 
 		row += when.Render(word) + strings.Repeat(" ", whenW-lipgloss.Width(word)) + "  "
 	}
 	return row + st.Faint.Render(it.Path+":"+strconv.Itoa(it.Line))
+}
+
+// todoMark is a todo's glyph: ○ open in ink-muted, ◐ in progress in its state's colour, ✓ done.
+func todoMark(it todo.Item, st theme.Styles, pal theme.Palette) string {
+	switch {
+	case it.Done:
+		return lipgloss.NewStyle().Foreground(pal.Color(theme.Done)).Render(theme.Glyph(theme.Done, 0))
+	case it.InProgress():
+		return lipgloss.NewStyle().Foreground(pal.Color(theme.InProgress)).Render(theme.Glyph(theme.InProgress, 0))
+	}
+	return st.Muted.Render("○")
 }
 
 // nt todo add "text" [--due when] [--in folder]: a new todo at the end of Inbox in todo.md, the
@@ -182,8 +190,9 @@ func runTodoAdd(args []string) int {
 	return 0
 }
 
-// nt todo done|undo|rm <match>, nt todo due <match> <when>: check, uncheck, delete a todo or
-// set its due date. match is path:line as nt todo prints it, or words from the todo's text.
+// nt todo done|undo|start|stop|rm <match>, nt todo due <match> <when>: check, uncheck, mark in
+// progress or open again, delete a todo or set its due date. match is path:line as nt todo
+// prints it, or words from the todo's text.
 func runTodoChange(kind string, args []string) int {
 	args, asJSON := takeBool(args, "--json")
 	words, err := positional("todo "+kind, args)
@@ -211,7 +220,7 @@ func runTodoChange(kind string, args []string) int {
 		out.Deleted = &deleted
 		return printJSON(out)
 	}
-	verb := map[string]string{"done": "done", "undo": "open again", "due": "due", "rm": "deleted"}[kind]
+	verb := map[string]string{"done": "done", "undo": "open again", "start": "in progress", "stop": "open", "due": "due", "rm": "deleted"}[kind]
 	st := cliStyles(m)
 	lipgloss.Println(st.Muted.Render(verb+" ") + oneRow(m, it, v.Day(v.Now())))
 	return 0

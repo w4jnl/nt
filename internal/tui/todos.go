@@ -118,12 +118,14 @@ func (b *browser) todoKeys(k tea.KeyPressMsg) (tea.Cmd, bool) {
 			keep = todoRef(it)
 		}
 		return b.loadTodos(keep), true
-	case "x", "space", "d", "e", "D":
+	case "x", "space", "i", "d", "e", "D":
 		if it == nil {
 			return nil, true
 		}
 		c := *it
 		switch s {
+		case "i":
+			return b.startTodo(c), true
 		case "d":
 			b.todoAt = &c
 			return b.prompt("due", "due (fri, +3d, YYYY-MM-DD, empty for none): "), true
@@ -154,22 +156,37 @@ type todoSettleMsg struct{ seq int }
 // glyph turned until the ticks settle, todoHold after the last, so the person sees what they did
 // and another x takes it back; then the list is read again (settleTodos).
 func (b *browser) toggleTodo(it todo.Item) tea.Cmd {
+	return b.changeTodo(it, false)
+}
+
+// startTodo marks a todo in progress (started:), or open again when it is; a done one opens
+// again in progress. The row holds as a tick does.
+func (b *browser) startTodo(it todo.Item) tea.Cmd {
+	return b.changeTodo(it, true)
+}
+
+func (b *browser) changeTodo(it todo.Item, start bool) tea.Cmd {
 	var n todo.Item
 	var err error
-	if it.Done {
+	said := "done: "
+	switch {
+	case start && it.InProgress():
+		n, err = todo.Stop(b.v, it)
+		said = "open: "
+	case start:
+		n, err = todo.Start(b.v, it, b.v.Day(b.v.Now()))
+		said = "in progress: "
+	case it.Done:
 		n, err = todo.Uncheck(b.v, it)
-	} else {
+		said = "open again: "
+	default:
 		n, err = todo.Check(b.v, it, b.v.Day(b.v.Now()))
 	}
 	if err != nil {
 		b.say(err.Error(), true)
 		return b.loadTodos("")
 	}
-	if it.Done {
-		b.say("open again: "+it.Text, false)
-	} else {
-		b.say("done: "+it.Text, false)
-	}
+	b.say(said+it.Text, false)
 	if p := b.pick; p != nil && p.todos && p.sel < len(p.items) {
 		p.items[p.sel].todo = &n // the line as it is now, for the glyph and for another x
 		if p.ticked == nil {
@@ -279,8 +296,9 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 	return nil
 }
 
-// todoRow draws a todo: ○ open or ✓ done, its text, the note it is in (from, faint) when given,
-// and at the right edge when it is due (late in warn, with the word) or when it was done.
+// todoRow draws a todo: ○ open, ◐ in progress or ✓ done, its text, the note it is in (from,
+// faint) when given, and at the right edge when it is due (late in warn, with the word), since
+// when it is in progress, or when it was done.
 func (b *browser) todoRow(it todo.Item, selected bool, w int, from string) string {
 	text, muted, faint := b.st.Text, b.st.Muted, b.st.Faint
 	warn, done := lipgloss.NewStyle().Foreground(b.pal.Warn), lipgloss.NewStyle().Foreground(b.pal.Color(theme.Done))
@@ -291,8 +309,15 @@ func (b *browser) todoRow(it todo.Item, selected bool, w int, from string) strin
 		lead = b.st.Bar.Render("▎")
 	}
 	mark := muted.Render(" ○ ")
-	if it.Done {
+	switch {
+	case it.Done:
 		mark = done.Render(" " + theme.Glyph(theme.Done, 0) + " ")
+	case it.InProgress():
+		doing := lipgloss.NewStyle().Foreground(b.pal.Color(theme.InProgress))
+		if selected {
+			doing = doing.Background(b.pal.Surface)
+		}
+		mark = doing.Render(" " + theme.Glyph(theme.InProgress, 0) + " ")
 	}
 	right := ""
 	if word, late := it.Word(b.v.Day(b.v.Now())); word != "" {

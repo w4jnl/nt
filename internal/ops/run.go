@@ -240,7 +240,7 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 	kind := ""
 	if len(args) > 0 {
 		switch args[0] {
-		case "add", "done", "undo", "due", "rm", "on", "off":
+		case "add", "done", "undo", "start", "stop", "due", "rm", "on", "off":
 			kind, args = args[0], args[1:]
 		}
 	}
@@ -270,7 +270,7 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 			return nil, 2, err
 		}
 		if len(pos) > 1 {
-			return nil, 2, errors.New("todo: name one folder, or use add, done, undo, due or rm")
+			return nil, 2, errors.New("todo: name one folder, or use add, done, undo, start, stop, due or rm")
 		}
 		folder := ""
 		if len(pos) == 1 {

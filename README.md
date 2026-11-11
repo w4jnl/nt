@@ -145,7 +145,7 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   and when nvim exits after a note was written. It never rebases, and it does not merge while a
   note has unsaved changes in an editor.
 - **nvim.** `<leader>ip` pastes the clipboard's image beside the note, `<leader>tx` checks the
-  todo under the cursor, and notes changed on disk reload.
+  todo under the cursor, `<leader>ti` marks it in progress, and notes changed on disk reload.
 - **`nt doctor`** checks the setup and lists the links that point at nothing.
 - **nt for Mac.** The same folder in a window: the sidebar with the views, the pins and every
   folder, the note in live preview as Typora shows it (a line's markdown only while the cursor
