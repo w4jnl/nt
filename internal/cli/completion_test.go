@@ -74,7 +74,7 @@ c nt config set s
 		"auto dark light",
 		"tech/2026-10-20-nas.md", // the flag's value is not an argument
 		"tech/2026-10-20-nas.md",
-		"--sync --nvim --skill",
+		"--sync --nvim --skill --mcp --read-only",
 		"bash zsh",
 		"obsidian",
 		"import write",

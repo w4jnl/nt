@@ -39,6 +39,7 @@ var Settings = []Setting{
 	{Key: "theme.mode", File: "machine", Kind: "enum", Values: []string{"auto", "dark", "light"}, Help: "the browser's colours: auto follows the terminal"},
 	{Key: "inline_images", File: "machine", Kind: "enum", Values: []string{"auto", "on", "off"}, Help: "draw images in the note (Ghostty, kitty); from the next start"},
 	{Key: "image_viewer", File: "machine", Kind: "string", Help: "the command that opens an image full size; empty: Quick Look, xdg-open or chafa"},
+	{Key: "mcp.hide", File: "machine", Kind: "list", Help: "folders nt mcp keeps from the Claude app, with all they hold, e.g. private/health"},
 	{Key: "default_folder", File: "repo", Kind: "string", Help: "where nt n puts a note when no folder is given"},
 	{Key: "day_starts", File: "repo", Kind: "time", Help: "before this time an entry counts toward the day before"},
 	{Key: "pins", File: "repo", Kind: "list", Help: "folders on the browser's keys 1-9, e.g. tech, work"},
@@ -91,6 +92,8 @@ func (s Setting) Value(m Machine, r Repo) string {
 		return m.InlineImages
 	case "image_viewer":
 		return m.ImageViewer
+	case "mcp.hide":
+		return strings.Join(m.MCP.Hide, ", ")
 	case "default_folder":
 		return r.DefaultFolder
 	case "day_starts":

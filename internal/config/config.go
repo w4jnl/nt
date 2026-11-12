@@ -100,6 +100,9 @@ type Machine struct {
 	Theme struct {
 		Mode string `toml:"mode"`
 	} `toml:"theme"`
+	MCP struct {
+		Hide []string `toml:"hide"` // folders nt mcp keeps from the Claude app
+	} `toml:"mcp"`
 }
 
 // DefaultMachine is the configuration a machine without a config file gets.
@@ -131,6 +134,9 @@ mode = "auto"              # auto | dark | light
 [summary]
 tool = ""                  # claude | copilot: summarize what was written on this machine each week
 model = ""                 # optional: the model the tool uses, e.g. "haiku"
+
+[mcp]
+hide = []                  # folders nt mcp keeps from the Claude app, e.g. ["private/health"]
 `
 
 // MachinePath is the machine config file: $NT_CONFIG, else ~/.config/nt/config.toml (on macOS

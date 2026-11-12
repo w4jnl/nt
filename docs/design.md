@@ -136,6 +136,8 @@ Decisions taken with the user (2026-10-26):
 | `nt install --sync`, `nt uninstall --sync` | Start or stop the background sync job (launchd `nl.w4j.nt.sync`, systemd `nt-sync.timer`) |
 | `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
 | `nt install --skill`, `nt uninstall --skill` | The agent skill (§3); `nt uninstall --hooks` takes out nt's old hooks |
+| `nt mcp [--read-only]` | nt as a Model Context Protocol server on stdin and stdout, which the Claude app starts (The Claude app, below) |
+| `nt install --mcp [--read-only]`, `nt uninstall --mcp` | Name this nt as the Claude app's `nt` server in the app's config file, or take it out |
 | `nt agent import`, `nt agent write` | Agent session reports: flok's records, the agent's own account (§3) |
 | `nt digest [date]` | Write and list a day's agent digest (§3) |
 | `nt week [date\|last]` | Compile a week's digest now (Weekly digest, below); the machine with `weekly = true` does it on every sync |
@@ -236,6 +238,34 @@ Decisions taken with the user (2026-10-26):
 It finds the repository with `nt _editor repo`, never a fixed path, and does nothing outside it. Every action is the `nt` command line, so another editor's plugin needs only the same `_editor` calls and `nt paste`.
 
 **Following links in the note** (`internal/tui/follow.go`). Glamour writes every link as an OSC 8 hyperlink carrying its target as written, so after each render nt reads which cells of which line belong to which link. A link to a file that is not there is drawn in `ink-faint` and struck through, so it reads as broken before a click says so. A click on a link follows it (a drag still selects text); `f` puts a label of one or two letters, on `accent`, over the first cells of each link on screen, one per target, and typing it follows; the notes under "Linked from" are hyperlinks too. A note opens at the heading its anchor names, a folder in the list, an image as `i` opens it, any other file or a URL with the OS. `b` goes back through the notes links were followed from (at most 50).
+
+**The Claude app** (`internal/mcp`, added 2026-11-12). `nt mcp` is nt as a Model Context Protocol server on stdin and stdout, so the Claude desktop app reads, writes and reorganizes the notes in a chat. Claude Code and Copilot CLI keep using the skill (§3); the server is for the app, which runs no commands.
+
+- **One binary, nt's own operations.** The server is a subcommand, not a second program: each tool calls what the command line calls (`internal/ops`, `internal/move`), so it writes under the repository lock, through temp files, with nt's names, and it is always the version of the nt that is installed. The protocol is written on the standard library: `initialize`, `ping`, `tools/list` and `tools/call`, one JSON object a line. Only protocol messages go to stdout; what goes wrong goes to stderr, which the app keeps in its log.
+- **No git.** The server never runs git. A few seconds after the last write it starts `nt sync --background`, as closing an editor does, so a run of writes is one commit; the `sync` tool syncs now.
+- **The tools**, fifteen, each with a description the model picks it by:
+
+  | Tool | What it does |
+  |---|---|
+  | `list` | The folders and notes in a folder, newest first, with titles; `recursive` for a whole structure |
+  | `search` | `nt s`: the lines that match, with path and line |
+  | `note_read` | A note's markdown, its title and its `sha` |
+  | `todo_list` | `nt todo`: open, done or all, each named `path:line` |
+  | `journal_add` | `nt a`: a timestamped line in today's journal |
+  | `note_new` | `nt n` with the body, tags and images in one call: nt names the file and writes the frontmatter and title; a folder that is missing is made |
+  | `note_append` | Markdown at the end of a note, or at the end of the section under a heading; images too |
+  | `note_write` | The note's whole new text, written only when the note is still the one read (`sha`), as an editor's save (§8) |
+  | `todo_add`, `todo_change` | `nt todo add`; done, undo, start, stop, due (`none` clears) and remove |
+  | `folder_new` | `nt mkdir`, with the folders above it |
+  | `move`, `rename` | `nt mv` and `nt rename`: links fixed, images along; `dry_run` says what would change |
+  | `remove` | `nt rm`: a note with its unshared images and journal line, or an empty folder; `dry_run` |
+  | `sync` | `nt sync` now |
+
+  With `--read-only` the server has only `list`, `search`, `note_read` and `todo_list`.
+- **Images.** `note_new` and `note_append` take image files (svg, png, jpg, gif, webp; an SVG as text, the others as base64; at most 5 MB each). The text names each by its file name, `![alt](chart.svg)`; nt saves it as `assets/YYYY-MM-DD-chart.svg` beside the note (docs/format.md §3) and points the link there. An image the text does not name is added at the end.
+- **What it refuses.** A path is a path from the root of the notes: an absolute path, one that leaves the repository (`..`, or a symlink that leads out) and a name that starts with a dot are refused, and nothing is written. A note is at most 1 MB. The agents' reports and the weekly digests are read, never written, and nothing moves into their folders. What a tool refuses comes back as the tool's error, in words the model can act on.
+- **Hidden folders.** The machine setting `mcp.hide` lists folders the server is kept from, with all they hold: they are not listed, searched or read, their todos are not shown, and nothing is written, moved or renamed into, out of or around them. It is read on every call, so a change holds from the next one, and the server has no tool that changes a setting. A link to a hidden note in another note still shows as written.
+- **Installing.** `nt install --mcp` writes the entry `nt` under `mcpServers` in the app's `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on macOS), with this nt's full path, `mcp` as its argument and a `PATH` that finds git and rg, since the app starts it without the shell's; the rest of the file stays, and a file that is not JSON is left alone. The repository is the one nt's own config names. `nt doctor` says which nt the app runs and what it is kept from, and fails when that nt is gone.
 
 **Deferred:** multiple views.
 
@@ -393,6 +423,7 @@ internal/importer   hidden one-shot: Obsidian → nt
 internal/editor     $VISUAL / $EDITOR hand-off with +line, shared by the CLI and the TUI
 internal/clip       the clipboard's image for nt paste: AppKit via osascript, wl-paste, xclip
 internal/nvim       the nvim plugin (Lua, embedded) and nt install --nvim
+internal/mcp        nt mcp: the MCP server for the Claude app, its tools over internal/ops, nt install --mcp
 assets/brand/ · docs/design-system/ · docs/{research,format}.md · skills/nt/SKILL.md
 scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/ci.yml
 assets/demo/ (scene.sh, *.tape, record.sh, ghostty.sh) → assets/readme/*.gif   the README recordings
@@ -898,7 +929,7 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
 - A weekly digest: `weekly/GGGG/GGGG-Www.md` (ISO week-year), compiled by the one machine with `weekly = true` from the week's journals, the notes made or changed that week, its todos and its agent sessions, and kept up to date through the week.
 - Weekly summaries, one per machine (`[summary] tool`): Claude Code at home, Copilot CLI at the office, each about what was written on its own machine; the digest shows them all. They take the place of a daily `nt digest --summarize`.
 - Home and the viewer (0.5.0, 2026-10-28): the browser's root starts with the views and pins, as the Mac app's sidebar does (Home, §4); `nt <file>` and the viewer's reading keys make nt a viewer for any markdown or text file (The viewer, §4).
-- Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes.
+- Dropped (2026-10-27): `nt mcp`. A local, stdio MCP server would add only Claude Desktop: Claude Code and Copilot CLI already use nt through the skill, and VS Code Copilot Chat can run `nt` in its terminal. claude.ai and the phone apps reach only remote servers, which would need a hosted copy of the notes, HTTPS and OAuth 2.1, against nt's rule of nothing running and no network but git and ssh. Reconsider if Claude Desktop is used with the notes. Built 2026-11-12, for Claude Desktop with the notes (The Claude app, §4): local and stdio only, so the rule holds.
 
 **6. Mac app** (§8). Done: steps 0 to 5, released with 0.5.1 (2026-10-28) as its own cask,
 `brew install --cask w4jnl/tap/nt-app`, or the notarized DMG. Since then: notes and folders made,
