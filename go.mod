@@ -8,16 +8,16 @@ require (
 	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/BurntSushi/toml v1.6.0
+	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/mobile v0.0.0-20261011034528-197770444867
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 )
 
 require (
-	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4 // indirect
