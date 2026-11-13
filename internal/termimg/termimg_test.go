@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -204,6 +205,50 @@ func TestLoadConvertsAndShrinks(t *testing.T) {
 	_ = os.WriteFile(bad, []byte("not an image"), 0o644)
 	if _, err := term.Load(bad, nil); err == nil {
 		t.Error("a non-image loaded")
+	}
+}
+
+func TestLoadDrawsAnSVG(t *testing.T) {
+	if _, err := exec.LookPath(SVGTool); err != nil {
+		t.Skip(SVGTool + " is not installed")
+	}
+	state := t.TempDir()
+	t.Setenv("NT_STATE", state)
+	term := &Terminal{cellW: 10, cellH: 20, high: 1}
+	p := filepath.Join(t.TempDir(), "chart.SVG")
+	svg := `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#FAFAF7"/></svg>`
+	if err := os.WriteFile(p, []byte(svg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	im, err := term.Load(p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(im.data, []byte("\x89PNG")) || im.w != 240 || im.h != 120 {
+		t.Errorf("svg not drawn as a PNG at twice its size: %dx%d", im.w, im.h)
+	}
+	kept, _ := filepath.Glob(filepath.Join(state, "svg", "*.png"))
+	if len(kept) != 1 {
+		t.Fatalf("kept %v, want one PNG in the state", kept)
+	}
+	// the kept PNG is what a second load reads: no second drawing
+	writePNG(t, kept[0], 7, 5)
+	if again, err := term.Load(p, nil); err != nil || again.w != 7 || again.h != 5 {
+		t.Errorf("second load did not read the kept PNG: %v %v", again, err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(state, "svg", ".nt-tmp-*")); len(left) != 0 {
+		t.Errorf("temp files left: %v", left)
+	}
+}
+
+func TestAnSVGWithoutTheToolKeepsItsAltText(t *testing.T) {
+	t.Setenv("NT_STATE", t.TempDir())
+	t.Setenv("PATH", t.TempDir())
+	term := &Terminal{cellW: 10, cellH: 20, high: 1}
+	p := filepath.Join(t.TempDir(), "chart.svg")
+	_ = os.WriteFile(p, []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>`), 0o644)
+	if _, err := term.Load(p, nil); err == nil || !strings.Contains(err.Error(), SVGTool) {
+		t.Errorf("err = %v, want one naming %s", err, SVGTool)
 	}
 }
 

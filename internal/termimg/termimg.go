@@ -9,7 +9,10 @@ package termimg
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
@@ -19,11 +22,15 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+
+	"github.com/w4jnl/nt/internal/config"
 )
 
 const (
@@ -195,7 +202,7 @@ func kittyLike(s string) bool {
 
 // Load reads an image file, ready to send. A file that changed since the last Load of the same
 // Image is read again under the same id. PNG files up to maxSide are sent as they are; other
-// formats and larger pictures are scaled and encoded as PNG first.
+// formats and larger pictures are scaled and encoded as PNG first, an SVG through rsvg-convert.
 func (t *Terminal) Load(path string, prev *Image) (*Image, error) {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -210,6 +217,11 @@ func (t *Terminal) Load(path string, prev *Image) (*Image, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
+	}
+	if strings.EqualFold(filepath.Ext(path), ".svg") {
+		if raw, err = rasterize(raw); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
 	}
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(raw))
 	if err != nil {
@@ -236,6 +248,45 @@ func (t *Terminal) Load(path string, prev *Image) (*Image, error) {
 		im.data, im.w, im.h = b.Bytes(), m.Bounds().Dx(), m.Bounds().Dy()
 	}
 	return im, nil
+}
+
+// SVGTool is the program that draws an SVG as a PNG; without it an SVG keeps its alt text.
+const SVGTool = "rsvg-convert"
+
+// svgZoom draws an SVG at twice its own size, so its text stays sharp on a dense screen.
+const svgZoom = "2"
+
+// rasterize draws an SVG as a PNG with rsvg-convert. The PNG is kept in nt's state, under the
+// hash of the SVG, so each picture is drawn once on this machine and nothing is written into
+// the notes. The SVG goes in on stdin: it has no folder to load other files from.
+func rasterize(svg []byte) ([]byte, error) {
+	sum := sha256.Sum256(svg)
+	dir := filepath.Join(config.StateDir(), "svg")
+	kept := filepath.Join(dir, hex.EncodeToString(sum[:])+"@"+svgZoom+".png")
+	if b, err := os.ReadFile(kept); err == nil {
+		return b, nil
+	}
+	bin, err := exec.LookPath(SVGTool)
+	if err != nil {
+		return nil, fmt.Errorf("an SVG needs %s to be drawn", SVGTool)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "--format", "png", "--zoom", svgZoom)
+	cmd.Stdin = bytes.NewReader(svg)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", SVGTool, err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err == nil { // keeping it is only for speed
+		if f, err := os.CreateTemp(dir, ".nt-tmp-*"); err == nil {
+			_, werr := f.Write(out)
+			if cerr := f.Close(); werr != nil || cerr != nil || os.Rename(f.Name(), kept) != nil {
+				_ = os.Remove(f.Name())
+			}
+		}
+	}
+	return out, nil
 }
 
 // Fit returns the cells the image takes, keeping its shape: its own size in cells, but at most

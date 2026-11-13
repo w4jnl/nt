@@ -64,7 +64,11 @@ func runDoctor(args []string) int {
 	toolChecks(add)
 	switch t, why := termimg.Detect(m.InlineImages); {
 	case t != nil:
-		add("images", "ok", "drawn in the preview")
+		if _, err := exec.LookPath(termimg.SVGTool); err != nil {
+			add("images", "warn", "drawn in the preview, but not SVGs: brew install librsvg")
+		} else {
+			add("images", "ok", "drawn in the preview")
+		}
 	case why != "":
 		add("images", "warn", "%s", why)
 	case m.InlineImages == "off":

@@ -294,6 +294,10 @@ nothing.
   `set -g allow-passthrough on`; when that is the only thing missing, the footer says so.
   Elsewhere (Terminal.app, a Linux console, tmux in an unknown tmux) images keep their alt text
   and `i`.
+- **SVG.** Go draws PNG, JPEG and GIF itself. An SVG is drawn as a PNG by `rsvg-convert` (librsvg)
+  at twice its size, read on stdin so it loads no other file. The PNG is kept in nt's state
+  (`svg/<sha256 of the SVG>@2.png`), never in the notes, so each picture is drawn once on a
+  machine. Without `rsvg-convert` an SVG keeps its alt text and `i`, and `nt doctor` says so.
 - **Inside flok.** nt's tmux is a client in a pane of flok's outer tmux. flok publishes the outer
   socket as `FLOK_OUTER_SOCKET` in the inner server's global environment; when nt's tmux reports
   another tmux as its terminal, nt reads it (`tmux show-environment -g`), asks the outer server
