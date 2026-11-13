@@ -384,6 +384,9 @@ mode = "auto"              # auto | dark | light
 [summary]
 tool = "claude"            # claude | copilot: write this machine's weekly summaries with it; "" none
 model = ""                 # optional: the model the tool uses, e.g. "haiku"
+
+[mcp]
+hide = []                  # folders nt mcp keeps from the Claude app, e.g. ["private/health"]
 ```
 
 ## 10. Writing and syncing

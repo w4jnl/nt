@@ -62,6 +62,7 @@ for faster search; details under [Requirements](#requirements).
    ```sh
    nt install --nvim    # lazy.nvim: { dir = "~/.local/share/nt/nvim", name = "nt", lazy = false }
    nt install --skill   # teach Claude Code and Copilot CLI your notes
+   nt install --mcp     # give the Claude desktop app your notes (nt mcp); then quit and open the app
    ```
    A report for every agent session comes from [flok](https://github.com/w4jnl/flok), with its
    `[notes]` on.
@@ -146,6 +147,11 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   note has unsaved changes in an editor.
 - **nvim.** `<leader>ip` pastes the clipboard's image beside the note, `<leader>tx` checks the
   todo under the cursor, `<leader>ti` marks it in progress, and notes changed on disk reload.
+- **The Claude app.** `nt install --mcp` gives the Claude desktop app your notes through `nt mcp`,
+  a local MCP server: in a chat it searches and reads them, adds to today, makes a note with its
+  images, changes todos, and makes folders and moves notes with their links kept. It writes as
+  nt does and runs no git; a sync follows by itself. `nt config set mcp.hide private/health`
+  keeps folders from it, and `nt install --mcp --read-only` lets it only read.
 - **`nt doctor`** checks the setup and lists the links that point at nothing.
 - **nt for Mac.** The same folder in a window: the sidebar with the views, the pins and every
   folder, the note in live preview as Typora shows it (a line's markdown only while the cursor
@@ -181,7 +187,8 @@ Every command that prints data takes `--json`.
 | `nt week [date\|last]` | compile a week's digest now; `--summarize` has this machine's tool write its summary first |
 | `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
 | `nt sync`, `nt doctor` | sync now; check the setup |
-| `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent skill |
+| `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent skill, the Claude app's server |
+| `nt mcp` | nt as an MCP server for the Claude app, which `nt install --mcp` sets up; `--read-only` for reading only |
 | `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |
 | `nt import obsidian <vault>` | bring an Obsidian vault over once |
 | `nt completion bash\|zsh` | shell completion |

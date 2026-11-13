@@ -264,14 +264,7 @@ func ChangeTodo(v *vault.Vault, kind, match, when string) (todo.Item, error) {
 			return todo.Item{}, fmt.Errorf("todo due: %w", err)
 		}
 	}
-	want := map[string]func(todo.Item) bool{
-		"done":  func(it todo.Item) bool { return !it.Done },
-		"due":   func(it todo.Item) bool { return !it.Done },
-		"undo":  func(it todo.Item) bool { return it.Done },
-		"start": func(it todo.Item) bool { return !it.InProgress() },
-		"stop":  func(it todo.Item) bool { return it.InProgress() },
-		"rm":    func(todo.Item) bool { return true },
-	}[kind]
+	want := TodoWant(kind)
 	if want == nil {
 		return todo.Item{}, fmt.Errorf("todo: %q is not add, done, undo, start, stop, due or rm", kind)
 	}
@@ -297,6 +290,19 @@ func ChangeTodo(v *vault.Vault, kind, match, when string) (todo.Item, error) {
 		return it, fmt.Errorf("todo %s: %w", kind, err)
 	}
 	return it, nil
+}
+
+// TodoWant says which todos a change of kind is for (done: the open ones), or nil when kind is
+// no change.
+func TodoWant(kind string) func(todo.Item) bool {
+	return map[string]func(todo.Item) bool{
+		"done":  func(it todo.Item) bool { return !it.Done },
+		"due":   func(it todo.Item) bool { return !it.Done },
+		"undo":  func(it todo.Item) bool { return it.Done },
+		"start": func(it todo.Item) bool { return !it.InProgress() },
+		"stop":  func(it todo.Item) bool { return it.InProgress() },
+		"rm":    func(todo.Item) bool { return true },
+	}[kind]
 }
 
 var lineRef = regexp.MustCompile(`^(.+\.md):(\d+)$`)

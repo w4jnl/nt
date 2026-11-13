@@ -59,6 +59,7 @@ func runDoctor(args []string) int {
 		checks = append(checks, linkCheck(v))
 	}
 	syncChecks(m, add)
+	mcpCheck(m, add)
 	summaryCheck(m, add)
 	toolChecks(add)
 	switch t, why := termimg.Detect(m.InlineImages); {

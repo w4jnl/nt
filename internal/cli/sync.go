@@ -126,21 +126,32 @@ func plural(n int, what string) string {
 	return fmt.Sprintf("%d %ss", n, what)
 }
 
-// nt install --sync|--nvim|--skill: the background sync timer, the nvim plugin and the agent
-// skill; nt uninstall takes the same flags and removes them, and --hooks, nt's old agent hooks.
+// nt install --sync|--nvim|--skill|--mcp: the background sync timer, the nvim plugin, the agent
+// skill and the Claude app's server; nt uninstall takes the same flags and removes them, and
+// --hooks, nt's old agent hooks.
 func runInstall(args []string, remove bool) int {
 	args, sync := takeBool(args, "--sync")
 	args, withNvim := takeBool(args, "--nvim")
 	args, hooks := takeBool(args, "--hooks")
 	args, skill := takeBool(args, "--skill")
+	args, withMCP := takeBool(args, "--mcp")
+	args, readOnly := takeBool(args, "--read-only")
 	if _, err := positional("install", args); err != nil {
 		return fail(err)
 	}
 	if hooks && !remove {
 		return fail(errors.New("install: nt has no agent hooks any more: flok writes the session reports, with its [notes] on"))
 	}
-	if !sync && !withNvim && !hooks && !skill {
-		return fail(errors.New("install: use --sync, --nvim or --skill (nt uninstall takes the same, and --hooks)"))
+	if !sync && !withNvim && !hooks && !skill && !withMCP {
+		return fail(errors.New("install: use --sync, --nvim, --skill or --mcp (nt uninstall takes the same, and --hooks)"))
+	}
+	if readOnly && (!withMCP || remove) {
+		return fail(errors.New("install: --read-only goes with install --mcp"))
+	}
+	if withMCP {
+		if err := installMCP(remove, readOnly); err != nil {
+			return fail(fmt.Errorf("install: mcp: %w", err))
+		}
 	}
 	if withNvim {
 		if err := installNvim(remove); err != nil {
