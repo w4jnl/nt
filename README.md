@@ -223,7 +223,8 @@ The mouse selects text in the note, resizes the list by dragging the divider, an
 - `fzf` for `nt f`. Optional: `rg` for faster search (nt searches without it), `glow` for `v`,
   `chafa` for images over ssh.
 - Images inside the note need a terminal with the kitty graphics protocol (Ghostty, kitty); in
-  tmux, `set -g allow-passthrough on`. Other terminals show the alt text.
+  tmux, `set -g allow-passthrough on`. Other terminals show the alt text. An SVG also needs
+  `rsvg-convert` (`brew install librsvg`).
 - The agent reports need Claude Code or Copilot CLI.
 - Go 1.27 only if you build from source.
 
