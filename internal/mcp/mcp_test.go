@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -462,11 +463,14 @@ func TestJournalAndTodos(t *testing.T) {
 func TestInstall(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "claude_desktop_config.json")
-	if err := Install(filepath.Join(dir, "none", "c.json"), "/opt/nt", false); err == nil {
-		t.Error("installed without the app's folder")
+	app := Client{Name: "claude", Title: "the Claude app", Path: p, Need: "install the Claude app and open it once", Fix: "fix it in the app"}
+	gone := app
+	gone.Path = filepath.Join(dir, "none", "c.json")
+	if err := Install(gone, "/opt/nt", false); err == nil || !strings.Contains(err.Error(), "install the Claude app") {
+		t.Errorf("installed without the app's folder: %v", err)
 	}
 	put(t, p, `{"theme":"dark","mcpServers":{"other":{"command":"/bin/x","args":["a"],"extra":1}}}`)
-	if err := Install(p, "/opt/nt/bin/nt", true); err != nil {
+	if err := Install(app, "/opt/nt/bin/nt", true); err != nil {
 		t.Fatal(err)
 	}
 	var cfg struct {
@@ -479,18 +483,68 @@ func TestInstall(t *testing.T) {
 	if cfg.Theme != "dark" || !strings.Contains(string(cfg.Servers["other"]), `"extra"`) {
 		t.Errorf("the rest of the file changed: %s", get(t, p))
 	}
-	e, has, err := Installed(p)
+	if raw := string(cfg.Servers["nt"]); strings.Contains(raw, `"type"`) || strings.Contains(raw, `"tools"`) {
+		t.Errorf("the Claude app's entry has Copilot's keys: %s", raw)
+	}
+	e, has, err := Installed(app)
 	if err != nil || !has || e.Command != "/opt/nt/bin/nt" || strings.Join(e.Args, " ") != "mcp --read-only" || !e.ReadOnly() || !strings.HasPrefix(e.Env["PATH"], "/opt/nt/bin:") {
 		t.Errorf("Installed = %+v, %v, %v", e, has, err)
 	}
-	if err := Remove(p); err != nil {
-		t.Fatal(err)
+	if had, err := Remove(app); err != nil || !had {
+		t.Fatalf("Remove = %v, %v", had, err)
 	}
-	if _, has, _ := Installed(p); has || !strings.Contains(get(t, p), `"other"`) {
+	if _, has, _ := Installed(app); has || !strings.Contains(get(t, p), `"other"`) {
 		t.Errorf("after Remove: %s", get(t, p))
 	}
+	if had, err := Remove(app); err != nil || had {
+		t.Errorf("a second Remove = %v, %v", had, err)
+	}
 	put(t, p, `{broken`)
-	if err := Install(p, "/opt/nt", false); err == nil || get(t, p) != `{broken` {
+	if err := Install(app, "/opt/nt", false); err == nil || get(t, p) != `{broken` || !strings.Contains(err.Error(), "fix it in the app") {
 		t.Errorf("a file that is not JSON was written over: %v", err)
+	}
+}
+
+func TestInstallForCopilot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("COPILOT_HOME", home)
+	cs, err := Pick("copilot")
+	if err != nil || len(cs) != 1 || cs[0].Path != filepath.Join(home, "mcp-config.json") {
+		t.Fatalf("Pick(copilot) = %+v, %v", cs, err)
+	}
+	if err := Install(cs[0], "/opt/nt/bin/nt", false); err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Servers map[string]map[string]any `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(get(t, cs[0].Path)), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	e := cfg.Servers["nt"]
+	if e["type"] != "local" || e["command"] != "/opt/nt/bin/nt" || fmt.Sprint(e["args"]) != "[mcp]" || fmt.Sprint(e["tools"]) != "[*]" {
+		t.Errorf("Copilot's entry = %v", e)
+	}
+	if _, has := e["env"]; has {
+		t.Errorf("Copilot's entry carries a PATH; it has the shell's: %v", e)
+	}
+}
+
+func TestPick(t *testing.T) {
+	names := func(cs []Client) string {
+		var out []string
+		for _, c := range cs {
+			out = append(out, c.Name)
+		}
+		return strings.Join(out, " ")
+	}
+	for list, want := range map[string]string{"": "claude", "all": "claude copilot", "copilot": "copilot", "copilot, claude,copilot": "copilot claude"} {
+		cs, err := Pick(list)
+		if err != nil || names(cs) != want {
+			t.Errorf("Pick(%q) = %q, %v; want %q", list, names(cs), err, want)
+		}
+	}
+	if _, err := Pick("cursor"); err == nil || !strings.Contains(err.Error(), "claude, copilot, or all") {
+		t.Errorf("Pick(cursor) = %v", err)
 	}
 }
