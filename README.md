@@ -151,7 +151,8 @@ that conflicts in git, and sync that is either paid or fragile. nt does less:
   a local MCP server: in a chat it searches and reads them, adds to today, makes a note with its
   images, changes todos, and makes folders and moves notes with their links kept. It writes as
   nt does and runs no git; a sync follows by itself. `nt config set mcp.hide private/health`
-  keeps folders from it, and `nt install --mcp --read-only` lets it only read.
+  keeps folders from it, and `nt install --mcp --read-only` lets it only read. Copilot CLI takes the
+  same server: `nt install --mcp=copilot`, or `--mcp=all` for both.
 - **`nt doctor`** checks the setup and lists the links that point at nothing.
 - **nt for Mac.** The same folder in a window: the sidebar with the views, the pins and every
   folder, the note in live preview as Typora shows it (a line's markdown only while the cursor
@@ -188,7 +189,7 @@ Every command that prints data takes `--json`.
 | `nt config` | every setting, its value and what it does; `nt config set summary.model haiku`, `get`, `edit` |
 | `nt sync`, `nt doctor` | sync now; check the setup |
 | `nt init`, `nt install`, `nt uninstall` | make or clone the repository; the sync timer, the nvim plugin, the agent skill, the Claude app's server |
-| `nt mcp` | nt as an MCP server for the Claude app, which `nt install --mcp` sets up; `--read-only` for reading only |
+| `nt mcp` | nt as an MCP server for the Claude app and Copilot CLI, which `nt install --mcp[=claude,copilot]` sets up; `--read-only` for reading only |
 | `nt agent …`, `nt digest [date]` | agent reports, and the day's digest |
 | `nt import obsidian <vault>` | bring an Obsidian vault over once |
 | `nt completion bash\|zsh` | shell completion |

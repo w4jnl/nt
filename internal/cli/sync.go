@@ -134,7 +134,7 @@ func runInstall(args []string, remove bool) int {
 	args, withNvim := takeBool(args, "--nvim")
 	args, hooks := takeBool(args, "--hooks")
 	args, skill := takeBool(args, "--skill")
-	args, withMCP := takeBool(args, "--mcp")
+	args, withMCP, clients := takeMCP(args)
 	args, readOnly := takeBool(args, "--read-only")
 	if _, err := positional("install", args); err != nil {
 		return fail(err)
@@ -143,13 +143,13 @@ func runInstall(args []string, remove bool) int {
 		return fail(errors.New("install: nt has no agent hooks any more: flok writes the session reports, with its [notes] on"))
 	}
 	if !sync && !withNvim && !hooks && !skill && !withMCP {
-		return fail(errors.New("install: use --sync, --nvim, --skill or --mcp (nt uninstall takes the same, and --hooks)"))
+		return fail(errors.New("install: use --sync, --nvim, --skill or --mcp[=claude,copilot] (nt uninstall takes the same, and --hooks)"))
 	}
 	if readOnly && (!withMCP || remove) {
 		return fail(errors.New("install: --read-only goes with install --mcp"))
 	}
 	if withMCP {
-		if err := installMCP(remove, readOnly); err != nil {
+		if err := installMCP(clients, remove, readOnly); err != nil {
 			return fail(fmt.Errorf("install: mcp: %w", err))
 		}
 	}
