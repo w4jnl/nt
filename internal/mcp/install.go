@@ -11,9 +11,9 @@ import (
 	"strings"
 )
 
-// The Claude app and Copilot CLI each start the servers their config file names under
-// "mcpServers". nt install --mcp writes nt's entry there, and leaves the rest of the file as it
-// is.
+// Each client starts the servers its config names: most in a JSON file under "mcpServers", Codex
+// CLI in a table of its config.toml, Claude Code in a file it writes itself. nt install --mcp
+// writes nt's entry there, and leaves the rest as it is.
 
 // name is nt's entry in a client's config.
 const name = "nt"
@@ -24,8 +24,9 @@ type Client struct {
 	Title string // as messages name it
 	Path  string // its config file
 	Apply string // what makes it read the file again
-	Fix   string // where the person mends a file that is not JSON
-	Need  string // what to do when its folder is not there
+	Fix   string // where the person mends a file nt cannot read
+	Need  string // what to do when it is not on this machine
+	kind  int    // inJSON, inTOML or byClaude
 	shell bool   // started from a shell, with its PATH: the entry carries none
 	typ   string // the entry's "type", where the client wants one
 	tools bool   // the entry lists the tools the client may call
@@ -44,10 +45,30 @@ func Clients() []Client {
 			Fix:   "fix it by hand, or with copilot's /mcp",
 			Need:  "install Copilot CLI and run it once",
 			shell: true, typ: "local", tools: true},
+		{Name: "claude-code", Title: "Claude Code", Path: ClaudeCodePath(),
+			Apply: "a new claude session applies it (/mcp lists its servers)",
+			Fix:   "fix it with claude mcp",
+			Need:  "install Claude Code",
+			kind:  byClaude, shell: true, typ: "stdio"},
+		{Name: "codex", Title: "Codex CLI", Path: filepath.Join(home("CODEX_HOME", ".codex"), "config.toml"),
+			Apply: "a new codex session applies it",
+			Fix:   "fix it by hand, or with codex mcp",
+			Need:  "install Codex CLI and run it once",
+			kind:  inTOML, shell: true},
+		{Name: "gemini", Title: "Gemini CLI", Path: filepath.Join(home("", ".gemini"), "settings.json"),
+			Apply: "a new gemini session applies it (/mcp lists its servers)",
+			Fix:   "fix it by hand; nt does not change a settings.json with comments",
+			Need:  "install Gemini CLI and run it once",
+			shell: true},
+		{Name: "cursor", Title: "Cursor", Path: filepath.Join(home("", ".cursor"), "mcp.json"),
+			Apply: "Cursor reads it in Settings › MCP",
+			Fix:   "fix it in Cursor, Settings › MCP",
+			Need:  "install Cursor and open it once",
+			typ:   "stdio"},
 	}
 }
 
-// Pick is the clients a comma list names: "" the first, "all" every one.
+// Pick is the clients a comma list names: "" the first, "all" every one nt knows.
 func Pick(list string) ([]Client, error) {
 	all := Clients()
 	var names []string
@@ -74,7 +95,7 @@ next:
 				continue next
 			}
 		}
-		return nil, fmt.Errorf("--mcp=%s: nt knows %s, or all", n, strings.Join(names, ", "))
+		return nil, fmt.Errorf("--mcp=%s: nt knows %s, and all for those on this machine", n, strings.Join(names, ", "))
 	}
 	return out, nil
 }
@@ -159,11 +180,16 @@ func write(path string, top, servers map[string]json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+	return writeFile(path, append(out, '\n'))
+}
+
+// writeFile puts data at path through a temp file beside it.
+func writeFile(path string, data []byte) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".nt-tmp-*")
 	if err != nil {
 		return err
 	}
-	_, werr := f.Write(append(out, '\n'))
+	_, werr := f.Write(data)
 	if err := errors.Join(werr, f.Close()); err != nil {
 		os.Remove(f.Name())
 		return err
@@ -181,12 +207,11 @@ func write(path string, top, servers map[string]json.RawMessage) error {
 // hands its own on.
 func Install(c Client, bin string, readOnly bool) error {
 	path := c.Path
-	if st, err := os.Stat(filepath.Dir(path)); err != nil || !st.IsDir() {
+	if !Present(c) {
+		if c.kind == byClaude {
+			return fmt.Errorf("claude is not on PATH: %s", c.Need)
+		}
 		return fmt.Errorf("%s is not there: %s", filepath.Dir(path), c.Need)
-	}
-	top, servers, err := read(c)
-	if err != nil {
-		return err
 	}
 	e := Entry{Type: c.typ, Command: bin, Args: []string{"mcp"}}
 	if !c.shell {
@@ -204,6 +229,22 @@ func Install(c Client, bin string, readOnly bool) error {
 	if err != nil {
 		return err
 	}
+	switch c.kind {
+	case inTOML:
+		_, err := putTOML(c, &e)
+		return err
+	case byClaude: // it does not write over a server it has
+		if _, has, _ := Installed(c); has {
+			if err := claudeCode("remove", "--scope", "user", name); err != nil {
+				return err
+			}
+		}
+		return claudeCode("add-json", "--scope", "user", name, string(raw))
+	}
+	top, servers, err := read(c)
+	if err != nil {
+		return err
+	}
 	servers[name] = raw
 	return write(path, top, servers)
 }
@@ -211,6 +252,15 @@ func Install(c Client, bin string, readOnly bool) error {
 // Remove takes nt's entry out of the client's config file, and says whether it had one.
 func Remove(c Client) (bool, error) {
 	path := c.Path
+	switch c.kind {
+	case inTOML:
+		return putTOML(c, nil)
+	case byClaude:
+		if _, has, err := Installed(c); err != nil || !has {
+			return false, err
+		}
+		return true, claudeCode("remove", "--scope", "user", name)
+	}
 	top, servers, err := read(c)
 	if err != nil {
 		return false, err
@@ -225,6 +275,11 @@ func Remove(c Client) (bool, error) {
 // Installed is nt's entry in the client's config file, and whether it has one.
 func Installed(c Client) (Entry, bool, error) {
 	path := c.Path
+	if c.kind == inTOML {
+		_, servers, err := readTOML(c)
+		e, ok := servers[name]
+		return e, ok, err
+	}
 	_, servers, err := read(c)
 	if err != nil {
 		return Entry{}, false, err

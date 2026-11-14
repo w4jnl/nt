@@ -143,7 +143,7 @@ func runInstall(args []string, remove bool) int {
 		return fail(errors.New("install: nt has no agent hooks any more: flok writes the session reports, with its [notes] on"))
 	}
 	if !sync && !withNvim && !hooks && !skill && !withMCP {
-		return fail(errors.New("install: use --sync, --nvim, --skill or --mcp[=claude,copilot] (nt uninstall takes the same, and --hooks)"))
+		return fail(errors.New("install: use --sync, --nvim, --skill or --mcp[=<tools>] (nt uninstall takes the same, and --hooks)"))
 	}
 	if readOnly && (!withMCP || remove) {
 		return fail(errors.New("install: --read-only goes with install --mcp"))

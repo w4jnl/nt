@@ -538,13 +538,143 @@ func TestPick(t *testing.T) {
 		}
 		return strings.Join(out, " ")
 	}
-	for list, want := range map[string]string{"": "claude", "all": "claude copilot", "copilot": "copilot", "copilot, claude,copilot": "copilot claude"} {
+	for list, want := range map[string]string{"": "claude", "all": "claude copilot claude-code codex gemini cursor", "copilot": "copilot", "codex, claude,codex": "codex claude"} {
 		cs, err := Pick(list)
 		if err != nil || names(cs) != want {
 			t.Errorf("Pick(%q) = %q, %v; want %q", list, names(cs), err, want)
 		}
 	}
-	if _, err := Pick("cursor"); err == nil || !strings.Contains(err.Error(), "claude, copilot, or all") {
-		t.Errorf("Pick(cursor) = %v", err)
+	if _, err := Pick("emacs"); err == nil || !strings.Contains(err.Error(), "claude, copilot, claude-code, codex, gemini, cursor") {
+		t.Errorf("Pick(emacs) = %v", err)
+	}
+}
+
+// pick is the one client name names, with the homes of every client under the test's folder.
+func pick(t *testing.T, name string) (Client, string) {
+	t.Helper()
+	h := t.TempDir()
+	t.Setenv("HOME", h)
+	for _, k := range []string{"COPILOT_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME"} {
+		t.Setenv(k, "")
+	}
+	cs, err := Pick(name)
+	if err != nil || len(cs) != 1 {
+		t.Fatalf("Pick(%s) = %+v, %v", name, cs, err)
+	}
+	return cs[0], h
+}
+
+func TestInstallForGeminiAndCursor(t *testing.T) {
+	for name, file := range map[string]string{"gemini": ".gemini/settings.json", "cursor": ".cursor/mcp.json"} {
+		c, h := pick(t, name)
+		if c.Path != filepath.Join(h, file) {
+			t.Errorf("%s: path %s", name, c.Path)
+		}
+		if Present(c) {
+			t.Errorf("%s: present without its folder", name)
+		}
+		if err := os.MkdirAll(filepath.Dir(c.Path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		put(t, c.Path, `{"theme":"x"}`)
+		if err := Install(c, "/opt/nt/bin/nt", false); err != nil {
+			t.Fatal(err)
+		}
+		var cfg struct {
+			Theme   string                    `json:"theme"`
+			Servers map[string]map[string]any `json:"mcpServers"`
+		}
+		if err := json.Unmarshal([]byte(get(t, c.Path)), &cfg); err != nil {
+			t.Fatal(err)
+		}
+		e := cfg.Servers["nt"]
+		_, env := e["env"]
+		if cfg.Theme != "x" || e["command"] != "/opt/nt/bin/nt" || env != (name == "cursor") || (name == "cursor") != (e["type"] == "stdio") {
+			t.Errorf("%s: %s", name, get(t, c.Path))
+		}
+	}
+}
+
+func TestInstallForCodex(t *testing.T) {
+	c, h := pick(t, "codex")
+	if c.Path != filepath.Join(h, ".codex", "config.toml") {
+		t.Fatalf("path %s", c.Path)
+	}
+	if err := os.MkdirAll(filepath.Dir(c.Path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// no file yet
+	if err := Install(c, "/opt/nt/bin/nt", true); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := get(t, c.Path), "[mcp_servers.nt]\ncommand = \"/opt/nt/bin/nt\"\nargs = [\"mcp\", \"--read-only\"]\n"; got != want {
+		t.Errorf("a new config.toml = %q, want %q", got, want)
+	}
+	if e, has, err := Installed(c); err != nil || !has || !e.ReadOnly() || e.Command != "/opt/nt/bin/nt" {
+		t.Errorf("Installed = %+v, %v, %v", e, has, err)
+	}
+	// the rest of a file stays, comments too, and an older table of nt's goes with what is under it
+	before := "# mine\nmodel = \"o\"  # kept\n\n[mcp_servers.nt]\ncommand = \"/old/nt\"\nargs = [\"mcp\"]\n\n[mcp_servers.nt.env]\nA = \"b\"\n\n[mcp_servers.other]\ncommand = \"x\"\n"
+	put(t, c.Path, before)
+	if err := Install(c, "/opt/nt/bin/nt", false); err != nil {
+		t.Fatal(err)
+	}
+	want := "# mine\nmodel = \"o\"  # kept\n\n[mcp_servers.other]\ncommand = \"x\"\n\n[mcp_servers.nt]\ncommand = \"/opt/nt/bin/nt\"\nargs = [\"mcp\"]\n"
+	if got := get(t, c.Path); got != want {
+		t.Errorf("config.toml =\n%s\nwant\n%s", got, want)
+	}
+	if had, err := Remove(c); err != nil || !had {
+		t.Fatalf("Remove = %v, %v", had, err)
+	}
+	if got, want := get(t, c.Path), "# mine\nmodel = \"o\"  # kept\n\n[mcp_servers.other]\ncommand = \"x\"\n"; got != want {
+		t.Errorf("after Remove =\n%s\nwant\n%s", got, want)
+	}
+	if had, err := Remove(c); err != nil || had {
+		t.Errorf("a second Remove = %v, %v", had, err)
+	}
+	// a form nt does not change, and a file that is not TOML, are left alone
+	for _, text := range []string{"[mcp_servers]\nnt = { command = \"/old/nt\" }\n", "not = [toml\n"} {
+		put(t, c.Path, text)
+		if err := Install(c, "/opt/nt/bin/nt", false); err == nil || get(t, c.Path) != text {
+			t.Errorf("%q was written over: %v", text, err)
+		}
+	}
+}
+
+func TestInstallForClaudeCode(t *testing.T) {
+	c, h := pick(t, "claude-code")
+	t.Setenv("PATH", t.TempDir())
+	if Present(c) {
+		t.Fatal("present without claude")
+	}
+	if err := Install(c, "/opt/nt/bin/nt", false); err == nil || !strings.Contains(err.Error(), "install Claude Code") {
+		t.Errorf("installed without claude: %v", err)
+	}
+	// a claude that keeps what it is asked, and has the server already
+	bin := t.TempDir()
+	log := filepath.Join(h, "asked")
+	put(t, filepath.Join(bin, "claude"), "#!/bin/sh\necho \"$@\" >> "+log+"\n")
+	if err := os.Chmod(filepath.Join(bin, "claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":/usr/bin:/bin")
+	put(t, c.Path, `{"numStartups":3,"mcpServers":{"nt":{"type":"stdio","command":"/old/nt","args":["mcp","--read-only"]}}}`)
+	if e, has, err := Installed(c); err != nil || !has || !e.ReadOnly() || e.Command != "/old/nt" {
+		t.Errorf("Installed = %+v, %v, %v", e, has, err)
+	}
+	if err := Install(c, "/opt/nt/bin/nt", false); err != nil {
+		t.Fatal(err)
+	}
+	if had, err := Remove(c); err != nil || !had {
+		t.Errorf("Remove = %v, %v", had, err)
+	}
+	want := "mcp remove --scope user nt\n" +
+		`mcp add-json --scope user nt {"type":"stdio","command":"/opt/nt/bin/nt","args":["mcp"]}` + "\n" +
+		"mcp remove --scope user nt\n"
+	if got := get(t, log); got != want {
+		t.Errorf("claude was asked\n%s\nwant\n%s", got, want)
+	}
+	if !strings.Contains(get(t, c.Path), `"numStartups":3`) {
+		t.Error("nt wrote Claude Code's file")
 	}
 }
