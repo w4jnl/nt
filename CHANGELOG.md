@@ -4,6 +4,43 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.6 (2026-11-14)
+
+The notes for the Claude app and other AI tools, todos in progress, Back after a link, and SVGs
+in the terminal.
+
+- **`nt mcp`, the notes for the Claude app:** `nt install --mcp` gives the Claude desktop app
+  your notes through a local MCP server; quit and open the app after. In a chat it lists,
+  searches and reads notes, adds to today, makes a note with its images (nt names the file,
+  keeps the images under `assets/` and fixes the links), adds to or rewrites a note it has
+  read, changes todos, and makes folders, moves, renames and removes with every link kept and
+  a dry run first. It writes as nt does and runs no git: a sync follows a few seconds after the
+  last write. Agent reports and weekly digests stay read-only. `--read-only` gives it only the
+  tools that read.
+- **Folders kept from it:** `nt config set mcp.hide "private/health, private/finance"` keeps
+  folders from the server, with all they hold: not listed, searched, read or written. It is a
+  setting of the machine, read at every call, shown in the Mac app's Settings and by
+  `nt doctor`.
+- **Other tools:** `nt install --mcp=<names>` writes the same server for a comma list of
+  `claude`, `copilot` (Copilot CLI), `claude-code`, `codex`, `gemini` and `cursor`;
+  `--mcp=all` takes those on this machine and names the ones it left, so a server without the
+  Claude app has what it does have. `nt uninstall` takes the same names. Each tool's own
+  config keeps the rest of what it holds, and `nt doctor` has an `mcp` line for each tool that
+  runs nt.
+- **Todos in progress:** a todo can be under way: `- [ ] text started:2026-11-11`, a stamp
+  like `due:` and `done:`, so the box stays open in any other viewer. nt lists the ones in
+  progress first, draws them ◐ and counts them. `nt todo start` and `stop` on the command
+  line, `i` in the terminal's todos, `i` and the row's menu on the Mac, iPhone and iPad
+  (Option-click on a task's box in the note), `<leader>ti` in nvim. Checking keeps the date, so
+  the line says when the work began and ended. The row's menu also sets, changes or removes a
+  due date.
+- **Back:** after following a link or a "Linked from" line in nt for Mac and iPad, Back (⌘[,
+  and a chevron in the toolbar) returns to the note it was followed from, scrolled as it was.
+- **SVGs in the terminal:** the browser's preview draws an SVG beside PNG, JPEG and GIF, when
+  `rsvg-convert` is installed (`brew install librsvg`). It is drawn once on a machine and kept
+  in nt's state, not in the notes. Without it an SVG keeps its alt text, and `nt doctor` says
+  what to install.
+
 ## 0.9.5 (2026-11-06)
 
 Alerts, table columns that keep their words, and nt for Mac as an app for markdown files.
