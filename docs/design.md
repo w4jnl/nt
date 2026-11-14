@@ -137,7 +137,7 @@ Decisions taken with the user (2026-10-26):
 | `nt install --nvim`, `nt uninstall --nvim` | Write or remove nt's nvim plugin (below) |
 | `nt install --skill`, `nt uninstall --skill` | The agent skill (§3); `nt uninstall --hooks` takes out nt's old hooks |
 | `nt mcp [--read-only]` | nt as a Model Context Protocol server on stdin and stdout, which the Claude app starts (The Claude app, below) |
-| `nt install --mcp [--read-only]`, `nt uninstall --mcp` | Name this nt as the Claude app's `nt` server in the app's config file, or take it out |
+| `nt install --mcp[=<clients>] [--read-only]`, `nt uninstall --mcp[=<clients>]` | Name this nt as the `nt` server of the Claude app (`claude`, the one taken when none is named), or of a comma list of `claude`, `copilot`, `claude-code`, `codex`, `gemini` and `cursor`, or of `all`, those on this machine; or take it out (The Claude app, below) |
 | `nt agent import`, `nt agent write` | Agent session reports: flok's records, the agent's own account (§3) |
 | `nt digest [date]` | Write and list a day's agent digest (§3) |
 | `nt week [date\|last]` | Compile a week's digest now (Weekly digest, below); the machine with `weekly = true` does it on every sync |
@@ -266,6 +266,18 @@ It finds the repository with `nt _editor repo`, never a fixed path, and does not
 - **What it refuses.** A path is a path from the root of the notes: an absolute path, one that leaves the repository (`..`, or a symlink that leads out) and a name that starts with a dot are refused, and nothing is written. A note is at most 1 MB. The agents' reports and the weekly digests are read, never written, and nothing moves into their folders. What a tool refuses comes back as the tool's error, in words the model can act on.
 - **Hidden folders.** The machine setting `mcp.hide` lists folders the server is kept from, with all they hold: they are not listed, searched or read, their todos are not shown, and nothing is written, moved or renamed into, out of or around them. It is read on every call, so a change holds from the next one, and the server has no tool that changes a setting. A link to a hidden note in another note still shows as written.
 - **Installing.** `nt install --mcp` writes the entry `nt` under `mcpServers` in the app's `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on macOS), with this nt's full path, `mcp` as its argument and a `PATH` that finds git and rg, since the app starts it without the shell's; the rest of the file stays, and a file that is not JSON is left alone. The repository is the one nt's own config names. `nt doctor` says which nt the app runs and what it is kept from, and fails when that nt is gone.
+- **Other clients** (added 2026-11-14). `nt install --mcp=<names>` writes the same server for the clients a comma list names, and `nt uninstall` takes the same names; `--read-only` holds for each named. `--mcp=all` writes for those on this machine and names the ones it left; a machine without the Claude app, a server, takes `--mcp=copilot` or `--mcp=all`. `internal/mcp` keeps them as a table:
+
+  | Name | Client | Where | The entry |
+  |------|--------|-------|-----------|
+  | `claude` | the Claude app | `claude_desktop_config.json`, `mcpServers` | with a `PATH` |
+  | `copilot` | Copilot CLI, and VS Code's Copilot, which reads the same file | `$COPILOT_HOME/mcp-config.json` (`~/.copilot/`), `mcpServers` | `"type": "local"`, `"tools": ["*"]` |
+  | `claude-code` | Claude Code | its own `~/.claude.json`, which nt only reads: nt runs `claude mcp add-json --scope user` and `claude mcp remove` | `"type": "stdio"` |
+  | `codex` | Codex CLI | `$CODEX_HOME/config.toml` (`~/.codex/`), the table `[mcp_servers.nt]` | `command`, `args` |
+  | `gemini` | Gemini CLI | `~/.gemini/settings.json`, `mcpServers` | |
+  | `cursor` | Cursor | `~/.cursor/mcp.json`, `mcpServers` | `"type": "stdio"`, with a `PATH` |
+
+  A client that runs in a shell hands its own `PATH` on; the two apps get one in the entry. A client is on this machine when its folder is there (for Claude Code, `claude` on `PATH`). In Codex's `config.toml` nt changes only the lines of its own table, so comments and the rest stay, and a file that names the server in another form, or is not TOML, is left alone, as a JSON file with comments is. `nt doctor` has an `mcp` line for each client that runs nt, naming it. Claude Code and Copilot CLI also have the skill (`nt install --skill`), which runs nt's commands; the server is for a setup that wants nt's tools instead, and the two do not conflict. Not taken: ChatGPT's app, which starts no local server.
 
 **Deferred:** multiple views.
 

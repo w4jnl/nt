@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/w4jnl/nt/internal/config"
 	"github.com/w4jnl/nt/internal/mcp"
@@ -35,50 +36,112 @@ func runMCP(args []string) int {
 	return 0
 }
 
-// installMCP names this nt as the Claude app's nt server, or takes it out.
-func installMCP(remove, readOnly bool) error {
-	p := mcp.ConfigPath()
-	if remove {
-		if err := mcp.Remove(p); err != nil {
-			return err
+// takeMCP takes --mcp and --mcp=<clients> out of args: whether it was there, and the clients
+// it names ("" when none).
+func takeMCP(args []string) (rest []string, on bool, list string) {
+	for _, a := range args {
+		switch v, ok := strings.CutPrefix(a, "--mcp="); {
+		case a == "--mcp":
+			on = true
+		case ok:
+			on, list = true, v
+		default:
+			rest = append(rest, a)
 		}
-		fmt.Println("removed nt from the Claude app's servers (" + tilde(p) + "); quit and open the app to apply")
+	}
+	return rest, on, list
+}
+
+// installMCP names this nt as the nt server of the clients list names, or takes it out. "all"
+// is every client on this machine: the others are named and left.
+func installMCP(list string, remove, readOnly bool) error {
+	clients, err := mcp.Pick(list)
+	if err != nil {
+		return err
+	}
+	all := strings.TrimSpace(list) == "all"
+	if all && !remove {
+		var here []mcp.Client
+		var away []string
+		for _, c := range clients {
+			if mcp.Present(c) {
+				here = append(here, c)
+			} else {
+				away = append(away, c.Name)
+			}
+		}
+		if len(here) == 0 {
+			return fmt.Errorf("none of %s is on this machine", joinAnd(away))
+		}
+		if len(away) > 0 {
+			defer fmt.Printf("not on this machine, left: %s\n", joinAnd(away))
+		}
+		clients = here
+	}
+	if remove {
+		for _, c := range clients {
+			had, err := mcp.Remove(c)
+			if err != nil {
+				return err
+			}
+			if had {
+				fmt.Printf("removed nt from %s's servers (%s); %s\n", c.Title, tilde(c.Path), c.Apply)
+			} else if !all {
+				fmt.Printf("%s has no nt server (%s)\n", c.Title, tilde(c.Path))
+			}
+		}
 		return nil
 	}
 	bin, err := stableBinary()
 	if err != nil {
 		return err
 	}
-	if err := mcp.Install(p, bin, readOnly); err != nil {
-		return err
-	}
 	how := "reads and writes the notes"
 	if readOnly {
 		how = "only reads the notes"
 	}
-	fmt.Printf("the Claude app runs %s mcp, which %s (%s); quit and open the app to apply\n", tilde(bin), how, tilde(p))
+	for _, c := range clients {
+		if err := mcp.Install(c, bin, readOnly); err != nil {
+			if list == "" {
+				return fmt.Errorf("%w; nt install --mcp=all takes the tools that are here (nt knows %s)", err, known())
+			}
+			return err
+		}
+		fmt.Printf("%s runs %s mcp, which %s (%s); %s\n", c.Title, tilde(bin), how, tilde(c.Path), c.Apply)
+	}
 	return nil
 }
 
-// mcpCheck says whether the Claude app runs nt, with which binary, and what it is kept from.
+// known lists the clients' names.
+func known() string {
+	var names []string
+	for _, c := range mcp.Clients() {
+		names = append(names, c.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// mcpCheck says which clients run nt, with which binary, and what they are kept from.
 func mcpCheck(m config.Machine, add func(name, state, format string, a ...any)) {
-	e, ok, err := mcp.Installed(mcp.ConfigPath())
-	switch {
-	case err != nil:
-		add("claude app", "warn", "%v", err)
-	case !ok:
-		return // not asked for
-	case !runs(e.Command):
-		add("claude app", "fail", "it runs %s, which is not there, so the app has no notes: nt install --mcp", tilde(e.Command))
-	default:
-		what := "reads and writes the notes"
-		if e.ReadOnly() {
-			what = "only reads the notes"
+	for _, c := range mcp.Clients() {
+		const line = "mcp" // one line a client; the detail names it
+		e, ok, err := mcp.Installed(c)
+		switch {
+		case err != nil:
+			add(line, "warn", "%v", err)
+		case !ok: // not asked for
+		case !runs(e.Command):
+			add(line, "fail", "%s runs %s, which is not there, so it has no notes: nt install --mcp=%s", c.Title, tilde(e.Command), c.Name)
+		default:
+			what := "reads and writes the notes"
+			if e.ReadOnly() {
+				what = "only reads the notes"
+			}
+			if h := mcp.Hidden(m); len(h) > 0 {
+				what += fmt.Sprintf(", kept from %s (mcp.hide)", joinAnd(h))
+			}
+			add(line, "ok", "%s runs %s mcp, which %s", c.Title, tilde(e.Command), what)
 		}
-		if h := mcp.Hidden(m); len(h) > 0 {
-			what += fmt.Sprintf(", kept from %s (mcp.hide)", joinAnd(h))
-		}
-		add("claude app", "ok", "%s mcp %s", tilde(e.Command), what)
 	}
 }
 

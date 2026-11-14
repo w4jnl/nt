@@ -74,7 +74,9 @@ repository
   install --nvim       nt's nvim plugin: paste images, no merge under unsaved notes, sync on exit
   install --skill      teach Claude Code and Copilot CLI nt; uninstall --hooks: nt's old hooks
   install --mcp        give the Claude app the notes: it runs nt mcp [--read-only: reading only]
-  mcp                  nt as an MCP server on stdin and stdout, for the Claude app [--read-only]
+                       [--mcp=<names>: of claude, copilot, claude-code, codex, gemini, cursor;
+                        --mcp=all: those on this machine]
+  mcp                  nt as an MCP server on stdin and stdout, for the Claude app and other AI tools [--read-only]
   doctor               check the repository, git, the sync timer and the tools nt uses
   config               every setting, its value and what it does; config set <key> <value>,
                        config get <key>, config edit [--repo] (the whole file in $EDITOR)
