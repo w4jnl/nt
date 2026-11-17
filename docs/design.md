@@ -445,6 +445,7 @@ scripts/e2e/ · CLAUDE.md · README.md (hero) · Makefile · .github/workflows/c
 assets/demo/ (scene.sh, *.tape, record.sh, ghostty.sh) → assets/readme/*.gif   the README recordings
 CONTRIBUTING.md · SECURITY.md · .github/ISSUE_TEMPLATE/ · .github/dependabot.yml
 scripts/release.sh · CHANGELOG.md · .github/workflows/release.yml   tag, tarballs, Homebrew tap bump
+scripts/install.sh                                                  a release's binary into ~/.local/bin, checked (Linux, macOS)
 app/macos/          the Mac app (§8): project.yml (XcodeGen), Nt/ (SwiftUI), NtTests/, and editor/,
                     CodeMirror with nt's live preview, built into Nt/Resources/editor
 ```

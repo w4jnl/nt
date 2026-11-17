@@ -30,22 +30,35 @@ iPad** keeps a full clone on the phone, synced with git over ssh by a key the ph
 
 ## Setup
 
-Current version: 0.8.1 · [release notes](CHANGELOG.md). Needs git, and `fzf` for find, `rg`
-for faster search; details under [Requirements](#requirements).
+[Release notes](CHANGELOG.md). Needs git, and `fzf` for find, `rg` for faster search; details
+under [Requirements](#requirements).
 
-1. Install the binary. Homebrew, on macOS or Linux:
+1. Install the binary.
+
+   **macOS**, with Homebrew:
    ```sh
    brew install w4jnl/tap/nt
    ```
-   Or a prebuilt static binary from the [releases page](https://github.com/w4jnl/nt/releases)
-   (Linux and macOS, `amd64` and `arm64`, no Go, no root):
+   **Linux** (and macOS without Homebrew), `amd64` and `arm64`: the prebuilt static binary of
+   the latest [release](https://github.com/w4jnl/nt/releases), with no Go and no root. The
+   script checks the download against the release's checksums and puts `nt` in `~/.local/bin`:
    ```sh
-   ver=0.8.1; os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
-   curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/nt_${ver}_${os}_${arch}.tar.gz"
-   curl -fsSLO "https://github.com/w4jnl/nt/releases/download/v$ver/sha256sums.txt"
-   shasum -a 256 -c --ignore-missing sha256sums.txt
-   mkdir -p ~/.local/bin && tar -xzf "nt_${ver}_${os}_${arch}.tar.gz" --strip-components=1 -C ~/.local/bin "nt_${ver}_${os}_${arch}/nt"
+   curl -fsSL https://raw.githubusercontent.com/w4jnl/nt/main/scripts/install.sh | sh
    ```
+   Then what nt uses, from your distribution:
+   ```sh
+   sudo apt install git fzf ripgrep        # Debian, Ubuntu
+   sudo dnf install git fzf ripgrep        # Fedora
+   sudo pacman -S git fzf ripgrep          # Arch
+   ```
+   - Upgrade by running the script again. A version instead of the latest: `... | sh -s -- 0.9.6`.
+     Another place than `~/.local`: `... | sudo PREFIX=/usr/local sh`.
+   - If `~/.local/bin` is not on your `PATH`, the script says so: add
+     `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` or `~/.zshrc`.
+   - By hand: download `nt_<version>_linux_<arch>.tar.gz` and `sha256sums.txt` from the
+     releases page, run `sha256sum -c --ignore-missing sha256sums.txt`, and copy the `nt` in
+     the tarball to a folder on your `PATH`.
+   - Homebrew on Linux works too: `brew install w4jnl/tap/nt`.
 2. Make the notes repository, and give it a private remote:
    ```sh
    nt init ~/notes

@@ -1,7 +1,8 @@
 name: release
 
 # nt binaries for each tagged release: Linux and macOS tarballs, cgo-free and static. Homebrew
-# builds from source (w4jnl/homebrew-tap); the tarballs are for a machine without Homebrew or Go.
+# builds from source (w4jnl/homebrew-tap); the tarballs are for a machine without Homebrew or Go,
+# which scripts/install.sh installs them on.
 # The tag push creates the GitHub release, or refreshes its notes when the tag was moved;
 # workflow_dispatch can repair or rebuild an existing tag.
 on:

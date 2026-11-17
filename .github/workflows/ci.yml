@@ -33,6 +33,8 @@ jobs:
       - run: go test -race -timeout 120s ./...
       - run: make build
       - run: ./bin/nt version
+      - name: scripts/install.sh installs the latest release
+        run: PREFIX="$RUNNER_TEMP/nt" sh scripts/install.sh && "$RUNNER_TEMP/nt/bin/nt" version
 
   # the Mac app's editor page: its live preview without a screen, and its colours against
   # tokens.json (the app itself builds with make mac-test on a Mac with Xcode 26)
