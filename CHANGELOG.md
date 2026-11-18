@@ -4,6 +4,30 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.7 (2026-11-18)
+
+Todos by list and section, a new todo in the section you choose, and nt on Linux in one line.
+
+- **Todos show where they belong:** in the terminal browser, `nt todo`, the Mac app and the
+  iPhone and iPad app. The open todos that are due or in progress stay on top, each with its
+  list and section beside it (`storscan › NA reimport`). The others sit under a heading per
+  list and section (`work/shell/storscan · NA reimport`), in the file's order, with a gap
+  where the file has a blank line between two todos.
+- **A todo for a section:** `nt todo add "text" --in work --section "Next week"` puts it under
+  that heading, of any level, and makes the section when it is missing; `--after <todo>` puts
+  it at the end of the paragraph that todo is in. Without either it goes to Inbox, as before.
+  `--json` gives each todo's `para`, and the MCP server's `todo_add` takes a `section`.
+- **In the browser:** `a` with the selection on a todo under a heading adds at the end of its
+  paragraph; anywhere else it goes to Inbox. The prompt names the place, and `tab` there opens
+  every list and section: typing narrows them, and a name none has offers
+  `new section "<name>"` in the list in use.
+- **In the apps:** the right end of the Todos view's add field names the place and is a menu
+  of the lists and their sections, with New Section…. The Mac's capture panel lists each
+  list's sections after Tab, and a new section for a name typed. On the iPhone a todo in the
+  capture sheet has a row, In, with the same menu.
+- **Linux:** `scripts/install.sh` installs the release's static binary to `~/.local/bin` after
+  checking its sha256, for amd64 and arm64; the README has the steps by platform.
+
 ## 0.9.6 (2026-11-14)
 
 The notes for the Claude app and other AI tools, todos in progress, Back after a link, and SVGs

@@ -1464,7 +1464,7 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 			// another list or section for the todo being typed
 			b.tv.draft = b.input.Value()
 			b.pick = &picker{title: "todo in"}
-			b.prompt("place", "todo in: ")
+			b.prompt("place", "todo in (a new name makes a section): ")
 			return b.placeTargets()
 		}
 		if b.inputKind == "within" {
