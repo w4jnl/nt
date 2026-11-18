@@ -476,7 +476,14 @@ todos: true
 - **`todo.md`** starts as `todos: true` in its frontmatter, `# Todo` and `## Inbox`. A client adds a new todo, `- [ ] text` with
   its `due:` when it has one, at the end of `## Inbox` of the root's `todo.md`, or of
   `<folder>/todo.md` when the person names a folder, and adds the file or the section when it is
-  missing. The agents folder and hidden folders have no todo list. The rest of the file is the
+  missing. When the person names a section, it goes to the end of that section instead: under
+  the first heading with that name, of any level and in any case, before the next heading; a
+  section that is missing is added at the end of the file as `## <name>`.
+- **Sections and paragraphs:** a todo belongs to the heading above it, its section. Within a
+  section, a blank line between two todos starts a new paragraph. Clients list the open todos
+  with no `due:` and no `started:` under their list and section, in the file's order, with a
+  gap between paragraphs; the ones due or in progress are listed above, with where they are. A
+  client may add a todo after another one: at the end of that todo's paragraph, with its indent. The agents folder and hidden folders have no todo list. The rest of the file is the
   person's: other sections, order, notes between items.
 - **Changing a todo** rewrites its one line, and only when the line is still as the client read
   it.

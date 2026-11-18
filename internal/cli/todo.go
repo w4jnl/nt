@@ -112,7 +112,26 @@ func runTodoList(args []string) int {
 		word, _ := it.Word(today)
 		textW, whenW = max(textW, min(56, lipgloss.Width(it.Text))), max(whenW, lipgloss.Width(word))
 	}
-	for _, it := range show {
+	// the open ones that are due or in progress first; the rest under their list and section,
+	// with a gap where the file has a blank line between two of them
+	var prev *todo.Item
+	for i, it := range show {
+		grouped := !it.Done && !it.Pinned()
+		switch {
+		case grouped && (prev == nil || !prev.SameGroup(it)):
+			if i > 0 {
+				lipgloss.Println()
+			}
+			lipgloss.Println(st.Muted.Render(it.Group("")))
+		case grouped && prev.Para != it.Para:
+			lipgloss.Println()
+		case !grouped && prev != nil:
+			lipgloss.Println()
+		}
+		prev = nil
+		if grouped {
+			prev = &show[i]
+		}
 		lipgloss.Println(todoRow(m, it, today, textW, whenW))
 	}
 	return 0
@@ -162,6 +181,14 @@ func runTodoAdd(args []string) int {
 	if err != nil {
 		return fail(fmt.Errorf("todo add: %w", err))
 	}
+	args, section, _, err := takeValue(args, "--section")
+	if err != nil {
+		return fail(fmt.Errorf("todo add: %w", err))
+	}
+	args, after, _, err := takeValue(args, "--after")
+	if err != nil {
+		return fail(fmt.Errorf("todo add: %w", err))
+	}
 	words, err := positional("todo add", args)
 	if err != nil {
 		return fail(err)
@@ -178,7 +205,7 @@ func runTodoAdd(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	it, err := ops.AddTodo(v, folder, text, due)
+	it, err := ops.AddTodo(v, folder, section, after, text, due)
 	if err != nil {
 		return fail(err)
 	}

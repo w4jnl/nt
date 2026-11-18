@@ -15,8 +15,34 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
     var doneOn: String
     var when: String
     var late: Bool
+    let section: String // the heading above it
+    let para: Int // its paragraph in the section, from 0: a blank line in the file starts the next
 
     var id: String { "\(rel):\(line)" }
+
+    /// pinned says the todo is listed above the lists: open, and due some day or in progress.
+    /// The other open ones are under their list and section, as the file has them.
+    var pinned: Bool { !done && (!due.isEmpty || !started.isEmpty) }
+
+    /// isList says the todo is in a todo.md, where nt adds new ones.
+    var isList: Bool { (rel as NSString).lastPathComponent == "todo.md" }
+
+    /// group names the list and section the todo is under, as the terminal browser's headings
+    /// do: "work/shell · NA reimport", "todo.md · Inbox"; note is what to call a note that is
+    /// no todo.md, its title.
+    func group(_ note: String) -> String {
+        let name = rel == "todo.md" ? rel : isList ? folder : note.isEmpty ? rel : note
+        return section.isEmpty || section == name ? name : "\(name) · \(section)"
+    }
+
+    /// from names where a todo above the lists is, short: "storscan › NA reimport".
+    func from(_ note: String) -> String {
+        let name = rel == "todo.md" ? rel : isList ? (folder as NSString).lastPathComponent : note.isEmpty ? rel : note
+        return section.isEmpty || section == name ? name : "\(name) › \(section)"
+    }
+
+    /// sameGroup says two todos are in one note, under one heading.
+    func sameGroup(_ o: Todo) -> Bool { rel == o.rel && section == o.section }
 
     /// isTask reports a line that is a task, open or done, as nt reads one: a list marker, a
     /// space, `[ ]` or `[x]`. The note searches leave these lines out; Todos finds them.
@@ -41,7 +67,7 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
     var inProgress: Bool { !done && !started.isEmpty }
 
     enum CodingKeys: String, CodingKey {
-        case rel, line, done, text, due, when, late, started
+        case rel, line, done, text, due, when, late, started, section, para
         case doneOn = "done_on"
     }
 
@@ -56,6 +82,8 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         doneOn = try c.decodeIfPresent(String.self, forKey: .doneOn) ?? ""
         when = try c.decodeIfPresent(String.self, forKey: .when) ?? ""
         late = try c.decodeIfPresent(Bool.self, forKey: .late) ?? false
+        section = try c.decodeIfPresent(String.self, forKey: .section) ?? ""
+        para = try c.decodeIfPresent(Int.self, forKey: .para) ?? 0
     }
 
     struct List: Decodable {
@@ -96,6 +124,53 @@ struct Todo: Decodable, Identifiable, Equatable, Sendable {
         }
         let folders = per.keys.filter { own.contains($0) || !$0.contains("/") }
         return folders.sorted { $0.lowercased() < $1.lowercased() }.map { ($0, per[$0] ?? 0) }
+    }
+}
+
+/// TodoPlace is where a new todo goes: a section of a folder's todo.md. Written as a folder
+/// alone ("work") it is that list's Inbox.
+struct TodoPlace: Hashable, Sendable, ExpressibleByStringLiteral {
+    var folder = "" // whose todo.md; "" is the root's
+    var section = "" // the heading it goes under; "" is Inbox
+    var isNew = false // no heading has the name yet: nt makes the section
+
+    init(folder: String = "", section: String = "", isNew: Bool = false) {
+        self.folder = folder
+        self.section = section
+        self.isNew = isNew
+    }
+
+    init(stringLiteral value: String) {
+        folder = value
+    }
+
+    /// file is the todo.md it is in.
+    var file: String { (folder.isEmpty ? "" : folder + "/") + "todo.md" }
+
+    /// name is the place as the lists' headings say it: "work/shell · NA reimport".
+    var name: String { "\(folder.isEmpty ? "todo.md" : folder) · \(section.isEmpty ? "Inbox" : section)" }
+
+    /// sections are the headings that hold todos in each folder's todo.md, besides Inbox, in the
+    /// file's order.
+    static func sections(_ todos: [Todo]) -> [String: [String]] {
+        var out: [String: [String]] = [:]
+        for t in todos.filter(\.isList).sorted(by: { $0.rel != $1.rel ? $0.rel < $1.rel : $0.line < $1.line })
+            where !t.section.isEmpty && t.section != "Inbox" && out[t.folder]?.contains(t.section) != true {
+            out[t.folder, default: []].append(t.section)
+        }
+        return out
+    }
+
+    /// lists are the places in the todo lists there are, the root's first, and in also's folders.
+    static func lists(_ todos: [Todo], also: [String] = []) -> [TodoPlace] {
+        let folders = Set(todos.filter(\.isList).map(\.folder)).union(also).subtracting([""])
+        return all(in: folders.sorted { $0.lowercased() < $1.lowercased() }, sections: sections(todos))
+    }
+
+    /// all are the places there are: the root's list, then each folder's: its Inbox, then its
+    /// other sections.
+    static func all(in dirs: [String], sections: [String: [String]]) -> [TodoPlace] {
+        ([""] + dirs).flatMap { d in [TodoPlace(folder: d)] + (sections[d] ?? []).map { TodoPlace(folder: d, section: $0) } }
     }
 }
 

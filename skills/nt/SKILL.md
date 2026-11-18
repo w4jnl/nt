@@ -68,7 +68,8 @@ go to `todo.md`, the root's or a folder's.
   (`--done`: the done ones, `--all`: both); each has `rel`, `line`, `text`, `due`, `started`,
   `in_progress`. The ones in progress come first.
 - `nt todo add "text" --due fri`: add one when the person asks you to remember something for
-  them; `--in work` puts it in `work/todo.md`. `--due` takes YYYY-MM-DD, today, tomorrow,
+  them; `--in work` puts it in `work/todo.md`, `--section "Next week"` under that heading there (made
+  when missing; Inbox otherwise). `--due` takes YYYY-MM-DD, today, tomorrow,
   mon…sun, +3d, +2w.
 - `nt todo done <todo>`, `nt todo start <todo>` (mark it in progress: do this when you begin
   working on it), `nt todo stop <todo>`, `nt todo due <todo> <when>` (`none` clears the date),

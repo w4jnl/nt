@@ -218,9 +218,10 @@ func (s *Server) tools() []tool {
 			name: "todo_add", title: "Add a todo", write: true,
 			about: "Add a todo for the person, to their todo list or to a folder's.",
 			props: map[string]any{
-				"text":   str("What is to do."),
-				"due":    str("When it is due: YYYY-MM-DD, today, tomorrow, mon to sun, +3d, +2w. Empty: no date."),
-				"folder": str("Put it in this folder's todo list, e.g. work. Empty: the main list."),
+				"text":    str("What is to do."),
+				"due":     str("When it is due: YYYY-MM-DD, today, tomorrow, mon to sun, +3d, +2w. Empty: no date."),
+				"folder":  str("Put it in this folder's todo list, e.g. work. Empty: the main list."),
+				"section": str("The heading in that list to put it under, e.g. Inbox or a project's name, as todo_list gives each todo's section. It is made when missing. Empty: Inbox."),
 			},
 			required: []string{"text"},
 			run:      todoAdd,
@@ -871,9 +872,10 @@ func noteWrite(sc scope, args json.RawMessage) (any, error) {
 
 func todoAdd(sc scope, args json.RawMessage) (any, error) {
 	var a struct {
-		Text   string `json:"text"`
-		Due    string `json:"due"`
-		Folder string `json:"folder"`
+		Text    string `json:"text"`
+		Due     string `json:"due"`
+		Folder  string `json:"folder"`
+		Section string `json:"section"`
 	}
 	if err := in(args, &a); err != nil {
 		return nil, err
@@ -885,7 +887,7 @@ func todoAdd(sc scope, args json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	it, err := ops.AddTodo(sc.v, folder, strings.TrimSpace(a.Text), strings.TrimSpace(a.Due))
+	it, err := ops.AddTodo(sc.v, folder, a.Section, "", strings.TrimSpace(a.Text), strings.TrimSpace(a.Due))
 	if err != nil {
 		return nil, err
 	}

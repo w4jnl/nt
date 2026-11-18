@@ -35,6 +35,7 @@ type Item struct {
 	Started string `json:"started,omitempty"` // the day work on it began: in progress while it is open
 	DoneOn  string `json:"done_on,omitempty"`
 	Section string `json:"section,omitempty"` // the heading above it
+	Para    int    `json:"para,omitempty"`    // which paragraph of its section it is in, from 0: a blank line starts the next
 	Raw     string `json:"-"`                 // the line as it is in the file
 }
 
@@ -82,9 +83,14 @@ func Parse(rel string, data []byte) []Item {
 		return nil
 	}
 	fence, section := "", ""
+	para, any, blank := 0, false, false // the paragraph in the section, whether it has a todo yet, a blank line since
 	for i := start; i < len(lines); i++ {
 		l := strings.TrimRight(lines[i], "\r")
 		t := strings.TrimLeft(l, " \t")
+		if t == "" && fence == "" {
+			blank = true
+			continue
+		}
 		if fence != "" {
 			if strings.HasPrefix(t, fence) {
 				fence = ""
@@ -96,14 +102,19 @@ func Parse(rel string, data []byte) []Item {
 			continue
 		}
 		if m := headingRe.FindStringSubmatch(l); m != nil {
-			section = strings.TrimSpace(strings.TrimRight(m[1], "# "))
+			section = headingText(m[1])
+			para, any, blank = 0, false, false
 			continue
 		}
 		m := taskRe.FindStringSubmatch(l)
 		if m == nil {
 			continue
 		}
-		it := Item{Path: rel, Line: i + 1, Done: m[2] != " ", Raw: lines[i], Section: section,
+		if any && blank {
+			para++
+		}
+		any, blank = true, false
+		it := Item{Path: rel, Line: i + 1, Done: m[2] != " ", Raw: lines[i], Section: section, Para: para,
 			Due: stamp(m[3], "due"), Started: stamp(m[3], "started"), DoneOn: stamp(m[3], "done")}
 		it.Text = strings.TrimSpace(unstamp(unstamp(unstamp(m[3], "due"), "started"), "done"))
 		if it.Text != "" {
@@ -401,15 +412,22 @@ func SetEnabled(v *vault.Vault, rel string, on bool) error {
 // title; Inbox follows with the first todo.
 const NewList = "---\ntodos: true\n---\n\n# Todo\n"
 
-// Add puts "- [ ] text", with " due:YYYY-MM-DD" when due is set, at the end of the Inbox
-// section of folder's todo.md ("" is the root's), making the file or the section when it is
-// missing. A due:<word> in the text counts as due when due is empty. It returns the todo as
-// written.
-func Add(v *vault.Vault, folder, text, due string, now time.Time) (Item, error) {
-	list, err := ListIn(v, folder)
-	if err != nil {
-		return Item{}, err
-	}
+// Place is where a new todo goes: the end of a section of a folder's todo.md, or the end of the
+// paragraph another todo is in.
+type Place struct {
+	Folder  string // whose todo.md: "" is the root's
+	Section string // the heading it goes under, made when missing: "" is Inbox
+	After   *Item  // a todo: the new one ends its paragraph, in its note; Folder and Section are not read
+}
+
+// Inbox is the section a new todo goes to when none is named.
+const Inbox = "Inbox"
+
+// Add puts "- [ ] text", with " due:YYYY-MM-DD" when due is set, at the place: the end of the
+// section of the folder's todo.md, making the file or the section when it is missing, or the
+// end of the paragraph a todo is in. A due:<word> in the text counts as due when due is empty.
+// It returns the todo as written.
+func Add(v *vault.Vault, at Place, text, due string, now time.Time) (Item, error) {
 	text = strings.Join(strings.Fields(text), " ")
 	if m := inlineDue.FindStringSubmatch(text); m != nil && due == "" {
 		due = m[1]
@@ -426,23 +444,156 @@ func Add(v *vault.Vault, folder, text, due string, now time.Time) (Item, error) 
 	if date != "" {
 		line += " due:" + date
 	}
-	at := 0
-	err = v.Update(list, func(old []byte) ([]byte, error) {
-		if old == nil {
-			old = []byte(NewList)
+	var list string
+	n := 0
+	if at.After != nil {
+		list = at.After.Path
+		_, err = rewrite(v, *at.After, func(lines []string, i int) []string {
+			line = at.After.Raw[:len(at.After.Raw)-len(strings.TrimLeft(at.After.Raw, " \t"))] + line
+			end := i
+			for end+1 < len(lines) && strings.TrimSpace(lines[end+1]) != "" && !headingRe.MatchString(lines[end+1]) {
+				end++
+			}
+			n = end + 2
+			return append(lines[:end+1], append([]string{line}, lines[end+1:]...)...)
+		})
+	} else {
+		section := strings.TrimSpace(strings.TrimLeft(strings.Join(strings.Fields(at.Section), " "), "# "))
+		if section == "" {
+			section = Inbox
 		}
-		doc := vault.AddToSection(old, "Inbox", line)
-		lines := strings.Split(string(doc), "\n")
-		for i := len(lines) - 1; i >= 0; i-- {
-			if lines[i] == line {
-				at = i + 1
-				break
+		if list, err = ListIn(v, at.Folder); err != nil {
+			return Item{}, err
+		}
+		err = v.Update(list, func(old []byte) ([]byte, error) {
+			if old == nil {
+				old = []byte(NewList)
+			}
+			var doc []byte
+			doc, n = addTo(list, old, section, line)
+			return doc, nil
+		})
+	}
+	if err != nil {
+		return Item{}, err
+	}
+	if b, err := os.ReadFile(v.Abs(list)); err == nil {
+		for _, it := range Parse(list, b) {
+			if it.Line == n {
+				return it, nil
 			}
 		}
-		return doc, nil
-	})
-	return Item{Path: list, Line: at, Text: text, Due: date, Section: "Inbox", Raw: line}, err
+	}
+	return Item{Path: list, Line: n, Text: text, Due: date, Raw: line}, nil
 }
+
+// headingText is a heading's text as a section is named: without closing #s.
+func headingText(s string) string {
+	return strings.TrimSpace(strings.TrimRight(strings.TrimSpace(s), "#"))
+}
+
+// addTo puts line at the end of the section named in the note at rel: under the first heading
+// with that name, of any level and in any case, after its last line that is not blank and
+// before the next heading. A missing section is added at the end as "## name". It returns the
+// note and the line's 1-based number.
+func addTo(rel string, doc []byte, section, line string) ([]byte, int) {
+	lines := strings.Split(string(doc), "\n")
+	_, start := enabled(rel, lines)
+	head, end, fence := -1, len(lines), ""
+	for i := start; i < len(lines); i++ {
+		t := strings.TrimLeft(strings.TrimRight(lines[i], "\r"), " \t")
+		if fence != "" {
+			if strings.HasPrefix(t, fence) {
+				fence = ""
+			}
+			continue
+		}
+		if strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
+			fence = t[:3]
+			continue
+		}
+		m := headingRe.FindStringSubmatch(strings.TrimRight(lines[i], "\r"))
+		if m == nil {
+			continue
+		}
+		if head >= 0 {
+			end = i
+			break
+		}
+		if strings.EqualFold(headingText(m[1]), section) {
+			head = i
+		}
+	}
+	if head < 0 {
+		s := strings.TrimRight(string(doc), "\n")
+		if s != "" {
+			s += "\n\n"
+		}
+		s += "## " + section + "\n\n"
+		return []byte(s + line + "\n"), strings.Count(s, "\n") + 1
+	}
+	last := head
+	for i := head + 1; i < end; i++ {
+		if strings.TrimSpace(lines[i]) != "" {
+			last = i
+		}
+	}
+	out := append([]string{}, lines[:last+1]...)
+	if last == head {
+		out = append(out, "")
+	}
+	at := len(out) + 1
+	out = append(out, line, "")
+	if end < len(lines) {
+		out = append(out, lines[end:]...)
+	}
+	return []byte(strings.Join(out, "\n")), at
+}
+
+// Pinned says a todo is listed above the lists: open, and due some day or in progress. The
+// other open ones are listed under their list and section, as they are in the file.
+func (it Item) Pinned() bool { return !it.Done && (it.Due != "" || it.Started != "") }
+
+// IsList says the todo is in a todo.md, where nt adds new ones.
+func (it Item) IsList() bool { return path.Base(it.Path) == File }
+
+// Group names the list and section a todo is under: "work/shell · NA reimport" for one in
+// work/shell/todo.md, "todo.md · Inbox" for the root's; note is what to call a note that is no
+// todo.md ("" its path).
+func (it Item) Group(note string) string {
+	name := it.Path
+	switch {
+	case it.Path == File:
+	case it.IsList():
+		name = path.Dir(it.Path)
+	case note != "":
+		name = note
+	}
+	if it.Section == "" || it.Section == name { // a note's todos under its title
+		return name
+	}
+	return name + " · " + it.Section
+}
+
+// From names where a pinned todo is, short: "storscan › NA reimport" for one in
+// work/shell/storscan/todo.md; note as in Group.
+func (it Item) From(note string) string {
+	name := it.Path
+	switch {
+	case it.Path == File:
+	case it.IsList():
+		name = path.Base(path.Dir(it.Path))
+	case note != "":
+		name = note
+	}
+	if it.Section == "" || it.Section == name { // a note's todos under its title
+		return name
+	}
+	return name + " › " + it.Section
+}
+
+// SameGroup says two todos are in one note and under one heading.
+func (it Item) SameGroup(o Item) bool { return it.Path == o.Path && it.Section == o.Section }
 
 // Check marks the todo done on day, adding done:YYYY-MM-DD. A started: date stays, so the line
 // says when the work began and when it ended.

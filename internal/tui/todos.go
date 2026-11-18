@@ -276,18 +276,18 @@ func (b *browser) todoInput(kind, text string) tea.Cmd {
 		if text == "" {
 			return nil
 		}
-		folder, due := "", ""
+		at, due := todo.Place{}, ""
 		if b.pick != nil {
-			folder, due = b.pick.folder, b.pick.day
+			at.Folder, due = b.pick.folder, b.pick.day
 		} else if b.tv != nil {
-			folder = b.tv.addTo()
+			at = b.tv.place
 		}
-		it, err := todo.Add(b.v, folder, text, due, b.v.Now())
+		it, err := todo.Add(b.v, at, text, due, b.v.Now())
 		if err != nil {
 			b.say(err.Error(), true)
 			return nil
 		}
-		b.say("added to "+it.Path, false)
+		b.say("added to "+it.Group(b.todoNote(it)), false)
 		if b.pick != nil && b.pick.todos {
 			b.pick.done = false
 		}

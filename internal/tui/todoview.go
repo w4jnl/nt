@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/w4jnl/nt/internal/scan"
 	"github.com/w4jnl/nt/internal/theme"
@@ -35,6 +36,152 @@ type todoView struct {
 	filter  string          // the words typed after /: only the todos with them, in their text or their note's name, show
 	clicked bool            // the last click selected a row; a second one opens its note
 	full    bool            // the pane was given the whole screen for it (narrow screens)
+	pin     map[string]bool // whether a todo was due or in progress when the list was read: it is above the lists
+	place   todo.Place      // where the todo being typed goes: after the selected one, or the place chosen with tab
+	draft   string          // the todo's text while the places are open
+}
+
+// read takes the todos as nt todo orders them and notes which are above the lists: the open
+// ones due some day or in progress. A row keeps its place until the list is read again.
+func (tv *todoView) read(items []todo.Item) {
+	tv.items, tv.ready, tv.held = append([]todo.Item(nil), items...), true, nil
+	todo.Sort(tv.items)
+	tv.pin = map[string]bool{}
+	for i := range tv.items {
+		tv.pin[todoRef(&tv.items[i])] = tv.items[i].Pinned()
+	}
+}
+
+// pinned says a todo is listed above the lists, with where it is at its side.
+func (tv *todoView) pinned(it todo.Item) bool {
+	if p, ok := tv.pin[todoRef(&it)]; ok {
+		return p
+	}
+	return it.Pinned()
+}
+
+// cursorPlace is where a todo added here goes before tab chooses: with the selection on a todo
+// under a list's heading, the end of the paragraph it is in; else (on one above the lists or a
+// done one, or with none) Inbox in the todo.md of the folder kept to, or the browser's.
+func (tv *todoView) cursorPlace() todo.Place {
+	if it := tv.selected(); it != nil && !tv.done(*it) && !tv.pinned(*it) {
+		return todo.Place{After: it}
+	}
+	return todo.Place{Folder: tv.addTo()}
+}
+
+// todoNote is what to call the note a todo is in when it is no todo.md: its title.
+func (b *browser) todoNote(it todo.Item) string {
+	if it.IsList() || b.ix == nil {
+		return ""
+	}
+	return b.ix.Title(it.Path)
+}
+
+// placeName names a place as the lists' headings do: "work/shell · NA reimport".
+func (b *browser) placeName(at todo.Place) string {
+	if at.After != nil {
+		return at.After.Group(b.todoNote(*at.After))
+	}
+	list, err := todo.ListIn(b.v, at.Folder)
+	if err != nil {
+		list = todo.File
+	}
+	return todo.Item{Path: list, Section: firstNonEmpty(at.Section, todo.Inbox)}.Group("")
+}
+
+// addPrompt opens the prompt for a new todo's text, naming where it goes; tab chooses another
+// list or section.
+func (b *browser) addPrompt(text string) tea.Cmd {
+	b.prompt("todo", "todo in "+b.placeName(b.tv.place)+" (tab: elsewhere): ")
+	b.input.insert(text)
+	return nil
+}
+
+// places are the lists and sections a todo can go to: Inbox of the root's todo.md and of the
+// folder's the browser is in, then every section of a todo.md that holds a todo, a list's in
+// the file's order; each with its open todos.
+func (tv *todoView) places() []pickItem {
+	type key struct{ folder, section string }
+	open, seen := map[key]int{}, map[key]bool{}
+	var keys []key
+	add := func(k key) {
+		if !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	add(key{"", todo.Inbox})
+	add(key{tv.addTo(), todo.Inbox})
+	lists := append([]todo.Item(nil), tv.items...)
+	sort.SliceStable(lists, func(i, j int) bool {
+		if lists[i].Path != lists[j].Path {
+			return pathBefore(lists[i].Path, lists[j].Path)
+		}
+		return lists[i].Line < lists[j].Line
+	})
+	for _, it := range lists {
+		if !it.IsList() || it.Section == "" {
+			continue
+		}
+		k := key{strings.TrimSuffix(strings.TrimSuffix(it.Path, todo.File), "/"), it.Section}
+		add(k)
+		if !it.Done {
+			open[k]++
+		}
+	}
+	sort.SliceStable(keys, func(i, j int) bool {
+		return keys[i].folder != keys[j].folder && pathBefore(keys[i].folder, keys[j].folder)
+	})
+	var items []pickItem
+	for _, k := range keys {
+		name := todo.Item{Path: path.Join(k.folder, todo.File), Section: k.section}.Group("")
+		items = append(items, pickItem{label: name, hint: strconv.Itoa(open[k]) + " open", kind: "place", target: k.folder, text: k.section})
+	}
+	return items
+}
+
+// placeTargets fills the place picker with the places that match what is typed, and, for a name
+// no section of the list has, a row that makes the section there.
+func (b *browser) placeTargets() tea.Cmd {
+	p, tv := b.pick, b.tv
+	if p == nil || tv == nil {
+		return nil
+	}
+	q := strings.Join(strings.Fields(b.input.Value()), " ")
+	folder := tv.addTo()
+	if it := tv.place.After; it != nil && it.IsList() {
+		folder = strings.TrimSuffix(strings.TrimSuffix(it.Path, todo.File), "/")
+	} else if it == nil {
+		folder = tv.place.Folder
+	}
+	p.items, p.sel, p.top = nil, 0, 0
+	has := false
+	for _, it := range tv.places() {
+		if _, ok := scan.Match(q, it.label); ok {
+			p.items = append(p.items, it)
+		}
+		has = has || it.target == folder && strings.EqualFold(it.text, q)
+	}
+	if q != "" && !has {
+		name := todo.Item{Path: path.Join(folder, todo.File)}.Group("")
+		p.items = append(p.items, pickItem{label: "new section " + strconv.Quote(q) + " in " + name, kind: "place", target: folder, text: q})
+	}
+	return nil
+}
+
+// choosePlace takes the place chosen (keep is false after esc) and goes back to the todo's text.
+func (b *browser) choosePlace(keep bool) tea.Cmd {
+	tv := b.tv
+	if tv == nil {
+		b.pick = nil
+		return nil
+	}
+	if p := b.pick; keep && p != nil && p.sel < len(p.items) {
+		tv.place = todo.Place{Folder: p.items[p.sel].target, Section: p.items[p.sel].text}
+	}
+	b.pick = nil
+	return b.addPrompt(tv.draft)
 }
 
 // done says which list a todo is in: the one it was read in while a tick holds it there.
@@ -196,7 +343,7 @@ func (b *browser) openTodoView() tea.Cmd {
 	if b.tv == nil {
 		b.tv = &todoView{folder: b.plainFolder()}
 		if b.todoKnown {
-			b.tv.items, b.tv.ready = append([]todo.Item(nil), b.todoItems...), true
+			b.tv.read(b.todoItems)
 		}
 		if b.narrow() && !b.full {
 			b.full, b.tv.full = true, true
@@ -222,8 +369,7 @@ func (b *browser) closeTodoView() tea.Cmd {
 // the row in the selected one's place.
 func (b *browser) setTodoView(items []todo.Item, keep string) {
 	tv := b.tv
-	tv.items, tv.ready, tv.held = append([]todo.Item(nil), items...), true, nil
-	todo.Sort(tv.items)
+	tv.read(items)
 	rows := tv.rows()
 	tv.sel = max(0, min(tv.sel, len(rows)-1))
 	for i := range rows {
@@ -274,12 +420,12 @@ func (b *browser) todoViewKey(k tea.KeyPressMsg) (tea.Cmd, bool) {
 	case "/":
 		return b.prompt("todos", "todos: "), true
 	case "a":
-		list, err := todo.ListIn(b.v, tv.addTo())
-		if err != nil {
+		tv.place = tv.cursorPlace()
+		if _, err := todo.ListIn(b.v, tv.place.Folder); err != nil {
 			b.say(err.Error(), true)
 			return nil, true
 		}
-		return b.prompt("todo", "todo in "+list+": "), true
+		return b.addPrompt(""), true
 	case "r":
 		keep := ""
 		if it != nil {
@@ -336,6 +482,7 @@ type todoViewLine struct {
 	row  int // -1 when the line is no todo
 	done bool
 	text string
+	head string // a list and section, above its todos
 }
 
 func (b *browser) todoViewLines(tv *todoView, active bool) []todoViewLine {
@@ -344,7 +491,22 @@ func (b *browser) todoViewLines(tv *todoView, active bool) []todoViewLine {
 	if !tv.ready {
 		return lines
 	}
-	for i := range open {
+	// the ones due or in progress, then the rest under their list and section as the file has
+	// them, with a gap where it has a blank line between two
+	var prev *todo.Item
+	for i, it := range open {
+		if !tv.pinned(it) {
+			switch {
+			case prev == nil || !prev.SameGroup(it):
+				if i > 0 {
+					lines = append(lines, todoViewLine{row: -1})
+				}
+				lines = append(lines, todoViewLine{row: -1, head: it.Group(b.todoNote(it))})
+			case prev.Para != it.Para:
+				lines = append(lines, todoViewLine{row: -1})
+			}
+			prev = &open[i]
+		}
 		lines = append(lines, todoViewLine{row: i})
 	}
 	if len(open) == 0 && tv.filter != "" {
@@ -394,7 +556,13 @@ func (b *browser) todoViewPane(tv *todoView, w, h int, active bool) string {
 		switch {
 		case l.row >= 0 && l.row < len(rows):
 			it := rows[l.row]
-			out = append(out, " "+b.todoRow(it, active && l.row == tv.sel, w-1, b.todoFrom(it)))
+			from := ""
+			if tv.done(it) || tv.pinned(it) {
+				from = it.From(b.todoNote(it))
+			}
+			out = append(out, " "+b.todoRow(it, active && l.row == tv.sel, w-1, from))
+		case l.head != "":
+			out = append(out, "  "+b.st.Muted.Render(ansi.Truncate(l.head, max(0, w-3), "…")))
 		case l.done:
 			mark := "▾"
 			if tv.fold {
@@ -450,7 +618,10 @@ func (b *browser) todoSummary(tv *todoView) string {
 
 // homeTodos is the view the home list's Todos row shows, before it has the keys.
 func (b *browser) homeTodos() *todoView {
-	tv := &todoView{items: b.todoItems, ready: b.todoKnown, sel: -1}
+	tv := &todoView{sel: -1}
+	if b.todoKnown {
+		tv.read(b.todoItems)
+	}
 	return tv
 }
 

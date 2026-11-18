@@ -57,6 +57,8 @@ todos
   todo [folder]        the open todos in every note, or under folder, overdue first [--done] [--all]
   todo add <text>      a new todo at the end of Inbox in todo.md [--due fri|+3d|YYYY-MM-DD]
                        [--in folder]: in that folder's todo.md
+                       [--section name]: under that heading, made when missing
+                       [--after <todo>]: at the end of the paragraph that todo is in
   todo done <todo>     check it; undo, start (in progress), stop, rm, and due <todo> <when> too.
                        <todo>: words or path:line
 
