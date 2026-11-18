@@ -26,7 +26,8 @@ final class Capture {
     var mode = Mode.today
     var text = ""
     var folder = "" // the folder whose todo.md a todo goes to; "" the root's
-    var picking = false // the folder list is open, query typed into it, pick chosen
+    var section = "" // the heading in it the todo goes under; "" is Inbox
+    var picking = false // the list of places is open, query typed into it, pick chosen
     var query = ""
     var pick = 0
     var added: Added?
@@ -53,6 +54,7 @@ final class Capture {
     func began(_ mode: Mode) {
         self.mode = mode
         folder = ""
+        section = ""
         closePlaces()
         added = nil
         problem = ""
@@ -64,37 +66,56 @@ final class Capture {
     var target: String {
         if picking {
             let p = places
-            return p.indices.contains(pick) ? "\(p[pick].isEmpty ? "" : p[pick] + "/")todo.md · Inbox" : ""
+            return p.indices.contains(pick) ? Self.target(p[pick]) : ""
         }
-        return mode == .today ? "\(ws.journalPath(ws.today)) · Log" : "\(folder.isEmpty ? "" : folder + "/")todo.md · Inbox"
+        return mode == .today ? "\(ws.journalPath(ws.today)) · Log" : Self.target(TodoPlace(folder: folder, section: section))
     }
+
+    nonisolated static func target(_ p: TodoPlace) -> String { "\(p.file) · \(p.section.isEmpty ? "Inbox" : p.section)" }
 
     // MARK: The folder a todo goes to
 
-    /// places are the folders the list offers for query: while nothing is typed the root first,
-    /// then every folder that takes todos; else the folders that match, the best first.
-    var places: [String] {
-        Self.places(query, in: (ws.index?.dirs ?? []).filter(ws.placeable))
+    /// places are what the list offers for query: while nothing is typed the root's list first,
+    /// then every folder that takes todos, each followed by the sections its todo.md has besides
+    /// Inbox; else the ones that match, the best first, and last a new section with the name
+    /// typed, in the list chosen so far, unless it has one.
+    var places: [TodoPlace] {
+        Self.places(query, in: (ws.index?.dirs ?? []).filter(ws.placeable), sections: TodoPlace.sections(ws.todos), new: folder)
     }
 
-    nonisolated static func places(_ query: String, in dirs: [String]) -> [String] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        if q.isEmpty { return [""] + dirs }
-        let hits = dirs.compactMap { d in Fuzzy.match(q, d).map { (d, $0.score) } }
-        return hits.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }.map(\.0)
+    nonisolated static func places(_ query: String, in dirs: [String], sections: [String: [String]] = [:], new: String? = nil) -> [TodoPlace] {
+        let all = TodoPlace.all(in: dirs, sections: sections)
+        let q = query.split(separator: " ").joined(separator: " ")
+        if q.isEmpty { return all }
+        let hits = all.enumerated().compactMap { i, p -> (TodoPlace, Int, Int)? in
+            let key = p.section.isEmpty ? p.folder : p.folder.isEmpty ? p.section : "\(p.folder) \(p.section)"
+            return Fuzzy.match(q, key).map { (p, $0.score, i) }
+        }
+        var out = hits.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.2 < $1.2 }.map(\.0)
+        if let new, !all.contains(where: { $0.folder == new && ($0.section.isEmpty ? "Inbox" : $0.section).caseInsensitiveCompare(q) == .orderedSame }) {
+            out.append(TodoPlace(folder: new, section: q, isNew: true))
+        }
+        return out
     }
 
-    /// open is how many todos are open in a folder's todo.md, the root's for "".
-    func open(in place: String) -> Int {
-        let file = (place.isEmpty ? "" : place + "/") + "todo.md"
-        return ws.todos.count { !$0.done && $0.rel == file }
+    /// open is how many todos are open in a place: in a section, or for a list's Inbox in the
+    /// whole todo.md.
+    func open(in place: TodoPlace) -> Int {
+        ws.todos.count { !$0.done && $0.rel == place.file && (place.section.isEmpty || $0.section == place.section) }
     }
 
-    /// openPlaces opens the folder list at the folder chosen so far.
+    /// openPlaces opens the list at the place chosen so far.
     func openPlaces() {
         query = ""
-        pick = places.firstIndex(of: folder) ?? 0
+        pick = places.firstIndex(of: TodoPlace(folder: folder, section: section)) ?? 0
         picking = true
+    }
+
+    /// take makes the line a todo for a place.
+    func take(_ p: TodoPlace) {
+        folder = p.folder
+        section = p.section
+        mode = .todo
     }
 
     /// type narrows the folder list with what was typed; deleteBack takes the last letter off.
@@ -116,10 +137,7 @@ final class Capture {
     /// choose takes the folder chosen and closes the list: the text is a todo for its todo.md.
     func choose() {
         let p = places
-        if p.indices.contains(pick) {
-            folder = p[pick]
-            mode = .todo
-        }
+        if p.indices.contains(pick) { take(p[pick]) }
         closePlaces()
     }
 
@@ -140,10 +158,11 @@ final class Capture {
         defer { busy = false }
         do {
             if todo {
-                struct Made: Decodable { let rel: String; let when: String? }
-                let m = try await nt.json(Made.self, ["todo", "add", "--json"] + (folder.isEmpty ? [] : ["--in", folder]) + ["--", line])
+                struct Made: Decodable { let rel: String; let when: String?; let section: String? }
+                let place = (folder.isEmpty ? [] : ["--in", folder]) + (section.isEmpty ? [] : ["--section", section])
+                let m = try await nt.json(Made.self, ["todo", "add", "--json"] + place + ["--", line])
                 let when = m.when ?? ""
-                added = Added(place: m.rel, detail: when.isEmpty ? "" : "due \(when)", section: "Inbox")
+                added = Added(place: m.rel, detail: when.isEmpty ? "" : "due \(when)", section: m.section ?? "Inbox")
                 await ws.loadTodos()
             } else {
                 struct Made: Decodable { let rel: String }

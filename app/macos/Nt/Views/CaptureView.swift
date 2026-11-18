@@ -280,7 +280,7 @@ struct CaptureView: View {
                         .foregroundStyle(Brand.ink)
                     Rectangle().fill(Brand.accent).frame(width: 2, height: 18)
                     if capture.query.isEmpty {
-                        Text(" Folder: type to narrow")
+                        Text(" Folder or section: type to narrow, or name a new section")
                             .foregroundStyle(Brand.muted)
                     }
                 }
@@ -324,10 +324,11 @@ struct CaptureView: View {
         }
     }
 
-    private func placeRow(_ place: String, selected: Bool) -> some View {
-        let open = capture.open(in: place)
+    private func placeRow(_ place: TodoPlace, selected: Bool) -> some View {
+        let open = place.isNew ? 0 : capture.open(in: place)
+        let list = place.folder.isEmpty ? "todo.md" : place.folder
         return HStack(spacing: 12) {
-            Text(place.isEmpty ? "todo.md" : place)
+            Text(place.isNew ? "New section “\(place.section)” in \(list)" : place.section.isEmpty ? list : "\(list) · \(place.section)")
                 .font(.system(size: 14))
                 .foregroundStyle(Brand.ink)
                 .lineLimit(1)

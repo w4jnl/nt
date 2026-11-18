@@ -178,6 +178,7 @@ type Todo struct {
 	Doing   bool   `json:"in_progress"` // started and still open
 	DoneOn  string `json:"done_on"`
 	Section string `json:"section"`
+	Para    int    `json:"para"` // its paragraph in the section, from 0: clients leave a gap where it changes
 	When    string `json:"when"`
 	Late    bool   `json:"late"`
 	Deleted *bool  `json:"deleted,omitempty"`
@@ -187,7 +188,7 @@ type Todo struct {
 func TodoOf(v *vault.Vault, it todo.Item) Todo {
 	when, late := it.Word(v.Day(v.Now()))
 	return Todo{Path: v.Abs(it.Path), Rel: it.Path, Line: it.Line, Done: it.Done, Text: it.Text, Due: it.Due,
-		Started: it.Started, Doing: it.InProgress(), DoneOn: it.DoneOn, Section: it.Section, When: when, Late: late}
+		Started: it.Started, Doing: it.InProgress(), DoneOn: it.DoneOn, Section: it.Section, Para: it.Para, When: when, Late: late}
 }
 
 // TodoList is nt todo --json: {"todos": [...]}.
@@ -244,9 +245,22 @@ func Todos(v *vault.Vault, folder string, done, all bool) ([]todo.Item, error) {
 	return show, nil
 }
 
-// AddTodo adds a todo to the end of Inbox in the todo.md of folder ("" the root's).
-func AddTodo(v *vault.Vault, folder, text, due string) (todo.Item, error) {
-	it, err := todo.Add(v, folder, text, due, v.Now())
+// AddTodo adds a todo to the end of a section (Inbox when "") in the todo.md of folder ("" the
+// root's), or, with after (path:line, or words from a todo's text), to the end of that todo's
+// paragraph.
+func AddTodo(v *vault.Vault, folder, section, after, text, due string) (todo.Item, error) {
+	at := todo.Place{Folder: folder, Section: section}
+	if after != "" {
+		if folder != "" || section != "" {
+			return todo.Item{}, errors.New("todo add: give --after, or --in and --section, not both")
+		}
+		ref, err := MatchTodo(todo.Collect(v), after, func(todo.Item) bool { return true })
+		if err != nil {
+			return todo.Item{}, fmt.Errorf("todo add --after: %w", err)
+		}
+		at.After = &ref
+	}
+	it, err := todo.Add(v, at, text, due, v.Now())
 	if err != nil {
 		return it, fmt.Errorf("todo add: %w", err)
 	}

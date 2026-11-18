@@ -643,10 +643,12 @@ final class Workspace {
         #endif
     }
 
-    /// addTodo adds a todo to the root's todo.md, or a folder's; due:fri in the text sets its
-    /// due date.
-    func addTodo(_ text: String, in folder: String = "") async -> Bool {
-        await todo(["add"] + (folder.isEmpty ? [] : ["--in", folder]) + ["--", text])
+    /// addTodo adds a todo to the root's todo.md, or a folder's, under Inbox or the section
+    /// named (made when missing); or, with after, at the end of the paragraph that todo is in.
+    /// due:fri in the text sets its due date.
+    func addTodo(_ text: String, in folder: String = "", section: String = "", after: Todo? = nil) async -> Bool {
+        if let after { return await todo(["add", "--after", after.id, "--", text]) }
+        return await todo(["add"] + (folder.isEmpty ? [] : ["--in", folder]) + (section.isEmpty ? [] : ["--section", section]) + ["--", text])
     }
 
     #if !os(macOS)

@@ -205,11 +205,11 @@ struct CaptureActionTests {
         press(126, "\u{F700}") // ↑
         #expect(c.pick == 1 && c.target == "homelab/todo.md · Inbox")
         press(13, "w") // typing narrows the list, and leaves the text alone
-        #expect(c.query == "w" && c.places == ["work"] && c.pick == 0)
+        #expect(c.query == "w" && c.places == ["work", TodoPlace(section: "w", isNew: true)] && c.pick == 0)
         press(51, "\u{7F}") // delete
         press(4, "h")
         press(31, "o")
-        #expect(c.query == "ho" && c.places == ["homelab"] && c.text == "Order cables")
+        #expect(c.query == "ho" && c.places.first == "homelab" && c.text == "Order cables")
         press(36, "\r") // Return takes it
         #expect(!c.picking && c.folder == "homelab" && c.mode == .todo && c.text == "Order cables")
         press(48, "\t") // Tab opens it at the folder chosen; esc goes back and keeps it
@@ -275,6 +275,52 @@ struct CaptureActionTests {
         #expect(Capture.places("q3", in: dirs).first == "work/q3")
         #expect(Capture.places("hl", in: dirs).first == "homelab")
         #expect(Capture.places("zz", in: dirs).isEmpty)
+
+        // a list's sections follow it, match by folder and name, and a name no section of the
+        // list chosen has offers a new one, last
+        let sections = ["": ["Someday"], "work": ["NA reimport"]]
+        #expect(Capture.places("", in: dirs, sections: sections, new: "work").prefix(2) == ["", TodoPlace(section: "Someday")])
+        #expect(Capture.places("reimp", in: dirs, sections: sections, new: "work")
+            == [TodoPlace(folder: "work", section: "NA reimport"), TodoPlace(folder: "work", section: "reimp", isNew: true)])
+        #expect(Capture.places("na REIMPORT", in: dirs, sections: sections, new: "work") == [TodoPlace(folder: "work", section: "NA reimport")])
+        #expect(Capture.places("inbox", in: dirs, sections: sections, new: "work").isEmpty, "Inbox is every list's")
+        #expect(TodoPlace(folder: "work", section: "NA reimport").name == "work · NA reimport" && TodoPlace().name == "todo.md · Inbox")
+    }
+
+    @Test func aTodoGoesToASection() async throws {
+        try FileManager.default.createDirectory(at: root.appending(path: "work"), withIntermediateDirectories: true)
+        try "# Todo\n\n## Inbox\n\n- [ ] one\n\n## NA reimport\n\n- [ ] AMS\n".write(to: root.appending(path: "work/todo.md"), atomically: true, encoding: .utf8)
+        #expect(await ws.prepare())
+        let c = Capture(workspace: ws)
+        c.began(.todo)
+        #expect(c.places.contains(TodoPlace(folder: "work", section: "NA reimport")))
+        c.text = "CAI"
+        c.openPlaces()
+        c.query = "reimp"
+        #expect(c.target == "work/todo.md · NA reimport")
+        c.choose()
+        #expect(c.folder == "work" && c.section == "NA reimport" && c.open(in: TodoPlace(folder: "work", section: "NA reimport")) == 1)
+        #expect(await c.submit(alternate: false))
+        #expect(read("work/todo.md").hasSuffix("- [ ] AMS\n- [ ] CAI\n") && c.added?.section == "NA reimport")
+
+        // a new section, in the list chosen
+        c.began(.todo)
+        c.take("work")
+        c.text = "sv0251"
+        c.openPlaces()
+        c.query = "Decomm"
+        c.pick = c.places.count - 1
+        #expect(c.places.last == TodoPlace(folder: "work", section: "Decomm", isNew: true))
+        c.choose()
+        #expect(await c.submit(alternate: false))
+        #expect(read("work/todo.md").hasSuffix("## Decomm\n\n- [ ] sv0251\n"))
+
+        // the Todos view adds at the end of the paragraph a todo is in
+        let ams = try #require(ws.todos.first { $0.text == "AMS" })
+        #expect(!ams.pinned && ams.group("") == "work · NA reimport" && ams.from("") == "work › NA reimport")
+        #expect(await ws.addTodo("BKK", after: ams))
+        #expect(read("work/todo.md").contains("- [ ] AMS\n- [ ] CAI\n- [ ] BKK\n\n## Decomm"))
+        #expect(TodoPlace.lists(ws.todos).map(\.name) == ["todo.md · Inbox", "work · Inbox", "work · NA reimport", "work · Decomm"])
     }
 
     @Test func settingsChangeThroughNtConfig() async throws {

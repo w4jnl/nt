@@ -1,8 +1,11 @@
 import SwiftUI
 
 /// TodosView is every todo in the notes, as the terminal browser's todo list shows them: the open
-/// ones overdue first with their dates in words, a field that adds one to todo.md, and the done
-/// ones below. "from every note" in the summary is a menu that keeps to one folder's todos, at
+/// ones that are due or in progress first, overdue ahead, with their dates in words and where
+/// they are; the other open ones under a heading per list and section, as the file has them,
+/// with a gap where it has a blank line; a field that adds one, and the done ones below. A todo
+/// added goes to Inbox in todo.md, or, with a todo under a heading selected, to the end of its
+/// paragraph; the field's menu names the place and has every list and section, and New Section…. "from every note" in the summary is a menu that keeps to one folder's todos, at
 /// any depth, as `nt todo <folder>` does; a todo added then goes to that folder's todo.md. Search todos,
 /// the view's own field, keeps to the todos with the words typed, in their text or their note's
 /// name. A click on ○ checks a todo; arrows move, space checks, i starts or stops it (◐, in
@@ -22,6 +25,7 @@ struct TodosView: View {
     @State private var showDone = true
     @State private var scope = "" // the folder whose todos show, at any depth; "" is every note
     @State private var query = "" // Search todos: only the todos with these words show
+    @State private var place: TodoPlace? // where a new todo goes, chosen in the field's menu; nil: by the selection
     @FocusState private var searching: Bool
     @State private var frozen: [Todo]? // the list as it stood at the first tick, while the ticks settle
     @State private var ticked: [String: Bool] = [:] // a todo just ticked → the state it was given
@@ -73,7 +77,23 @@ struct TodosView: View {
                         .foregroundStyle(Brand.muted)
                         .padding(.horizontal, 10)
                 }
-                ForEach(open) { row($0) }
+                ForEach(entries(open)) { e in
+                    switch e {
+                    case .todo(let t): row(t, from: t.pinned)
+                    case .head(_, let name):
+                        Text(name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Brand.muted)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 22)
+                            .padding(.bottom, 6)
+                            .accessibilityAddTraits(.isHeader)
+                    case .gap:
+                        Color.clear.frame(height: 12).accessibilityHidden(true)
+                    }
+                }
                 if !done.isEmpty {
                     Button {
                         showDone.toggle()
@@ -95,7 +115,7 @@ struct TodosView: View {
                     .padding(.bottom, 6)
                     .accessibilityValue(showDone ? "shown" : "hidden")
                     if showDone {
-                        ForEach(done) { row($0) }
+                        ForEach(done) { row($0, from: true) }
                     }
                 }
             }
@@ -187,7 +207,10 @@ struct TodosView: View {
         .buttonStyle(.plain)
         #endif
         .fixedSize()
-        .onChange(of: scope) { selected = nil }
+        .onChange(of: scope) {
+            selected = nil
+            place = nil
+        }
         .help("Keep to one folder's todos")
         .accessibilityLabel(scope.isEmpty ? "Todos from every note" : "Todos from \(scope)")
     }
@@ -205,9 +228,29 @@ struct TodosView: View {
                 .focused($focus, equals: .add)
                 .onSubmit(add)
                 .accessibilityLabel("New todo")
-            Text(scope.isEmpty ? "↵ todo.md" : "↵ \(scope)/todo.md")
+            PlaceMenu(places: TodoPlace.lists(frozen ?? ws.todos, also: [scope]), base: newBase,
+                      reset: place == nil ? nil : "By the Selection") { place = $0 } label: {
+                HStack(spacing: 3) {
+                    Text("↵ \(target.name)")
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                }
                 .font(Brand.mono(11))
                 .foregroundStyle(Brand.muted)
+                .contentShape(Rectangle())
+            }
+            .menuIndicator(.hidden)
+            #if os(macOS)
+            .menuStyle(.borderlessButton)
+            #else
+            .buttonStyle(.plain)
+            #endif
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 260, alignment: .trailing)
+            .help("Where the todo goes: another list or section, or a new section")
+            .accessibilityLabel("The todo goes to \(target.name)")
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
@@ -215,7 +258,68 @@ struct TodosView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Brand.line))
     }
 
-    private func row(_ t: Todo) -> some View {
+    /// Entry is a line of the open todos: a todo, the heading of a list and section, or the gap
+    /// between two paragraphs of a section.
+    private enum Entry: Identifiable {
+        case todo(Todo)
+        case head(String, String)
+        case gap(String)
+
+        var id: String {
+            switch self {
+            case .todo(let t): t.id
+            case .head(let at, _): "head " + at
+            case .gap(let at): "gap " + at
+            }
+        }
+    }
+
+    /// entries are the open todos as the view lists them: the pinned ones, then the rest under
+    /// their list and section, with a gap where the paragraph changes.
+    private func entries(_ open: [Todo]) -> [Entry] {
+        var out: [Entry] = []
+        var prev: Todo?
+        for t in open {
+            if !t.pinned {
+                if prev.map({ !$0.sameGroup(t) }) ?? true {
+                    out.append(.head(t.id, t.group(note(t))))
+                } else if prev?.para != t.para {
+                    out.append(.gap(t.id))
+                }
+                prev = t
+            }
+            out.append(.todo(t))
+        }
+        return out
+    }
+
+    /// note is what to call the note a todo is in when it is no todo.md: its title.
+    private func note(_ t: Todo) -> String { t.isList ? "" : ws.title(t.rel) }
+
+    /// cursor is the todo a new one goes after: the selected one, when it is under a heading.
+    private var cursor: Todo? {
+        guard place == nil, let t = shown.first(where: { $0.id == selected }), !t.done, !t.pinned else { return nil }
+        return t
+    }
+
+    /// target is where a todo added now goes: the place chosen, the selected todo's list and
+    /// section, or Inbox in the todo.md of the folder kept to.
+    private var target: (name: String, place: TodoPlace) {
+        if let place { return (place.name, place) }
+        if let t = cursor { return (t.group(note(t)), TodoPlace(folder: t.folder, section: t.section)) }
+        let p = TodoPlace(folder: scope)
+        return (p.name, p)
+    }
+
+    /// newBase is the folder whose todo.md New Section… adds to: the selected todo's list, the
+    /// place chosen, or the folder kept to.
+    private var newBase: String {
+        if let place { return place.folder }
+        if let t = cursor, t.isList { return t.folder }
+        return scope
+    }
+
+    private func row(_ t: Todo, from showFrom: Bool) -> some View {
         let done = isDone(t)
         let isSelected = selected == t.id
         return HStack(spacing: 12) {
@@ -242,13 +346,13 @@ struct TodosView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(done ? Brand.muted : Brand.ink)
                 .lineLimit(2)
-            let from = Button(source(t)) { ws.go(t.rel, line: t.line) }
+            let from = Button(t.from(note(t))) { ws.go(t.rel, line: t.line) }
                 .buttonStyle(.plain)
                 .font(.system(size: compact ? 13 : 12))
                 .foregroundStyle(Brand.muted)
                 .lineLimit(1)
                 .help("Open \(t.rel) at the todo")
-            if compact {
+            if compact, showFrom {
                 VStack(alignment: .leading, spacing: 2) {
                     text
                     from
@@ -256,7 +360,7 @@ struct TodosView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 text.frame(maxWidth: .infinity, alignment: .leading)
-                from
+                if showFrom { from }
             }
             if editingDue == t.id {
                 TextField("fri, +3d, none", text: $dueText)
@@ -275,7 +379,7 @@ struct TodosView: View {
             }
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: compact ? 52 : 40)
+        .frame(minHeight: compact && showFrom ? 52 : 40)
         .background(isSelected ? Brand.accentSoft : .clear, in: RoundedRectangle(cornerRadius: 8))
         .overlay(alignment: .leading) {
             if isSelected {
@@ -357,9 +461,11 @@ struct TodosView: View {
     private func add() {
         let text = newText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
+        let after = cursor
+        let to = target.place
         Task {
             await settled()
-            if await ws.addTodo(text, in: scope) { newText = "" }
+            if await ws.addTodo(text, in: to.folder, section: to.section, after: after) { newText = "" }
         }
     }
 

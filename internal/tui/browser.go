@@ -1438,6 +1438,9 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 	case "esc", "ctrl+c":
 		kind := b.inputKind
 		b.closeInput()
+		if kind == "place" {
+			return b.choosePlace(false)
+		}
 		b.moving = ""
 		if kind == "search" || kind == "find" || kind == "move" || kind == "scope" {
 			return b.closePick()
@@ -1457,6 +1460,13 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	case "down", "ctrl+j", "tab":
+		if b.inputKind == "todo" && b.tv != nil && b.pick == nil && k.String() == "tab" {
+			// another list or section for the todo being typed
+			b.tv.draft = b.input.Value()
+			b.pick = &picker{title: "todo in"}
+			b.prompt("place", "todo in: ")
+			return b.placeTargets()
+		}
 		if b.inputKind == "within" {
 			b.hit++
 			b.noteHit()
@@ -1509,6 +1519,8 @@ func (b *browser) inputKey(k tea.KeyPressMsg) tea.Cmd {
 				return b.moveInto(p.items[p.sel])
 			}
 			return b.moveNowhere(text)
+		case "place":
+			return b.choosePlace(true)
 		case "scope":
 			if p := b.pick; p != nil && p.sel < len(p.items) && b.tv != nil {
 				b.setScope(p.items[p.sel].target)
@@ -1548,6 +1560,8 @@ func (b *browser) inputChanged() tea.Cmd {
 		return b.moveTargets()
 	case "scope":
 		return b.scopeTargets()
+	case "place":
+		return b.placeTargets()
 	case "todos":
 		if b.tv != nil {
 			b.tv.setFilter(strings.TrimSpace(b.input.Value()))

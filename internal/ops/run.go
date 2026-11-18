@@ -294,6 +294,14 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 		if err != nil {
 			return nil, 2, fmt.Errorf("todo add: %w", err)
 		}
+		args, section, _, err := Value(args, "--section")
+		if err != nil {
+			return nil, 2, fmt.Errorf("todo add: %w", err)
+		}
+		args, after, _, err := Value(args, "--after")
+		if err != nil {
+			return nil, 2, fmt.Errorf("todo add: %w", err)
+		}
 		words, err := Positional("todo add", args)
 		if err != nil {
 			return nil, 2, err
@@ -302,7 +310,7 @@ func (r Runner) todo(args []string, stdin []byte) ([]byte, int, error) {
 		if text == "" {
 			text = string(stdin)
 		}
-		it, err := AddTodo(v, folder, text, due)
+		it, err := AddTodo(v, folder, section, after, text, due)
 		if err != nil {
 			return nil, 1, err
 		}

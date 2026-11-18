@@ -284,7 +284,7 @@ func TestTodoList(t *testing.T) {
 	}
 
 	press(b, "a") // the browser is in tech/, so tech/todo.md
-	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in tech/todo.md:") {
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in tech · Inbox (tab: elsewhere):") {
 		t.Errorf("the add prompt does not say where: %s", f)
 	}
 	press(b, "Buy milk")
@@ -368,9 +368,54 @@ func TestTodoScope(t *testing.T) {
 	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "2 open todos · from work/") {
 		t.Fatalf("the summary does not say the scope:\n%s", screen)
 	}
+	// the screen: the one that is due above the lists with where it is, the rest under headings
+	screen := ansi.Strip(b.View().Content)
+	if !strings.Contains(screen, "○ Send the report  work/2026-10-20-q3.md › Q3") || !strings.Contains(screen, "  work/team/2026-10-21.md · Team\n") {
+		t.Fatalf("the todos are not above and under their lists:\n%s", screen)
+	}
+	// the selection is on the one above the lists: a new one goes to the scope's Inbox
 	press(b, "a")
-	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/todo.md:") {
-		t.Errorf("a in the work scope does not add to work/todo.md: %s", f)
+	f := ansi.Strip(b.footer())
+	if !strings.Contains(f, "todo in work · Inbox (tab: elsewhere):") {
+		t.Fatalf("a in the work scope does not name work's Inbox: %s", f)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
+	// on a todo under a heading, a new one ends its paragraph, in its note
+	press(b, "j")
+	press(b, "a")
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/team/2026-10-21.md · Team (tab: elsewhere):") {
+		t.Fatalf("a on a todo under a heading does not name its list and section: %s", f)
+	}
+	press(b, "Book the bus")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if note, _ := os.ReadFile(b.v.Abs("work/team/2026-10-21.md")); !strings.HasSuffix(string(note), "- [ ] Plan the offsite\n- [ ] Book the bus\n") || b.tv.selected().Text != "Book the bus" {
+		t.Fatalf("a on a todo under a heading does not add after it:\n%s", note)
+	}
+	if err := todo.Remove(b.v, *b.tv.selected()); err != nil {
+		t.Fatal(err)
+	}
+	run(b, b.loadTodos(""))
+	press(b, "g")
+	press(b, "a")
+	f = ansi.Strip(b.footer())
+	// tab offers the lists and their sections, and a new section for a name there is none of
+	run(b, tea.KeyPressMsg{Code: tea.KeyTab})
+	if b.pick == nil || b.inputKind != "place" || len(labels()) < 2 || !strings.HasPrefix(labels()[0], "todo.md · Inbox") {
+		t.Fatalf("tab does not offer the places: %v", labels())
+	}
+	press(b, "Venues")
+	if l := labels(); !strings.HasPrefix(l[len(l)-1], `new section "Venues" in `) {
+		t.Fatalf("a name no section has does not offer a new section: %v", l)
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyEscape}) // esc keeps the place and the text
+	if b.pick != nil || b.inputKind != "todo" || ansi.Strip(b.footer()) != f {
+		t.Fatalf("esc in the places does not go back to the todo: %s", ansi.Strip(b.footer()))
+	}
+	run(b, tea.KeyPressMsg{Code: tea.KeyTab})
+	press(b, "work inbox")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if f := ansi.Strip(b.footer()); b.pick != nil || !strings.Contains(f, "todo in work · Inbox (tab: elsewhere):") {
+		t.Fatalf("choosing a place does not go back to the todo with it: %s", f)
 	}
 	press(b, "Call the venue")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -388,7 +433,7 @@ func TestTodoScope(t *testing.T) {
 	if b.tv.scope != "" || len(rows()) != 6 {
 		t.Fatalf("every note again: %q %v", b.tv.scope, rows())
 	}
-	// a folder at any depth: its own todos only, and a adds to its todo.md
+	// a folder at any depth: its own todos only, and its todo.md among the places
 	press(b, "f")
 	press(b, "team")
 	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -398,9 +443,12 @@ func TestTodoScope(t *testing.T) {
 	if screen := ansi.Strip(b.View().Content); !strings.Contains(screen, "1 open todo · from work/team/") {
 		t.Fatalf("the summary does not say the deep scope:\n%s", screen)
 	}
-	press(b, "a")
-	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/team/todo.md:") {
-		t.Errorf("a in the work/team scope does not add to work/team/todo.md: %s", f)
+	press(b, "a") // on the note's todo; tab has the scope's todo.md
+	run(b, tea.KeyPressMsg{Code: tea.KeyTab})
+	press(b, "team inbox")
+	run(b, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if f := ansi.Strip(b.footer()); !strings.Contains(f, "todo in work/team · Inbox (tab: elsewhere):") {
+		t.Errorf("the places in the work/team scope lack work/team/todo.md: %s", f)
 	}
 	run(b, tea.KeyPressMsg{Code: tea.KeyEscape})
 }

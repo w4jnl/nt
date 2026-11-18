@@ -80,7 +80,7 @@ key X
 expect_soon "X folds the done ones" '▸ Done 1' capture
 key X
 key a
-expect_soon "a asks for a todo, saying where it goes" 'todo in todo.md:' footer
+expect_soon "a asks for a todo, saying where it goes" 'todo in todo.md · Inbox' footer
 key -l 'From the browser'; key Enter
 expect_soon "and adds it to the open ones" '○ From the browser' capture
 expect "at the end of the root's list" '^- \[ \] From the browser$' "$(tail -1 "$T/a/todo.md")"

@@ -1,6 +1,7 @@
 package todo
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -150,14 +151,14 @@ func TestWhen(t *testing.T) {
 func TestAdd(t *testing.T) {
 	v := newVault(t)
 	now := day("2026-10-27").Add(10 * time.Hour)
-	it, err := Add(v, "", "Renew  passport", "fri", now)
+	it, err := Add(v, Place{Folder: ""}, "Renew  passport", "fri", now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if it.Line != 9 || it.Due != "2026-10-30" { // after the frontmatter, the title and Inbox
 		t.Errorf("added %+v", it)
 	}
-	if _, err := Add(v, "", "Call the plumber due:tomorrow", "", now); err != nil {
+	if _, err := Add(v, Place{Folder: ""}, "Call the plumber due:tomorrow", "", now); err != nil {
 		t.Fatal(err)
 	}
 	want := NewList + "\n## Inbox\n\n- [ ] Renew passport due:2026-10-30\n- [ ] Call the plumber due:2026-10-28\n"
@@ -167,7 +168,7 @@ func TestAdd(t *testing.T) {
 
 	// other sections are the person's; new todos still go to the end of Inbox
 	write(t, v, File, "# Todo\n\n## Inbox\n\n- [ ] one\n\n## Work\n\n- [ ] two\n")
-	if it, err = Add(v, "/", "three", "", now); err != nil || it.Line != 6 {
+	if it, err = Add(v, Place{Folder: "/"}, "three", "", now); err != nil || it.Line != 6 {
 		t.Fatalf("add: %+v %v", it, err)
 	}
 	want = "# Todo\n\n## Inbox\n\n- [ ] one\n- [ ] three\n\n## Work\n\n- [ ] two\n"
@@ -176,19 +177,19 @@ func TestAdd(t *testing.T) {
 	}
 
 	// a folder's own list
-	if it, err = Add(v, "work/../work/", "four", "", now); err != nil || it.Path != "work/todo.md" || it.Line != 9 {
+	if it, err = Add(v, Place{Folder: "work/../work/"}, "four", "", now); err != nil || it.Path != "work/todo.md" || it.Line != 9 {
 		t.Fatalf("add in a folder: %+v %v", it, err)
 	}
 	if got := read(t, v, "work/todo.md"); got != NewList+"\n## Inbox\n\n- [ ] four\n" {
 		t.Errorf("work/todo.md:\n%s", got)
 	}
 	for _, folder := range []string{"agents", "agents/2026", ".nt", "work/.hidden"} {
-		if _, err := Add(v, folder, "x", "", now); err == nil {
+		if _, err := Add(v, Place{Folder: folder}, "x", "", now); err == nil {
 			t.Errorf("Add in %s gave no error", folder)
 		}
 	}
 	for _, bad := range []struct{ text, due string }{{"", ""}, {"due:fri", ""}, {"x", "soon"}, {"x due:soon", ""}} {
-		if _, err := Add(v, "", bad.text, bad.due, now); err == nil {
+		if _, err := Add(v, Place{Folder: ""}, bad.text, bad.due, now); err == nil {
 			t.Errorf("Add(%q, %q) gave no error", bad.text, bad.due)
 		}
 	}
@@ -354,5 +355,59 @@ func TestSetEnabled(t *testing.T) {
 	}
 	if err := SetEnabled(v, "missing.md", true); err == nil {
 		t.Error("a missing note gave no error")
+	}
+}
+
+func TestAddToASectionAndAfterATodo(t *testing.T) {
+	v := newVault(t)
+	now := day("2026-10-27").Add(10 * time.Hour)
+	write(t, v, "work/todo.md", "# Todo\n\n## Inbox\n\n- [ ] one\n\n### NA reimport ##\n\n- [ ] AMS\n- [ ] CAI\n\n- [ ] HOU\n  with a note\n- [x] PEJ\n\n## Later\n")
+
+	// under a heading of any level, in any case, at the end of the section
+	it, err := Add(v, Place{Folder: "work", Section: "na  Reimport"}, "SPL", "", now)
+	if err != nil || it.Line != 15 || it.Section != "NA reimport" || it.Para != 1 {
+		t.Fatalf("add to a section: %+v %v", it, err)
+	}
+	// a section that is missing is made, at the end
+	if it, err = Add(v, Place{Folder: "work", Section: "## Decomm"}, "sv0251", "fri", now); err != nil || it.Section != "Decomm" || it.Para != 0 {
+		t.Fatalf("add to a new section: %+v %v", it, err)
+	}
+	// after a todo: at the end of its paragraph, in its note
+	items := Parse("work/todo.md", []byte(read(t, v, "work/todo.md")))
+	var ams Item
+	for _, i := range items {
+		if i.Text == "AMS" {
+			ams = i
+		}
+	}
+	if it, err = Add(v, Place{After: &ams}, "CAL", "", now); err != nil || it.Line != 11 || it.Section != "NA reimport" || it.Para != 0 {
+		t.Fatalf("add after a todo: %+v %v", it, err)
+	}
+	want := "# Todo\n\n## Inbox\n\n- [ ] one\n\n### NA reimport ##\n\n- [ ] AMS\n- [ ] CAI\n- [ ] CAL\n\n- [ ] HOU\n  with a note\n- [x] PEJ\n- [ ] SPL\n\n## Later\n\n## Decomm\n\n- [ ] sv0251 due:2026-10-30\n"
+	if got := read(t, v, "work/todo.md"); got != want {
+		t.Errorf("todo.md:\n%s\nwant:\n%s", got, want)
+	}
+	// the todo it goes after has to be as it was read
+	if _, err = Add(v, Place{After: &Item{Path: "work/todo.md", Line: 9, Raw: "- [ ] gone", Text: "gone"}}, "x", "", now); err == nil {
+		t.Error("added after a todo that is not there")
+	}
+}
+
+func TestParagraphsAndGroups(t *testing.T) {
+	items := Parse("work/shell/todo.md", []byte("# Todo\n\n## A\n- [ ] one\n- [ ] two\n\ntext\n\n- [ ] three due:2026-11-01\n\n```\n\n- [ ] no\n```\n- [ ] four started:2026-11-01\n## B\n\n- [ ] five\n"))
+	var got []string
+	for _, it := range items {
+		got = append(got, fmt.Sprintf("%s %s %d %v", it.Text, it.Section, it.Para, it.Pinned()))
+	}
+	want := []string{"one A 0 false", "two A 0 false", "three A 1 true", "four A 2 true", "five B 0 false"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("parsed %q, want %q", got, want)
+	}
+	if g, f := items[0].Group(""), items[0].From(""); g != "work/shell · A" || f != "shell › A" {
+		t.Errorf("group %q, from %q", g, f)
+	}
+	root, note := Item{Path: File, Section: "Inbox"}, Item{Path: "trips/2026-rome.md"}
+	if g, f := root.Group(""), note.From("Rome"); g != "todo.md · Inbox" || f != "Rome" {
+		t.Errorf("group %q, from %q", g, f)
 	}
 }

@@ -1,4 +1,5 @@
-// CaptureSheet adds one line to today's journal, under Log, or with the switch a todo to todo.md;
+// CaptureSheet adds one line to today's journal, under Log, or with the switch a todo to todo.md,
+// or to the list and section chosen under the switch (a new section too);
 // due:fri in the text sets the todo's date (docs/design.md §9, Capture). Return adds it. The mic
 // talks instead (Talk a note), in the language chosen beside it; what is typed is added first.
 import SwiftUI
@@ -55,6 +56,26 @@ struct CaptureSheet: View {
                 }
                 Toggle("Make it a todo", isOn: Binding(get: { capture.mode == .todo }, set: { capture.mode = $0 ? .todo : .today }))
                     .tint(Brand.accent)
+                if capture.mode == .todo {
+                    PlaceMenu(places: TodoPlace.lists(ws.todos), base: capture.folder) { p in
+                        if let p { capture.take(p) }
+                    } label: {
+                        HStack {
+                            Text("In")
+                                .foregroundStyle(Brand.ink)
+                            Spacer()
+                            Text(TodoPlace(folder: capture.folder, section: capture.section).name)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundStyle(Brand.muted)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("The todo goes to \(TodoPlace(folder: capture.folder, section: capture.section).name)")
+                }
                 if capture.problem.isEmpty {
                     Text("\(capture.target) · due:fri in the text sets a todo's date")
                         .font(Brand.mono(11))
