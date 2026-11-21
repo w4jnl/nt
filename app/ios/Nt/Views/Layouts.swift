@@ -222,12 +222,13 @@ extension SidebarTree {
     }
 }
 
-/// NoteMenu is the note's ⋯: rename, move and delete.
+/// NoteMenu is the note's bar: reading or writing, and its ⋯: find, rename, move and delete.
 struct NoteMenu: ToolbarContent {
     let path: String
     let find: () -> Void // shows the find bar
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) { ReadingButton() }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button("Find in Note…", systemImage: "magnifyingglass", action: find)

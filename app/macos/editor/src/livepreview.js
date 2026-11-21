@@ -14,6 +14,9 @@ import { DiagramWidget, isDiagram } from "./diagram.js";
 export const setBroken = StateEffect.define();
 // setFocus says whether the editor has the keyboard: without it no line shows its markdown.
 export const setFocus = StateEffect.define();
+// setReading turns reading on or off: while it is on a click or a tap places no cursor, so no
+// line shows its markdown; links, tags and task boxes answer as before.
+export const setReading = StateEffect.define();
 // setBacklinks gives the notes that link to this one: [{path, title, folder}].
 export const setBacklinks = StateEffect.define();
 // setFocusMode turns focus mode on or off: the paragraph being written stays, the rest dims.
@@ -90,23 +93,27 @@ export function nextHit(hits, pos, dir) {
 }
 
 // noteField is what the preview knows besides the text: the note's repository path, its broken
-// links, the focus and focus mode, and whether the screen is touched rather than clicked.
+// links, the focus and focus mode, whether the note is being read (setReading), and whether the
+// screen is touched rather than clicked.
 export const noteField = StateField.define({
-  create: () => ({ path: "", broken: new Set(), focused: false, focusMode: false, touch: false }),
+  create: () => ({ path: "", broken: new Set(), focused: false, focusMode: false, reading: false, touch: false }),
   update(v, tr) {
     for (const e of tr.effects) {
       if (e.is(setBroken)) v = { ...v, broken: new Set(e.value) };
       else if (e.is(setFocus)) v = { ...v, focused: e.value };
       else if (e.is(setFocusMode)) v = { ...v, focusMode: e.value };
+      else if (e.is(setReading)) v = { ...v, reading: e.value };
     }
     return v;
   },
 });
 
-// activeLines are the line numbers the selection touches while the editor has focus.
+// activeLines are the line numbers the selection touches while the editor has focus; none while
+// the note is being read.
 export function activeLines(state) {
   const lines = new Set();
-  if (!state.field(noteField).focused) return lines;
+  const { focused, reading } = state.field(noteField);
+  if (!focused || reading) return lines;
   for (const r of state.selection.ranges) {
     const a = state.doc.lineAt(r.from).number;
     const b = state.doc.lineAt(r.to).number;
@@ -877,7 +884,7 @@ const previewPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view.state);
     }
     update(u) {
-      const effects = u.transactions.some((tr) => tr.effects.some((e) => e.is(setBroken) || e.is(setFocus)));
+      const effects = u.transactions.some((tr) => tr.effects.some((e) => e.is(setBroken) || e.is(setFocus) || e.is(setReading)));
       if (u.docChanged || u.selectionSet || u.viewportChanged || effects || syntaxTree(u.startState) !== syntaxTree(u.state)) {
         this.decorations = buildDecorations(u.state);
       }
@@ -902,7 +909,7 @@ function frontmatterDecorations(state) {
 export const frontmatterField = StateField.define({
   create: frontmatterDecorations,
   update(deco, tr) {
-    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus))) return frontmatterDecorations(tr.state);
+    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus) || e.is(setReading))) return frontmatterDecorations(tr.state);
     return deco;
   },
   provide: (f) => EditorView.decorations.from(f),
@@ -947,7 +954,7 @@ export function blockDecorations(state) {
 export const blocksField = StateField.define({
   create: blockDecorations,
   update(deco, tr) {
-    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus) || e.is(setBroken)) || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
+    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(setFocus) || e.is(setReading) || e.is(setBroken)) || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
       return blockDecorations(tr.state);
     }
     return deco;
@@ -985,6 +992,7 @@ const clicks = EditorView.domEventHandlers({
     const fmw = e.target.closest?.(".cm-fm-summary");
     if (fmw) {
       e.preventDefault();
+      if (view.state.field(noteField).reading || view.state.readOnly) return true; // it opens to be edited
       view.focus();
       view.dispatch({ selection: { anchor: 4 }, effects: setFocus.of(true) });
       return true;

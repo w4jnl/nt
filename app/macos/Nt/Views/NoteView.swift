@@ -56,6 +56,7 @@ struct NoteView: View {
                 Breadcrumb(path: ws.note?.path ?? "", title: ws.note.map { ws.title($0.path) } ?? "")
             }
             .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .primaryAction) { ReadingButton() }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     ws.palette = .text

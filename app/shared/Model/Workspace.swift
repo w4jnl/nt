@@ -97,6 +97,24 @@ final class Workspace {
     var todoSearch = false // Search asked while Todos is shown: its field takes the keys, then sets this back
     var sidebar = true // shown; the split view's toggle and View > Hide Sidebar change it
     var focusMode = false
+    /// reading: the note shown is for reading. A click or a tap places no cursor and brings no
+    /// keyboard up; links, tags and task boxes answer as ever. The note's button (⌘E) turns it
+    /// on and off, and on iPhone and iPad a double tap starts editing where it lands.
+    var reading = Workspace.readsFirst
+    /// reads is how a note opens, for reading or for writing: what the button was last set to
+    /// on this device (for reading on iPhone and iPad, for writing on the Mac, until it is).
+    var reads = Workspace.readsFirst {
+        didSet { UserDefaults.standard.set(reads, forKey: "reading") }
+    }
+
+    static var readsFirst: Bool {
+        if let set = UserDefaults.standard.object(forKey: "reading") as? Bool { return set }
+        #if os(macOS)
+        return false
+        #else
+        return true
+        #endif
+    }
     var todos: [Todo] = [] // every todo, open ones overdue first, as nt todo --all lists them
     var journalDays: Set<String> = [] // the days that have a journal, YYYY-MM-DD
     var calendarDay = "" // the day the calendar shows; "" for today
@@ -442,7 +460,8 @@ final class Workspace {
             sidebar = sidebarBeforeOutside
         }
         if finding { closeFind() } // another note: the bar goes with the one it was for
-        editor.load(n, text: text, anchor: anchor, line: line, end: end, find: find, top: top)
+        reading = reads && !end // a note just made is there to be written
+        editor.load(n, text: text, reading: reading, anchor: anchor, line: line, end: end, find: find, top: top)
         selection = selectionFor(path)
         if !outside { recent = Self.remember(path, in: recent) } // the folders stay as they are: only the person opens one
     }
@@ -893,6 +912,35 @@ final class Workspace {
         #else
         await wrote()
         #endif
+    }
+
+    /// toggleReading turns reading on or off for the note shown and for the notes opened after
+    /// it. A digest, which nt writes, is always for reading.
+    func toggleReading() {
+        guard let n = note, !n.readOnly else { return }
+        reading.toggle()
+        reads = reading
+        editor?.reading(reading)
+        if !reading { editor?.focus() }
+    }
+
+    /// startedEditing: a double tap on a note being read started editing it. The notes opened
+    /// after it are for reading still.
+    func startedEditing() {
+        reading = false
+    }
+
+    /// keyboardLeft: the note let the keyboard go. One a double tap opened for writing is for
+    /// reading again; a moment's loss of focus, as a bar key's tap can make, does not count.
+    func keyboardLeft() {
+        guard reads, !reading else { return }
+        let path = note?.path
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !editing, reads, !reading, note?.path == path else { return }
+            reading = true
+            editor?.reading(true)
+        }
     }
 
     /// toggleFocus turns focus mode on or off: the sidebar goes and the other paragraphs dim.

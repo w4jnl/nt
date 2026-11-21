@@ -181,3 +181,11 @@ export function paragraphAt(doc, pos) {
   while (b < doc.lines && doc.line(b + 1).text.trim() !== "") b++;
   return [a, b];
 }
+
+// isDoubleTap says whether tap follows prev closely enough, in time and place, to be the second
+// of a double tap: {x, y, at} in pixels and milliseconds.
+export function isDoubleTap(prev, tap) {
+  if (!prev) return false;
+  const dt = tap.at - prev.at;
+  return dt > 0 && dt < 350 && Math.hypot(tap.x - prev.x, tap.y - prev.y) < 30;
+}

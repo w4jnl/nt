@@ -64,13 +64,15 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
     // MARK: Swift → page
 
-    /// load shows a note: its text, where it is, who links to it; end puts the cursor at its end
-    /// and gives it the keyboard, as for a note just made; top scrolls it as it was, for Back.
-    func load(_ note: Workspace.OpenNote, text: String, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "", top: Double = 0) {
+    /// load shows a note: its text, where it is, who links to it; reading shows it for reading,
+    /// with no cursor; end puts the cursor at its end and gives it the keyboard, as for a note
+    /// just made; top scrolls it as it was, for Back.
+    func load(_ note: Workspace.OpenNote, text: String, reading: Bool = false, anchor: String = "", line: Int = 0, end: Bool = false, find: String = "", top: Double = 0) {
         let payload: [String: Any] = [
             "doc": text,
             "path": note.path,
             "readOnly": note.readOnly,
+            "reading": reading,
             "anchor": anchor,
             "line": line,
             "end": end,
@@ -113,6 +115,11 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     /// zoom sets the note's text size, the page's zoom.
     func zoom(_ z: Double) {
         web.pageZoom = z
+    }
+
+    /// reading turns reading on or off for the note shown (Workspace.reading).
+    func reading(_ on: Bool) {
+        page("window.nt.reading(o)", ["o": on])
     }
 
     func focusMode(_ on: Bool) {
@@ -320,8 +327,13 @@ final class NoteEditor: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         case "focus":
             ws.editing = body["on"] as? Bool ?? false
             #if os(iOS)
-            if !ws.editing { ws.keyboardWent() }
+            if !ws.editing {
+                ws.keyboardWent()
+                ws.keyboardLeft()
+            }
             #endif
+        case "reading": // a double tap on a note being read
+            if body["on"] as? Bool == false { ws.startedEditing() }
         case "history":
             ws.undoable = body["undo"] as? Bool ?? false
             ws.redoable = body["redo"] as? Bool ?? false

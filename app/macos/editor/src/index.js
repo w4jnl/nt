@@ -9,8 +9,8 @@ import { EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth, redoDepth } from "@codemirror/commands";
 import { noteMarkdown } from "./syntax.js";
 import { post } from "./bridge.js";
-import { dictated, headingLine, normalize, ownLine, rebase, startTask, taskLine, toggleTask } from "./edits.js";
-import { findField, findHits, frontmatterRange, headingAt, hearingField, linkDests, livePreview, nextHit, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing } from "./livepreview.js";
+import { dictated, headingLine, isDoubleTap, normalize, ownLine, rebase, startTask, taskLine, toggleTask } from "./edits.js";
+import { findField, findHits, frontmatterRange, headingAt, hearingField, linkDests, livePreview, nextHit, noteField, setBacklinks, setBroken, setFind, setFocus, setFocusMode, setHearing, setReading } from "./livepreview.js";
 
 // fromDisk marks a change another writer made, laid over the text: it is not the person's to save.
 const fromDisk = Annotation.define();
@@ -22,6 +22,10 @@ let pending = ChangeSet.empty(0);
 let inflight = null;
 let seq = 0;
 let focusMode = false;
+// reading: the note is for reading. Nothing in it takes the keyboard, so a click or a tap places
+// no cursor and brings no keyboard up; the app's button turns it off, and on a touch screen a
+// double tap, which starts editing where it lands.
+let reading = false;
 let idle = 0;
 let undoable = "";
 
@@ -31,13 +35,15 @@ const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)"
 
 function extensions(path, readOnly) {
   return [
-    noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, touch })),
+    noteField.init(() => ({ path, broken: new Set(), focused: false, focusMode, reading, touch })),
     history(),
     // Mod-[ goes to the app's Back before defaultKeymap takes it to outdent (Shift-Tab still does).
     keymap.of([{ key: "Escape", run: clearFind }, { key: "Mod-[", run: () => (post({ type: "back" }), true) }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     noteMarkdown(),
     EditorView.lineWrapping,
     EditorState.readOnly.of(readOnly),
+    // a digest, which nt writes, takes no cursor either
+    EditorView.editable.compute([noteField], (s) => !readOnly && !s.field(noteField).reading),
     EditorView.contentAttributes.of(
       touch ? { spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" } : { spellcheck: "false", autocorrect: "off", autocapitalize: "off" },
     ),
@@ -48,7 +54,7 @@ function extensions(path, readOnly) {
     EditorView.updateListener.of((u) => {
       if (u.focusChanged) post({ type: "focus", on: u.view.hasFocus });
     }),
-    EditorView.domEventHandlers({ paste: pasted, dragover: dragging, drop: dropped }),
+    EditorView.domEventHandlers({ paste: pasted, dragover: dragging, drop: dropped, touchstart: tapStart, touchend: tapEnd }),
   ];
 }
 
@@ -186,7 +192,7 @@ function pasted(e, v) {
 
 // dragging takes a drag that carries files, so that it is dropped here and not opened.
 function dragging(e, v) {
-  if (v.state.readOnly || !e.dataTransfer?.types?.includes("Files")) return false;
+  if (v.state.readOnly || reading || !e.dataTransfer?.types?.includes("Files")) return false;
   e.preventDefault();
   e.dataTransfer.dropEffect = "copy";
   return true;
@@ -194,17 +200,58 @@ function dragging(e, v) {
 
 function dropped(e, v) {
   const files = images(e.dataTransfer?.files);
-  if (!files.length || v.state.readOnly) return false;
+  if (!files.length || v.state.readOnly || reading) return false;
   e.preventDefault();
   sendImages(files, v.posAtCoords({ x: e.clientX, y: e.clientY }, false));
   return true;
 }
 
+// A double tap on a note being read starts editing where it lands: the cursor goes there, the
+// keyboard comes up, and the app hears that reading is off. A tap on a link, a tag, a task box
+// or a button is that thing's own.
+let down = null;
+let lastTap = null;
+
+function tapStart(e) {
+  const t = e.touches.length === 1 ? e.touches[0] : null;
+  down = t && { x: t.clientX, y: t.clientY };
+  return false;
+}
+
+function tapEnd(e, v) {
+  const t = e.changedTouches[0];
+  const from = down;
+  down = null;
+  if (!reading || v.state.readOnly || !from || !t || e.touches.length) return false;
+  if (e.target.closest?.("[data-href], [data-open], .cm-check, .cm-open, .cm-fm-tag, button")) return false;
+  const tap = { x: t.clientX, y: t.clientY, at: e.timeStamp };
+  if (Math.hypot(tap.x - from.x, tap.y - from.y) > 10) return false; // a scroll, not a tap
+  const twice = isDoubleTap(lastTap, tap);
+  lastTap = twice ? null : tap;
+  if (!twice) return false;
+  e.preventDefault();
+  setReadingMode(false);
+  const pos = v.posAtCoords({ x: tap.x, y: tap.y }, false);
+  v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+  v.focus();
+  post({ type: "reading", on: false });
+  return true;
+}
+
+function setReadingMode(on) {
+  reading = on;
+  view.dispatch({ effects: setReading.of(on) });
+  if (on) view.contentDOM.blur();
+}
+
 window.nt = {
-  // load shows a note: {doc, path, readOnly, backlinks: [{path, title, folder}], anchor, line,
-  // end (put the cursor at the end and take the keyboard), find (a search's words, marked),
-  // top (how far it was scrolled, in pixels, for Back)}.
-  load({ doc, path, readOnly = false, backlinks = [], anchor = "", line = 0, end = false, find = "", top = 0 }) {
+  // load shows a note: {doc, path, readOnly, reading (for reading: no cursor until the app or a
+  // double tap says so), backlinks: [{path, title, folder}], anchor, line, end (put the cursor at
+  // the end and take the keyboard), find (a search's words, marked), top (how far it was
+  // scrolled, in pixels, for Back)}.
+  load({ doc, path, readOnly = false, reading: read = false, backlinks = [], anchor = "", line = 0, end = false, find = "", top = 0 }) {
+    reading = read;
+    lastTap = null;
     view.setState(EditorState.create({ doc: normalize(doc), extensions: extensions(path, readOnly) }));
     base = view.state.doc.toString();
     pending = ChangeSet.empty(base.length);
@@ -294,6 +341,8 @@ window.nt = {
     view.dispatch({ ...ownLine(view.state.doc, pos, line), scrollIntoView: true, userEvent: "input.paste" });
     view.focus();
   },
+  // reading turns reading on or off for the note shown.
+  reading: setReadingMode,
   focusMode(on) {
     focusMode = on;
     view.dispatch({ effects: setFocusMode.of(on) });

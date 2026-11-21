@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ChangeSet, EditorState, Text } from "@codemirror/state";
-import { clashes, dictated, headingLine, lineDiff, normalize, ownLine, paragraphAt, rebase, startTask, taskLine, toggleTask } from "../src/edits.js";
+import { clashes, dictated, headingLine, isDoubleTap, lineDiff, normalize, ownLine, paragraphAt, rebase, startTask, taskLine, toggleTask } from "../src/edits.js";
 
 // edit is the text after the person's changes, and those changes as a ChangeSet from base.
 function edit(base, ...specs) {
@@ -162,4 +162,12 @@ test("headingLine steps through ## and ### back to text", () => {
   assert.equal(headingLine("## Open"), "### Open");
   assert.equal(headingLine("### Open"), "Open");
   assert.equal(headingLine("# NAS setup"), "## NAS setup");
+});
+
+test("a double tap is two taps close in time and place", () => {
+  const first = { x: 100, y: 200, at: 1000 };
+  assert.equal(isDoubleTap(null, first), false);
+  assert.equal(isDoubleTap(first, { x: 104, y: 197, at: 1200 }), true);
+  assert.equal(isDoubleTap(first, { x: 104, y: 197, at: 1500 }), false, "too late");
+  assert.equal(isDoubleTap(first, { x: 180, y: 200, at: 1200 }), false, "elsewhere");
 });

@@ -48,6 +48,9 @@ struct NtApp: App {
                     .keyboardShortcut("s", modifiers: [.command, .control])
                 Toggle("Focus Mode", isOn: Binding(get: { workspace.focusMode }, set: { _ in workspace.toggleFocus() }))
                     .keyboardShortcut("l", modifiers: [.command, .shift])
+                Toggle("Reading Mode", isOn: Binding(get: { workspace.note?.readOnly == true || workspace.reading }, set: { _ in workspace.toggleReading() }))
+                    .keyboardShortcut("e")
+                    .disabled(workspace.note == nil || workspace.note?.readOnly == true)
             }
             CommandGroup(after: .textEditing) {
                 Button("Find in Note…") { workspace.openFind() }

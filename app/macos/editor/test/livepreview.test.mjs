@@ -20,6 +20,7 @@ import {
   resolve,
   setBroken,
   setFocus,
+  setReading,
   alignsOf,
   blockDecorations,
   findHits,
@@ -30,13 +31,13 @@ import { isDiagram } from "../src/diagram.js";
 import { codeLanguages } from "../src/code.js";
 import { LanguageDescription } from "@codemirror/language";
 
-function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [], touch = false } = {}) {
+function state(doc, { path = "homelab/2026-10-21-nas-setup.md", cursor = 0, focused = false, broken = [], touch = false, reading = false } = {}) {
   let s = EditorState.create({
     doc,
     selection: { anchor: cursor },
     extensions: [noteField.init(() => ({ path, broken: new Set(), focused: false, touch })), noteMarkdown(), frontmatterField],
   });
-  s = s.update({ effects: [setFocus.of(focused), setBroken.of(broken)] }).state;
+  s = s.update({ effects: [setFocus.of(focused), setBroken.of(broken), setReading.of(reading)] }).state;
   return s;
 }
 
@@ -76,6 +77,17 @@ test("a link shows its text, and its target only on the cursor line", () => {
   const on = decos(buildDecorations(state(doc, { cursor: 2, focused: true })));
   assert.ok(on.some((d) => d.cls === "cm-url"), "the target is hidden on the cursor line");
   assert.ok(!hidden(on, 8, 9), "[ is hidden on the cursor line");
+});
+
+test("a note being read shows no line's markdown, wherever the selection is", () => {
+  const doc = "# NAS setup\n\nNightly [backups](2026-10-22-backups.md) go out.";
+  const ds = decos(buildDecorations(state(doc, { cursor: 5, focused: true, reading: true })));
+  assert.ok(hidden(ds, 0, 2), "the # is shown");
+  assert.ok(ds.some((d) => d.cls === "cm-h1"), "the line is not a heading");
+  const at = doc.indexOf("[");
+  const far = decos(buildDecorations(state(doc, { cursor: at + 3, focused: true, reading: true, touch: true })));
+  assert.ok(hidden(far, at, at + 1), "[ is shown");
+  assert.ok(!far.some((d) => d.widget === "OpenChip"), "an open chip is shown: a tap follows the link");
 });
 
 test("a link to nothing is struck through", () => {
