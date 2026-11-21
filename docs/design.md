@@ -557,6 +557,13 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   folder yet makes one), and go through `nt n`, `nt mkdir`, `nt rename`, `nt mv` and `nt rm`:
   a delete says what goes with it and how many notes link to it. The journals, the agents'
   reports and the digests are not renamed or moved.
+- Reading mode (⌘E, View; the book or pencil in the toolbar, a book while reading; added
+  2026-11-21) shows the note for reading: a click places no cursor, so no line turns back into
+  its markdown, and nothing is typed, pasted or dropped. Links and tags answer a plain click,
+  a task's box still ticks, and text selects and copies. The switch stays as set on this Mac
+  (UserDefaults, off at first) for the notes opened after; a note just made opens for writing.
+  A digest is always for reading. The page does it (`window.nt.reading`): its content is not
+  editable while it is on.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
 - Back (⌘[, View; the chevron before the folders in the toolbar) returns to the note a link or
@@ -749,6 +756,10 @@ git over ssh to the person's remote. The design: https://claude.ai/artifact/SWFx
   - Under its title: on iPad its folders, then `changed 2h ago · macbook` as the terminal and
     the Mac say it (§4); on iPhone the changed line alone.
   - A bar above the keyboard: a task, a heading, a link, a photo, undo, redo, done.
+  - Reading mode, as on the Mac (§8): a book or a pencil in the note's bar, beside its ⋯ (⌘E
+    on a keyboard). Here it is on at first, so a tap while reading brings no keyboard up. A
+    double tap on the text starts writing where it lands, and when the keyboard goes (done)
+    the note is for reading again; the pencil keeps notes open for writing, as before.
   - A tap follows a link. On the line being edited the link shows an "open" chip in place of
     the Mac's Command-click.
   - On an iPad a link opens in place and Back, a chevron at the left of the note's bar (⌘[ on a
