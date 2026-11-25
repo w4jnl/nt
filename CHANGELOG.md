@@ -4,6 +4,15 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.10 (2026-11-25)
+
+- **Images on a host reached through tmux over ssh.** On a host you reach from a pane of tmux
+  (flok shows a remote host that way) nt drew no images: the host's tmux says its terminal is
+  tmux, and nt cannot ask the server on the other side. `export NT_OUTER_TMUX=1` on that host
+  says there is one tmux on the far side, in a Ghostty or kitty terminal, and nt wraps its
+  images for it. Both tmux servers need `set -g allow-passthrough on`. `nt doctor` names the
+  variable when it runs in tmux over ssh and finds no terminal that draws.
+
 ## 0.9.9 (2026-11-25)
 
 - **`nt doctor`** no longer warns about agent reports on a machine that imports none: a host
