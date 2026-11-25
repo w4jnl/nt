@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/BurntSushi/toml"
 
 	"github.com/w4jnl/nt/internal/agents"
 	"github.com/w4jnl/nt/internal/config"
@@ -238,9 +239,40 @@ func reportChecks(add func(name, state, format string, a ...any)) {
 	}
 	if last, ok := agents.LastImport(config.StateDir()); ok {
 		add("reports", "ok", "imported by flok, last at %s", last.Local().Format("Mon 2 Jan 15:04"))
+	} else if flokNotes() {
+		add("reports", "warn", "agent sessions get no reports: none imported yet, though flok's [notes] is on: flok doctor says why")
 	} else {
-		add("reports", "warn", "agent sessions get no reports: none imported yet, is flok's [notes] on?")
+		// a machine another flok drives imports nothing itself: that flok's nt writes its reports
+		add("reports", "ok", "none imported here: flok's [notes] is off on this machine (%s). The machine whose flok drives this one writes its sessions' reports", tilde(flokConfig()))
 	}
+}
+
+// flokConfig is flok's config file: $FLOK_CONFIG, else $XDG_CONFIG_HOME/flok/config.toml, else
+// ~/.config/flok/config.toml.
+func flokConfig() string {
+	if v := os.Getenv("FLOK_CONFIG"); v != "" {
+		return v
+	}
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		return filepath.Join(v, "flok", "config.toml")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "flok", "config.toml")
+}
+
+// flokNotes says whether flok on this machine hands its sessions to nt: command under [notes]
+// in its config is set and not "off". Without flok, or without the setting, it does not.
+func flokNotes() bool {
+	var c struct {
+		Notes struct {
+			Command string `toml:"command"`
+		} `toml:"notes"`
+	}
+	if _, err := toml.DecodeFile(flokConfig(), &c); err != nil {
+		return false
+	}
+	cmd := strings.TrimSpace(c.Notes.Command)
+	return cmd != "" && cmd != "off"
 }
 
 // runs says whether bin, the nt the sync job runs, is there to run: an executable
