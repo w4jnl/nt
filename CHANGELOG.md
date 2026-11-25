@@ -4,6 +4,33 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.8 (2026-11-25)
+
+Reading mode in the apps, drawings and your own style for agents, and a sidebar that shows
+where the note is.
+
+- **Reading mode** in the Mac app and the iPhone and iPad app: a book or a pencil in the
+  note's bar (⌘E; View › Reading Mode on the Mac). While reading, a click or a tap places no
+  cursor and brings no keyboard up, so no line turns back into its markdown; links, tags and
+  task boxes answer as before, and text selects and copies. On the iPhone and iPad it is on at
+  first: a double tap starts writing where it lands, and the note is for reading again when
+  the keyboard goes. The switch is kept per device; a note just made opens for writing. A
+  digest takes no cursor either.
+- **Agents are told how to write through the MCP server too**, as the skill tells them:
+  Simplified Technical English, lists for steps, tables for facts. It is a recommendation;
+  what you ask for comes first.
+- **Drawings:** the skill and the MCP server recommend a designed SVG where a technical note
+  explains how parts connect, how data moves, stages or a deployment, and none for a short
+  answer or plain steps; no flowcharts unless you ask. `drawing.svg`, installed with the
+  skill, is the pattern, in nt's colours, light and dark.
+- **Your own style:** a note named `style.md` in the root of the notes holds your rules for
+  writing and drawing everywhere, one in a folder for the notes under it; they come before
+  nt's recommendations. `nt style [folder]` prints the ones that hold, and the MCP server
+  hands the root's to a client when it connects. Run `nt install --skill` again after the
+  upgrade, and restart the Claude app.
+- **Mac app:** a note opened from Open, a search, a link or Back opens its folders in the
+  sidebar and scrolls to its row, so the sidebar shows where you are.
+
 ## 0.9.7 (2026-11-18)
 
 Todos by list and section, a new todo in the section you choose, and nt on Linux in one line.
