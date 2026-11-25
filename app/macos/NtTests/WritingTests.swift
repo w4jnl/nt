@@ -91,6 +91,13 @@ struct WritingTests {
         #expect(!left.contains { $0.hasPrefix(".nt-tmp-") })
     }
 
+    @Test func openingANoteOpensItsFoldersInTheSidebar() async throws {
+        ws.expanded.remove("homelab")
+        _ = try await opened("# NAS\n")
+        #expect(ws.selection == .note(note))
+        #expect(ws.expanded.contains("homelab"))
+    }
+
     @Test func aLineAddedOnDiskIsKeptWithTheTyping() async throws {
         _ = try await opened("# NAS\n\nFour disks.\n")
         try await page("window.nt.insertImage(p, l)", ["p": 0, "l": "Mine."])
