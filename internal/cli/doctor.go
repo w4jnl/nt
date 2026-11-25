@@ -74,6 +74,9 @@ func runDoctor(args []string) int {
 		add("images", "warn", "%s", why)
 	case m.InlineImages == "off":
 		add("images", "ok", "inline_images is off: images show their alt text")
+	case os.Getenv("TMUX") != "" && os.Getenv("SSH_CONNECTION") != "":
+		// over ssh nt cannot see past this machine: a tmux on the other side hides the terminal
+		add("images", "ok", "this terminal does not draw images: notes show their alt text. Reached from a tmux pane in Ghostty or kitty? export %s=1, and allow-passthrough on in both", termimg.OuterEnv)
 	default:
 		add("images", "ok", "this terminal does not draw images: notes show their alt text")
 	}
