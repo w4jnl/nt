@@ -140,6 +140,9 @@ func TestProtocol(t *testing.T) {
 	if init["protocolVersion"] != "2025-06-18" || init["serverInfo"].(map[string]any)["version"] != "1.2.3" {
 		t.Errorf("initialize = %v", init)
 	}
+	if in, _ := init["instructions"].(string); !strings.Contains(in, "a recommendation and not a rule") || !strings.Contains(in, "Simplified Technical English") {
+		t.Errorf("the instructions do not recommend how to write: %q", in)
+	}
 	tools := msgs[2]["result"].(map[string]any)["tools"].([]any)
 	if len(tools) != 15 {
 		t.Errorf("%d tools, want 15", len(tools))
