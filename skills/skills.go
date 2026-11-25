@@ -1,4 +1,5 @@
-// Package skills carries nt's agent skill (skills/nt/SKILL.md) inside the binary and installs
+// Package skills carries nt's agent skill (skills/nt/SKILL.md, and drawing.svg, the pattern for a
+// drawing in a note) inside the binary and installs
 // it once, in nt's data folder, linked into Claude Code's and Copilot CLI's personal skill
 // folders, so both agents read the same file and it always matches the nt that runs it.
 package skills
@@ -12,6 +13,12 @@ import (
 
 //go:embed nt/SKILL.md
 var skill []byte
+
+// Drawing is the pattern for a drawing in a note: an SVG in nt's colours, light and dark, whose
+// style block and parts an agent copies. The MCP server hands it over in its instructions.
+//
+//go:embed nt/drawing.svg
+var Drawing string
 
 // Dir is where the skill is installed: $XDG_DATA_HOME/nt/skills/nt, else
 // ~/.local/share/nt/skills/nt.
@@ -42,6 +49,9 @@ func Install(dir string, links []string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), skill, 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "drawing.svg"), []byte(Drawing), 0o644); err != nil {
 		return err
 	}
 	for _, l := range links {
@@ -89,7 +99,7 @@ func State(dir string, links []string) string {
 			return l + " does not link to it"
 		}
 	}
-	if string(b) != string(skill) {
+	if d, _ := os.ReadFile(filepath.Join(dir, "drawing.svg")); string(b) != string(skill) || string(d) != Drawing {
 		return "older than this nt"
 	}
 	return ""

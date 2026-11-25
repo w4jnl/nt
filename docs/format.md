@@ -539,3 +539,13 @@ Sync commits a move as files deleted and added, and git's merge finds the rename
 ## 14. Changes to this format
 
 A change that older clients would misread raises `format` in `.nt/config.toml`. A client must not write to a repository with a higher `format` than it knows. Adding an optional frontmatter key is not such a change.
+
+## 15. Style notes
+
+A note named `style.md` holds the person's own rules for how agents write and draw in the notes: the language, the tone, what a drawing looks like, what a kind of note must have.
+
+- `style.md` in the root holds for every note. One in a folder holds for that folder and the folders under it.
+- For a note, the style notes on the way from the root to its folder all hold. Where two disagree, the nearer one wins.
+- They come before the style a client recommends by default (nt's skill and MCP server: Simplified Technical English, and a drawing where it helps). Where they say nothing, the default holds.
+- A style note is a plain note: markdown, an optional frontmatter, edited and synced as any other. Its frontmatter is not part of the rules. A client reads at most 16 KB of one.
+- `nt style [folder]` prints the ones that hold for a folder or a note, the root's first (`--json`: `rel`, `text`). A client that knows nothing of them shows `style.md` as a note, and nothing breaks.

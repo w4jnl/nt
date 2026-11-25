@@ -44,6 +44,8 @@ notes
   paste <note>         save the clipboard's image beside the note and print its markdown line
                        [--name words]
   history <note>       when the note changed and from which machine, newest first, by git's history
+  style [folder]       your own rules for writing and drawing, for agents: style.md in the root
+                       and in the folders on the way to folder
 
 folders
   mv <from> <to>       move a note or a folder; to ending in / is a folder to move it into. The
@@ -139,6 +141,8 @@ func Main(args []string) int {
 		return runPaste(args[1:])
 	case "history":
 		return runHistory(args[1:])
+	case "style":
+		return runStyle(args[1:])
 	case "todo":
 		return runTodo(args[1:])
 	case "mv", "move":

@@ -103,6 +103,17 @@ Decisions taken with the user (2026-10-26):
 - Carried in the binary; `nt install --skill` writes it to `~/.local/share/nt/skills/nt` and symlinks that from `~/.claude/skills/nt` and `~/.agents/skills/nt`, so it works in Claude Code and Copilot CLI alike and always matches the installed `nt`.
 - Covers search, read, `nt a`, `nt agent write`, and how to write: Simplified Technical English
   (ASD-STE100, decided 2026-11-06) unless the person asks for another style.
+- **Drawings** (added 2026-11-25), a recommendation as the writing style is: a designed SVG where
+  a technical note explains how parts connect, how data moves, stages or a deployment; none
+  for a short answer, facts or plain steps; no mermaid or ASCII art unless asked. The pattern is
+  `skills/nt/drawing.svg`, installed beside `SKILL.md`: one `<style>` in nt's colours
+  (tokens.json), light by default and dark under `prefers-color-scheme`, with the parts a
+  drawing is built from (`bg`, `card`, `key`, `out`, `bad`, arrows, labels). A viewer that does
+  not follow the colour scheme (rsvg-convert, GitHub's light page) shows the light one.
+  `TestDrawingUsesTheTokens` keeps its colours equal to tokens.json.
+- **The person's own style** (added 2026-11-25): `style.md` in the root of the notes or in a
+  folder (docs/format.md §15) comes before these recommendations. The skill has the agent run
+  `nt style <folder>` before it writes; the MCP server puts the root's in its instructions.
 - Every command takes `--json`.
 - The notes repo also gets an `AGENTS.md`, written by `nt init` when missing.
 
@@ -129,6 +140,7 @@ Decisions taken with the user (2026-10-26):
 | `nt todo done\|undo\|start\|stop\|rm <todo>`, `nt todo due <todo> <when>` | Check, uncheck, mark in progress (`started:`) or open again, delete a todo, or set its due date (`none` clears it); `<todo>` is `path:line` or words from its text |
 | `nt todo on\|off <note>` | The note's task lines are todos, or a checklist: `todos:` in its frontmatter (docs/format.md §12) |
 | `nt paste <note> [--name words] [--from file]` | Save the clipboard's image, or the image file `--from` names, as `assets/YYYY-MM-DD-<name>.png` beside the note and print its `![name](assets/…)` line; nvim maps a key to it, the Mac app pastes and drops through it |
+| `nt style [folder]` | The person's own rules for writing and drawing that hold for a folder or a note: `style.md` in the root, then in each folder on the way down, the nearest last (docs/format.md §15). For agents, before they write. Nothing when there is none (`--json`: `rel`, `text`) |
 | `nt history <note>` | When the note changed and from which machine, newest first, by git's history: each commit that touched it, the host from sync's `nt: <host> · …` subject (`--json`: `at`, `by`). A change not yet synced is not in it |
 | `nt config [get\|set\|edit]` | Every setting with its value, its file and what it does; `set <key> <value>` changes one line of the right file, checked; `edit [--repo]` opens the whole file (Settings, below) |
 | `nt sync`, `nt doctor` | Sync now; check the setup, and list the links in the notes that point at nothing (`--json` lists every one) |
@@ -263,7 +275,7 @@ It finds the repository with `nt _editor repo`, never a fixed path, and does not
   | `sync` | `nt sync` now |
 
   With `--read-only` the server has only `list`, `search`, `note_read` and `todo_list`.
-- **How to write.** The server's instructions, which a client reads when it connects, end with the skill's writing style in short (§3: Simplified Technical English, lists for steps, tables for facts, GitHub alerts), worded as a recommendation: the person's own request, or the style a note already has, comes first (added 2026-11-25).
+- **How to write.** The server's instructions, which a client reads when it connects, end with the skill's writing style in short (§3: Simplified Technical English, lists for steps, tables for facts, GitHub alerts), worded as a recommendation: the person's own request, or the style a note already has, comes first (added 2026-11-25). After it come when and how to draw, with the skill's `drawing.svg` as the pattern, then the person's own style: the root's `style.md` in full, and the paths of the folders' ones, to read with `note_read` before writing there. They are read when the client connects, so a change to `style.md` holds from the next connection. A style note in a folder of `mcp.hide` is left out.
 - **Images.** `note_new` and `note_append` take image files (svg, png, jpg, gif, webp; an SVG as text, the others as base64; at most 5 MB each). The text names each by its file name, `![alt](chart.svg)`; nt saves it as `assets/YYYY-MM-DD-chart.svg` beside the note (docs/format.md §3) and points the link there. An image the text does not name is added at the end.
 - **What it refuses.** A path is a path from the root of the notes: an absolute path, one that leaves the repository (`..`, or a symlink that leads out) and a name that starts with a dot are refused, and nothing is written. A note is at most 1 MB. The agents' reports and the weekly digests are read, never written, and nothing moves into their folders. What a tool refuses comes back as the tool's error, in words the model can act on.
 - **Hidden folders.** The machine setting `mcp.hide` lists folders the server is kept from, with all they hold: they are not listed, searched or read, their todos are not shown, and nothing is written, moved or renamed into, out of or around them. It is read on every call, so a change holds from the next one, and the server has no tool that changes a setting. A link to a hidden note in another note still shows as written.

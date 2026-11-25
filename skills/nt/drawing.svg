@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" width="1000" height="300" role="img" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"><title>The pattern for a drawing in a note</title><desc>A client asks a service, the part the note is about, which reads a store and calls a vendor outside. A second arrow, in the warning colour, marks a fault.</desc>
+<style>
+.bg{fill:#F6F8F8;stroke:#DCE3E4}.card{fill:#FFFFFF;stroke:#DCE3E4}.key{fill:#E8F6F6;stroke:#0B7A7E;stroke-width:1.5}.out{fill:#EEF2F2;stroke:#7E8D90;stroke-dasharray:4 3}.bad{fill:#FBEEDC;stroke:#9A5A0E;stroke-width:1.5}
+.t{font:700 16px "JetBrains Mono",ui-monospace,Menlo,monospace;fill:#14181A}.h{font-size:14px;font-weight:600;fill:#14181A}.s{font-size:11.5px;fill:#5A686B}.l{font-size:11.5px;font-weight:600;fill:#14181A}.c{font:11px "JetBrains Mono",ui-monospace,Menlo,monospace;fill:#5A686B}
+.m{text-anchor:middle}.e{text-anchor:end}.a{stroke:#5A686B;stroke-width:1.6;fill:none}.ah{fill:#5A686B}.w{stroke:#9A5A0E;stroke-width:1.6;fill:none}.wh{fill:#9A5A0E}.wt{fill:#9A5A0E}
+@media (prefers-color-scheme:dark){.bg{fill:#14181A;stroke:#263034}.card{fill:#1A2023;stroke:#263034}.key{fill:#173437;stroke:#3FD0D4}.out{fill:#0F1214;stroke:#6B7A7D}.bad{fill:#33240F;stroke:#E8963C}
+.t,.h,.l{fill:#F2F5F5}.s,.c{fill:#8A999C}.a{stroke:#8A999C}.ah{fill:#8A999C}.w{stroke:#E8963C}.wh,.wt{fill:#E8963C}}
+</style>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="wh" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0.5" y="0.5" width="999" height="299" rx="12"/>
+<!-- the title at the top left, one line that says how to read the drawing at the top right -->
+<text class="t" x="28" y="38">A request, from the client to the vendor</text>
+<text class="s e" x="972" y="38">requests move from left to right</text>
+
+<!-- a part: a card with its name and one or two short lines -->
+<rect class="card" x="60" y="100" width="170" height="100" rx="10"/>
+<text class="h m" x="145" y="138">client</text><text class="s m" x="145" y="160">asks for the levels</text><text class="s m" x="145" y="176">browser</text>
+
+<!-- key: the part the note is about, one in a drawing -->
+<rect class="key" x="330" y="100" width="170" height="100" rx="10"/>
+<text class="h m" x="415" y="138">service</text><text class="s m" x="415" y="160">computes and serves</text><text class="s m" x="415" y="176">Go, port 8430</text>
+
+<rect class="card" x="600" y="100" width="150" height="100" rx="10"/>
+<text class="h m" x="675" y="138">store</text><text class="s m" x="675" y="160">keeps the quotes</text><text class="s m" x="675" y="176">SQLite</text>
+
+<!-- out: a part outside the person's control -->
+<rect class="out" x="840" y="100" width="120" height="100" rx="10"/>
+<text class="h m" x="900" y="146">vendor</text><text class="s m" x="900" y="166">servers</text>
+
+<!-- arrows end short of the cards; a label under each, the endpoint or command in mono -->
+<path class="a" d="M236 150H324" marker-end="url(#ar)"/>
+<text class="l m" x="280" y="226">levels</text><text class="c m" x="280" y="242">GET /v1/levels</text>
+<path class="a" d="M506 150H594" marker-end="url(#ar)"/>
+<text class="l m" x="550" y="226">quotes</text>
+<!-- the warning colour, for a fault or a risk only -->
+<path class="w" d="M756 150H834" marker-end="url(#aw)"/>
+<text class="l m wt" x="795" y="226">times out</text><text class="c m" x="795" y="242">after 30 s</text>
+</svg>
