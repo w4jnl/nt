@@ -56,6 +56,13 @@ func TestDetect(t *testing.T) {
 			return tm
 		}(), false, 0, ""},
 		{"on forces through flok", "on", nil, inFlok("off", "off"), true, 2, ""},
+		// a host reached over ssh from a pane of flok's outer tmux, which nt cannot ask
+		{"behind a far tmux", "auto", map[string]string{OuterEnv: "1"}, tmuxInfo{inside: true, termname: "tmux-256color", termtype: "tmux 3.8", passthrough: "on"}, true, 2, ""},
+		{"behind a far tmux, passthrough off here", "auto", map[string]string{OuterEnv: "1"}, tmuxInfo{inside: true, termname: "tmux-256color", passthrough: "off"}, false, 0, "set -g allow-passthrough on"},
+		{"behind a far tmux, no tmux here", "auto", map[string]string{OuterEnv: "1", "TERM": "tmux-256color"}, tmuxInfo{}, true, 1, ""},
+		{"behind a far tmux, off wins", "off", map[string]string{OuterEnv: "1"}, tmuxInfo{}, false, 0, ""},
+		{"a far count that is no count", "auto", map[string]string{OuterEnv: "many"}, tmuxInfo{inside: true, termname: "tmux-256color", passthrough: "on"}, false, 0, ""},
+		{"on, behind a far tmux", "on", map[string]string{OuterEnv: "1"}, tmuxInfo{inside: true, passthrough: "off"}, true, 2, ""},
 		{"on forces", "on", nil, tmuxInfo{inside: true, passthrough: "off"}, true, 1, ""},
 	} {
 		got, why := detect(tc.mode, env(tc.env), tc.tmux, cells)

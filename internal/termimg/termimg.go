@@ -41,7 +41,7 @@ const (
 
 // Terminal sends images to one terminal. Its zero value is unusable; get one from Detect.
 type Terminal struct {
-	layers       int         // tmux servers between nt and the terminal: 0, 1, or 2 inside flok
+	layers       int         // tmux servers between nt and the terminal: 0, 1, or 2 inside flok; more with OuterEnv
 	servers      []tmuxQuery // how to reach each of them, nearest first
 	cellW, cellH int         // pixels per cell, for sizing; a 1:2 guess when the terminal does not say
 	high         int         // the high byte of every image id: one per process, so nt in another pane keeps its own images
@@ -64,6 +64,8 @@ type Image struct {
 // Detect decides whether images can be drawn, from mode ("auto", "on" or "off") and the
 // environment. It returns nil when they cannot; why says what is missing and how to fix it,
 // or is empty when there is nothing the person can change.
+//
+// OuterEnv covers what nt cannot see: tmux servers on the far side of an ssh connection.
 func Detect(mode string) (t *Terminal, why string) {
 	var info tmuxInfo
 	if os.Getenv("TMUX") != "" {
@@ -145,10 +147,27 @@ func isTmux(tm tmuxInfo) bool {
 	return strings.HasPrefix(tm.termtype, "tmux ") || strings.HasPrefix(tm.termname, "tmux") || strings.HasPrefix(tm.termname, "screen")
 }
 
+// OuterEnv names the environment variable that says how many tmux servers nt cannot ask stand
+// between it and the terminal: on a host reached over ssh from a pane of tmux (flok's outer
+// one, say), 1. With it the person also says that the terminal draws images, Ghostty or kitty,
+// which nt cannot find out through servers it cannot reach. Each image is wrapped once more for
+// each, and those servers need allow-passthrough on, which nt cannot check either.
+const OuterEnv = "NT_OUTER_TMUX"
+
+// outerServers is OuterEnv's count, 0 to 3; anything else is 0.
+func outerServers(env func(string) string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(env(OuterEnv)))
+	if err != nil || n < 0 || n > 3 {
+		return 0
+	}
+	return n
+}
+
 func detect(mode string, env func(string) string, tm tmuxInfo, cells func() (int, int)) (*Terminal, string) {
 	if mode == "off" {
 		return nil, ""
 	}
+	far := outerServers(env)
 	// the servers between nt and the terminal, nearest first
 	var servers []tmuxInfo
 	if tm.inside {
@@ -157,7 +176,7 @@ func detect(mode string, env func(string) string, tm tmuxInfo, cells func() (int
 			servers = append(servers, *tm.outer)
 		}
 	}
-	t := &Terminal{layers: len(servers), high: 1 + rand.IntN(255)}
+	t := &Terminal{layers: len(servers) + far, high: 1 + rand.IntN(255)}
 	for _, sv := range servers {
 		t.servers = append(t.servers, sv.query)
 	}
@@ -174,13 +193,13 @@ func detect(mode string, env func(string) string, tm tmuxInfo, cells func() (int
 		return t, ""
 	}
 	if len(servers) == 0 {
-		if kittyLike(env("TERM")) || kittyLike(env("TERM_PROGRAM")) || env("KITTY_WINDOW_ID") != "" {
+		if far > 0 || kittyLike(env("TERM")) || kittyLike(env("TERM_PROGRAM")) || env("KITTY_WINDOW_ID") != "" {
 			return t, ""
 		}
 		return nil, ""
 	}
-	last := servers[len(servers)-1] // the server whose client is the terminal itself
-	if !kittyLike(last.termname) && !kittyLike(last.termtype) {
+	last := servers[len(servers)-1] // the server whose client is the terminal itself, or the far servers
+	if far == 0 && !kittyLike(last.termname) && !kittyLike(last.termtype) {
 		return nil, ""
 	}
 	for i, s := range servers {

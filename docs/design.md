@@ -320,6 +320,15 @@ nothing.
   `set -g allow-passthrough on`; when that is the only thing missing, the footer says so.
   Elsewhere (Terminal.app, a Linux console, tmux in an unknown tmux) images keep their alt text
   and `i`.
+- **Behind a tmux nt cannot ask** (added 2026-11-25). On a host reached over ssh from a pane of
+  tmux (flok's outer one shows a remote host that way), the host's tmux says its terminal is
+  tmux, and nt cannot reach the server on the other side to learn more. `NT_OUTER_TMUX=<n>` in
+  the environment there, 1 to 3, says how many such servers stand between and that the
+  terminal behind them draws images: nt wraps each image once more for each. The host's own
+  tmux is still checked for `allow-passthrough`; the far ones need it too. It belongs to how
+  the host is reached, not to the machine, so it is an environment variable and no setting:
+  `export NT_OUTER_TMUX=1` in the host's shell profile when it is always reached that way.
+  `nt doctor` names it when it runs in tmux over ssh and finds no terminal that draws.
 - **SVG.** Go draws PNG, JPEG and GIF itself. An SVG is drawn as a PNG by `rsvg-convert` (librsvg)
   at twice its size, read on stdin so it loads no other file. The PNG is kept in nt's state
   (`svg/<sha256 of the SVG>@2.png`), never in the notes, so each picture is drawn once on a
