@@ -18,7 +18,22 @@ struct SidebarView: View {
         }
     }
 
+    /// The list scrolls to the note on screen when it is out of sight: one opened from Open, a
+    /// search or a link, whose folders Workspace.open has just opened.
     private var list: some View {
+        ScrollViewReader { proxy in
+            rows
+                .onChange(of: ws.selection) { _, now in
+                    guard case .note(let path) = now else { return }
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(150)) // the folders open first
+                        withAnimation { proxy.scrollTo(path) }
+                    }
+                }
+        }
+    }
+
+    private var rows: some View {
         List(selection: Binding(get: { ws.selection }, set: { ws.select($0) })) {
             Label("Today", systemImage: "sun.max")
                 .tag(Workspace.Selection.today)

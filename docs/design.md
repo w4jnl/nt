@@ -577,6 +577,9 @@ the sync, and `nt sync` stays the one git writer on the Mac. The app never runs 
   (UserDefaults, off at first) for the notes opened after; a note just made opens for writing.
   A digest is always for reading. The page does it (`window.nt.reading`): its content is not
   editable while it is on.
+- The sidebar shows where the note on screen is (changed 2026-11-25): opening a note, from
+  Open, a search, a link or Back, opens its folders in the sidebar, selects its row and
+  scrolls the list to it. Folders the person closed stay closed until a note in them opens.
 - Focus mode (⇧⌘L, View) hides the sidebar and dims every paragraph but the one being written;
   turned off, the sidebar comes back as it was.
 - Back (⌘[, View; the chevron before the folders in the toolbar) returns to the note a link or

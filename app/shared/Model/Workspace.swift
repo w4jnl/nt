@@ -463,7 +463,11 @@ final class Workspace {
         reading = reads && !end // a note just made is there to be written
         editor.load(n, text: text, reading: reading, anchor: anchor, line: line, end: end, find: find, top: top)
         selection = selectionFor(path)
-        if !outside { recent = Self.remember(path, in: recent) } // the folders stay as they are: only the person opens one
+        if !outside {
+            recent = Self.remember(path, in: recent)
+            // the sidebar shows where the note is: its folders open, and the list scrolls to it
+            if case .note = selection { expanded.formUnion(SidebarTree.ancestors(path)) }
+        }
     }
 
     /// openFile opens a markdown file by its path on disk, as Finder, the Dock or `open -a nt`
