@@ -23,8 +23,23 @@ func TestReportChecks(t *testing.T) {
 		})
 		return strings.Join(got, "\n")
 	}
-	if got := check(); got != "warn reports agent sessions get no reports: none imported yet, is flok's [notes] on?" {
-		t.Errorf("nothing imported: %s", got)
+	flok := filepath.Join(dir, "flok.toml")
+	t.Setenv("FLOK_CONFIG", flok)
+	off := "ok reports none imported here: flok's [notes] is off on this machine (" + flok + "). The machine whose flok drives this one writes its sessions' reports"
+	if got := check(); got != off {
+		t.Errorf("no flok config: %s", got)
+	}
+	if err := os.WriteFile(flok, []byte("[notes]\ncommand = \"off\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := check(); got != off {
+		t.Errorf("[notes] off: %s", got)
+	}
+	if err := os.WriteFile(flok, []byte("[notes]\ncommand = \"auto\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := check(); got != "warn reports agent sessions get no reports: none imported yet, though flok's [notes] is on: flok doctor says why" {
+		t.Errorf("[notes] on, nothing imported: %s", got)
 	}
 	if err := agents.MarkImported(filepath.Join(dir, "state"), time.Date(2026, 10, 29, 14, 5, 0, 0, time.Local)); err != nil {
 		t.Fatal(err)
