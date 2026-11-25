@@ -140,6 +140,9 @@ func TestProtocol(t *testing.T) {
 	if init["protocolVersion"] != "2025-06-18" || init["serverInfo"].(map[string]any)["version"] != "1.2.3" {
 		t.Errorf("initialize = %v", init)
 	}
+	if in, _ := init["instructions"].(string); !strings.Contains(in, "a recommendation and not a rule") || !strings.Contains(in, "Simplified Technical English") {
+		t.Errorf("the instructions do not recommend how to write: %q", in)
+	}
 	tools := msgs[2]["result"].(map[string]any)["tools"].([]any)
 	if len(tools) != 15 {
 		t.Errorf("%d tools, want 15", len(tools))
@@ -676,5 +679,45 @@ func TestInstallForClaudeCode(t *testing.T) {
 	}
 	if !strings.Contains(get(t, c.Path), `"numStartups":3`) {
 		t.Error("nt wrote Claude Code's file")
+	}
+}
+
+// TestInstructionsCarryThePersonsStyle: the instructions end with the pattern for a drawing,
+// the root's style.md in full and the folders that have one of their own; a style note in a
+// folder of mcp.hide is not named.
+func TestInstructionsCarryThePersonsStyle(t *testing.T) {
+	root := repo(t, "[mcp]\nhide = [\"private\"]\n")
+	init := func(s *Server) string {
+		t.Helper()
+		msgs := ask(t, s, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+		in, _ := msgs[0]["result"].(map[string]any)["instructions"].(string)
+		return in
+	}
+	in := init(&Server{})
+	for _, want := range []string{"Drawings, a recommendation too", "<svg ", "prefers-color-scheme:dark", "a note named style.md"} {
+		if !strings.Contains(in, want) {
+			t.Errorf("the instructions lack %q", want)
+		}
+	}
+	if strings.Contains(in, "The person's own style") || strings.Contains(in, "of their own") {
+		t.Errorf("no style.md, yet the instructions name one:\n%s", in[len(in)-600:])
+	}
+
+	put(t, filepath.Join(root, "style.md"), "---\ntitle: Style\n---\n\nWrite in Dutch.\n")
+	put(t, filepath.Join(root, "kb", "trading", "style.md"), "Draw every chain.\n")
+	put(t, filepath.Join(root, "private", "style.md"), "Secret rules.\n")
+	in = init(&Server{})
+	for _, want := range []string{"The person's own style, from style.md", "Write in Dutch.", "\n- kb/trading/style.md"} {
+		if !strings.Contains(in, want) {
+			t.Errorf("the instructions lack %q", want)
+		}
+	}
+	for _, not := range []string{"title: Style", "Draw every chain", "private", "Secret"} {
+		if strings.Contains(in, not) {
+			t.Errorf("the instructions carry %q", not)
+		}
+	}
+	if in := init(&Server{ReadOnly: true}); strings.Contains(in, "note_append") && strings.Contains(in, "a note named style.md") {
+		t.Errorf("a server that only reads says how to write style.md")
 	}
 }

@@ -37,6 +37,7 @@ var commands = []command{
 	{[]string{"view"}, "show one note rendered", []flag{{"--theme", "light or dark", "(auto dark light)"}, {"--images", "draw images", "(auto on off)"}}, []string{"note"}},
 	{[]string{"paste"}, "save the clipboard's image beside a note", []flag{{"--name", "what the image shows", "name"}, {"--from", "an image file instead of the clipboard", "file"}, jsonFlag}, []string{"note"}},
 	{[]string{"history"}, "when a note changed and from which machine", []flag{jsonFlag}, []string{"note"}},
+	{[]string{"style"}, "your own rules for writing and drawing, for agents", []flag{jsonFlag}, []string{"folder"}},
 	{[]string{"mv", "move"}, "move a note or folder, its links fixed", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", "folder"}},
 	{[]string{"rename"}, "a note's new title and file name, or a folder's new name", []flag{{"--dry-run", "show what changes, write nothing", ""}, jsonFlag}, []string{"path", ""}},
 	{[]string{"mkdir"}, "a new folder, kept by git while it is empty", []flag{jsonFlag}, []string{"folder"}},

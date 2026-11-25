@@ -12,8 +12,13 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/w4jnl/nt/internal/ops"
+	"github.com/w4jnl/nt/internal/style"
+	"github.com/w4jnl/nt/skills"
 )
 
 // versions are the protocol versions this server speaks, the newest last. Its tools read the
@@ -93,7 +98,7 @@ func (s *Server) handle(line []byte) {
 			"protocolVersion": v,
 			"capabilities":    map[string]any{"tools": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "nt", "title": "nt notes", "version": s.Version},
-			"instructions":    instructions,
+			"instructions":    s.instructions(),
 		}, nil)
 	case "ping":
 		s.reply(req.ID, map[string]any{}, nil)
@@ -202,4 +207,62 @@ Paths are from the root of the notes, with forward slashes: work/2026-11-12-plan
 - Reorganize with folder_new, move and rename, never by writing a note again elsewhere: they keep every link working. For more than one move, run each with dry_run first and tell the person what will change.
 - remove deletes; ask the person before you use it.
 - Agent reports and weekly digests are compiled by nt: read them, never write them.
-- Writes sync by themselves a few seconds later. Call sync only when the person asks for it now.`
+- Writes sync by themselves a few seconds later. Call sync only when the person asks for it now.
+
+How to write, a recommendation and not a rule. When the person asks for another style, or the note already has one, follow that.
+
+- Simplified Technical English: short sentences, one topic in each. Active voice, present tense. Instructions in the imperative.
+- Plain words, and the same word for the same thing every time. Write the articles. "must" for a requirement, "can" for a possibility.
+- Steps in a numbered list, in the order they are done. Facts that line up in a table. A warning before the step it belongs to.
+- A note or warning box is a GitHub alert: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION].
+- Code, commands, paths, quoted text and the person's names for things stay as they are.
+
+Drawings, a recommendation too. A technical note is easier to follow with a picture of the thing it explains: draw one without being asked when it helps, and only then.
+
+- Draw when the text explains how parts connect, how data or control moves, how something changes in stages or over time, or how a deployment is laid out. A long technical note has one near its top, "in one picture".
+- Do not draw for a short answer, a list of facts, plain steps or a journal line: a table or a numbered list is the better form there. One drawing for one idea, under the heading it explains, with a sentence before it that says what it shows.
+- Make a designed SVG and give it in "images". Not a flowchart: no mermaid and no ASCII art unless the person asks for one.
+- Follow the pattern below: copy its <style> and <defs> as they are (nt's colours, light and dark) and build the drawing from its parts. A canvas 1000 wide and as high as it needs, on the "bg" card; the title at the top left ("t"), one line at the top right that says how to read it ("s e"). A part is a "card" with its name ("h") and one or two short lines ("s"); "key" is the part the note is about, one in a drawing; "out" is a part outside the person's control. Arrows ("a") end short of the cards, with a label by each ("l") and an endpoint, port or command under it in mono ("c"). The warning colour ("w", "bad") is for a fault or a risk only.
+- A <title> and a <desc>, text of at least 11 px, nothing that overlaps, room around every card. No other colours, no gradients, no shadows. The alt text says what the picture shows.
+
+The pattern for a drawing:
+
+`
+
+// instructions is what the client reads when it connects: how the notes work and how to write
+// and draw in them (nt's recommendations, with the pattern for a drawing), then the person's
+// own style: the root's style.md in full, and where the folders' are (docs/format.md §15).
+// Style notes in a folder of mcp.hide are left out.
+func (s *Server) instructions() string {
+	var b strings.Builder
+	b.WriteString(instructions)
+	b.WriteString(strings.TrimSpace(skills.Drawing))
+	v, m, err := ops.Open()
+	if err != nil {
+		return b.String()
+	}
+	sc := scope{v: v, hide: Hidden(m)}
+	var folders []string
+	for _, rel := range style.All(v.Root) {
+		switch {
+		case sc.hidden(rel):
+		case style.Folder(rel) == "":
+			if ns := style.For(v.Root, ""); len(ns) == 1 {
+				b.WriteString("\n\nThe person's own style, from style.md in the root of the notes. It comes before the recommendations above; where it says nothing, they hold.\n\n")
+				b.WriteString(ns[0].Text)
+			}
+		default:
+			folders = append(folders, rel)
+		}
+	}
+	if len(folders) > 0 {
+		b.WriteString("\n\nThese folders have a style.md of their own. Before you write a note in one, or in a folder under it, read it with note_read: it comes before the root's style and the recommendations.\n")
+		for _, rel := range folders {
+			b.WriteString("\n- " + rel)
+		}
+	}
+	if !s.ReadOnly {
+		b.WriteString("\n\nWhen the person tells you how they want their notes written or drawn from now on, say that a note named style.md, in the root of the notes or in a folder, keeps it for every agent. When it is there, add to it with note_append.")
+	}
+	return b.String()
+}

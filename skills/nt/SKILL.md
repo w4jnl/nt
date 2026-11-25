@@ -57,6 +57,42 @@ stay as they are.
 - Steps in a numbered list, in the order they are done; facts that line up in a table.
 - Keep the person's names for things (projects, hosts, tools) exactly as they write them.
 
+## Drawings
+
+A recommendation, as the writing style is. A technical note is easier to follow with a picture
+of the thing it explains, so draw one without being asked when it helps, and only then.
+
+- Draw when the text explains how parts connect, how data or control moves, how something
+  changes in stages or over time, or how a deployment is laid out. A long technical note has
+  one near its top, "in one picture".
+- Do not draw for a short answer, a list of facts, plain steps or a journal line: a table or a
+  numbered list is the better form there. One drawing for one idea, under the heading it
+  explains, with a sentence before it that says what it shows.
+- Make a designed SVG, not a flowchart: no mermaid and no ASCII art unless the person asks for
+  one. `drawing.svg` beside this file is the pattern: copy its `<style>` and `<defs>` as they
+  are (nt's colours, light and dark) and build the drawing from its parts.
+  - A canvas 1000 wide and as high as it needs, on the `bg` card. The title at the top left
+    (`t`), one line at the top right that says how to read it (`s e`).
+  - A part is a `card` with its name (`h`) and one or two short lines (`s`). `key` is the part
+    the note is about, one in a drawing. `out` is a part outside the person's control.
+  - Arrows (`a`) end short of the cards. A label by each (`l`), an endpoint, port or command
+    under it in mono (`c`). The warning colour (`w`, `bad`) is for a fault or a risk only.
+  - A `<title>` and a `<desc>`. Text of at least 11 px, nothing that overlaps, room around
+    every card. No other colours, no gradients, no shadows.
+- Write the file, then `nt paste <note> --from <file.svg> --name "what it shows"` saves it
+  beside the note and prints the line that shows it. The alt text says what the picture shows.
+
+## The person's own style
+
+`nt style [folder]` prints the person's own rules for writing and drawing: `style.md` in the
+root of the notes holds everywhere, one in a folder for the notes under it. Run it before you
+write a note, with the folder the note goes to. What it prints comes before everything in How
+to write and Drawings above, and a folder's `style.md` before the root's; where it says
+nothing, the recommendations above hold. It prints nothing when the person has none.
+
+When the person tells you how they want their notes written or drawn from now on, offer to
+put it in `style.md` (the root's, or the folder's), so that every agent follows it.
+
 ## Todos
 
 A todo is a task line, `- [ ] text due:YYYY-MM-DD`, in progress `- [ ] text started:YYYY-MM-DD`, and once done `- [x] text done:YYYY-MM-DD`,
