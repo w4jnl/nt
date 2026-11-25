@@ -4,6 +4,13 @@ User-facing changes per release, newest first. `scripts/release.sh` refuses to t
 that has no section here and uses the section as the GitHub release notes, so every release
 updates this file first. Dates are the tag dates.
 
+## 0.9.9 (2026-11-25)
+
+- **`nt doctor`** no longer warns about agent reports on a machine that imports none: a host
+  that another machine's flok drives has its sessions' reports written there. The `reports`
+  line reads flok's `[notes]` setting and warns only when it is on here and nothing was
+  imported yet.
+
 ## 0.9.8 (2026-11-25)
 
 Reading mode in the apps, drawings and your own style for agents, and a sidebar that shows
